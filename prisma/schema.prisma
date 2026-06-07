@@ -1,0 +1,352 @@
+// RTD — Premium luxury airport concierge & transportation platform
+// Prisma schema. Database: PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  DRIVER
+}
+
+enum Language {
+  EN
+  AR
+}
+
+/// Lifecycle of a concierge request, in business order.
+enum RequestStatus {
+  REQUEST_RECEIVED
+  UNDER_REVIEW
+  CLIENT_CONTACTED
+  EMPLOYEE_ASSIGNED
+  DRIVER_ASSIGNED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// Operational status a driver progresses through for an assigned task.
+enum DriverTaskStatus {
+  PENDING
+  ACCEPTED
+  ON_THE_WAY
+  ARRIVED
+  COMPLETED
+}
+
+/// The nine canonical journey segments.
+enum StepType {
+  HOME_TO_RIYADH_AIRPORT
+  DEPARTURE_ASSIST_RIYADH
+  ARRIVAL_ASSIST_DESTINATION
+  AIRPORT_TO_HOTEL
+  CHAUFFEUR_DURING_STAY
+  HOTEL_TO_AIRPORT
+  DEPARTURE_ASSIST_RETURN
+  ARRIVAL_ASSIST_RIYADH
+  RIYADH_AIRPORT_TO_HOME
+}
+
+/// Service composition chosen per step.
+enum ServiceType {
+  CAR_ONLY
+  MEET_ASSIST_ONLY
+  FAST_TRACK_ONLY
+  MEET_ASSIST_CAR
+  MEET_ASSIST_FASTTRACK_CAR
+  SKIP
+}
+
+enum CarCategory {
+  VVIP
+  VIP
+  ECONOMY
+}
+
+enum PackageType {
+  ARRIVAL
+  DEPARTURE
+  FULL_JOURNEY
+  VVIP_CONCIERGE
+  LONDON_CHAUFFEUR
+  AIRPORT_TO_HOTEL
+  HOTEL_TO_AIRPORT
+}
+
+enum VerificationChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum VerificationPurpose {
+  PHONE
+  EMAIL
+}
+
+// ─────────────────────────── Models ───────────────────────────
+
+/// Staff accounts (admin / operations employee / driver). Customers are NOT users.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  role         UserRole @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedAsEmployee Request[]       @relation("EmployeeAssignment")
+  assignedAsDriver   Request[]       @relation("DriverAssignment")
+  statusChanges      StatusHistory[]
+  internalNotes      InternalNote[]
+  auditLogs          AuditLog[]
+  driverTasks        DriverTask[]
+
+  @@index([role])
+}
+
+/// The traveller who submits a request. Decoupled from User.
+model Customer {
+  id            String   @id @default(cuid())
+  fullName      String
+  phone         String // E.164 with country code
+  phoneVerified Boolean  @default(false)
+  email         String
+  emailVerified Boolean  @default(false)
+  language      Language @default(EN)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  requests Request[]
+
+  @@index([phone])
+  @@index([email])
+}
+
+model Request {
+  id              String        @id @default(cuid())
+  referenceNumber String        @unique // e.g. RTD-2026-00045
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status          RequestStatus @default(REQUEST_RECEIVED)
+
+  selectedPackage   PackageType?
+  preferredLanguage Language     @default(EN)
+
+  // Trip-level summary defaults (each step can override)
+  carCategory CarCategory @default(VIP)
+  passengers  Int         @default(1)
+  bags        Int         @default(0)
+  children    Boolean     @default(false)
+  childSeat   Boolean     @default(false)
+
+  notes               String?
+  contactMeInstead    Boolean @default(false) // "I don't know the details yet, please contact me"
+  validationStatus    String  @default("PENDING") // PENDING | VALID | HAS_WARNINGS
+
+  assignedEmployeeId String?
+  assignedEmployee   User?   @relation("EmployeeAssignment", fields: [assignedEmployeeId], references: [id])
+  assignedDriverId   String?
+  assignedDriver     User?   @relation("DriverAssignment", fields: [assignedDriverId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  journeySteps  JourneyStep[]
+  statusHistory StatusHistory[]
+  internalNotes InternalNote[]
+  driverTasks   DriverTask[]
+  auditLogs     AuditLog[]
+
+  @@index([status])
+  @@index([assignedEmployeeId])
+  @@index([assignedDriverId])
+  @@index([createdAt])
+}
+
+model JourneyStep {
+  id        String @id @default(cuid())
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  stepOrder Int
+  stepType  StepType
+
+  city           String?
+  airport        String?
+  terminal       String?
+  loungeType     String?
+  flightNumber   String?
+  scheduledAt    DateTime? // combined date + time
+  endAt          DateTime? // for chauffeur / multi-day services
+  pickupLocation String?
+  dropoffLocation String?
+  hotelName      String?
+  hotelAddress   String?
+  homeAddress    String?
+
+  serviceType ServiceType @default(CAR_ONLY)
+  carCategory CarCategory?
+  passengers  Int?
+  bags        Int?
+
+  // chauffeur specifics
+  days       Int?
+  dailyHours Int?
+
+  skipped Boolean @default(false)
+
+  validationErrors   String[] @default([])
+  validationWarnings String[] @default([])
+
+  notes String?
+
+  driverTask DriverTask?
+
+  @@unique([requestId, stepOrder])
+  @@index([requestId])
+}
+
+/// A driver-executable task derived from a transfer-type journey step.
+model DriverTask {
+  id            String           @id @default(cuid())
+  requestId     String
+  request       Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  journeyStepId String           @unique
+  journeyStep   JourneyStep      @relation(fields: [journeyStepId], references: [id], onDelete: Cascade)
+  driverId      String?
+  driver        User?            @relation(fields: [driverId], references: [id])
+  status        DriverTaskStatus @default(PENDING)
+  driverNotes   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([driverId])
+}
+
+model VehicleCategory {
+  id            String      @id @default(cuid())
+  category      CarCategory @unique
+  nameEn        String
+  nameAr        String
+  maxPassengers Int
+  exampleModels String
+  descriptionEn String
+  descriptionAr String
+  isRecommended Boolean     @default(false)
+  sortOrder     Int         @default(0)
+  active        Boolean     @default(true)
+}
+
+model ServicePackage {
+  id            String      @id @default(cuid())
+  type          PackageType @unique
+  nameEn        String
+  nameAr        String
+  descriptionEn String
+  descriptionAr String
+  includedSteps StepType[]  @default([])
+  featured      Boolean     @default(false)
+  sortOrder     Int         @default(0)
+  active        Boolean     @default(true)
+}
+
+model City {
+  id        String   @id @default(cuid())
+  code      String   @unique // RUH, LON, PAR, DXB, CAI
+  nameEn    String
+  nameAr    String
+  country   String
+  active    Boolean  @default(true)
+  airports  Airport[]
+}
+
+model Airport {
+  id      String  @id @default(cuid())
+  code    String  @unique // IATA
+  nameEn  String
+  nameAr  String
+  cityId  String
+  city    City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  terminals String[] @default([])
+}
+
+model Hotel {
+  id      String  @id @default(cuid())
+  name    String
+  city    String
+  address String?
+  active  Boolean @default(true)
+
+  @@index([city])
+}
+
+model StatusHistory {
+  id         String         @id @default(cuid())
+  requestId  String
+  request    Request        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromStatus RequestStatus?
+  toStatus   RequestStatus
+  changedById String?
+  changedBy  User?          @relation(fields: [changedById], references: [id])
+  reason     String?
+  createdAt  DateTime       @default(now())
+
+  @@index([requestId])
+}
+
+model InternalNote {
+  id         String   @id @default(cuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId   String?
+  author     User?    @relation(fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model VerificationCode {
+  id        String              @id @default(cuid())
+  target    String // phone (E.164) or email
+  purpose   VerificationPurpose
+  channel   VerificationChannel
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean             @default(false)
+  attempts  Int                 @default(0)
+  createdAt DateTime            @default(now())
+
+  @@index([target, purpose])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // e.g. REQUEST_CREATED, STATUS_CHANGED, EMPLOYEE_ASSIGNED
+  entity    String // e.g. Request
+  entityId  String
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  requestId String?
+  request   Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([requestId])
+}

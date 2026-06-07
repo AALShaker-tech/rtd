@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-arabic: "Tajawal", "Noto Kufi Arabic", system-ui, sans-serif;
+}
+
+html[dir="rtl"] {
+  --font-sans: var(--font-arabic);
+}
+
+@layer base {
+  body {
+    @apply bg-ivory text-charcoal antialiased;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3 {
+    @apply font-serif tracking-tight;
+  }
+
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3 {
+    font-family: var(--font-arabic);
+    @apply tracking-normal;
+  }
+
+  ::selection {
+    @apply bg-gold/30 text-charcoal;
+  }
+}
+
+@layer components {
+  .luxe-container {
+    @apply mx-auto w-full max-w-7xl px-5 sm:px-8;
+  }
+
+  .luxe-card {
+    @apply rounded-luxe border border-charcoal/5 bg-white shadow-card transition-shadow duration-300;
+  }
+
+  .luxe-card-hover {
+    @apply hover:shadow-luxe hover:border-gold/30;
+  }
+
+  .gold-text {
+    @apply bg-gold-gradient bg-clip-text text-transparent;
+  }
+
+  .gold-rule {
+    @apply h-px w-16 bg-gold-gradient;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium
+           transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-gold {
+    @apply btn bg-gold-gradient text-charcoal shadow-luxe-gold hover:brightness-105 active:scale-[0.98];
+  }
+
+  .btn-dark {
+    @apply btn bg-charcoal text-ivory hover:bg-charcoal-800 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply btn border border-charcoal/15 bg-transparent text-charcoal hover:border-gold hover:text-gold-dark;
+  }
+
+  .btn-ghost {
+    @apply btn text-charcoal/70 hover:bg-charcoal/5 hover:text-charcoal;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-charcoal/80;
+  }
+
+  .field-input {
+    @apply w-full rounded-xl border border-charcoal/15 bg-white px-4 py-2.5 text-sm text-charcoal
+           shadow-sm outline-none transition placeholder:text-charcoal/30
+           focus:border-gold focus:ring-2 focus:ring-gold/30;
+  }
+
+  .field-input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .timeline-line {
+    @apply absolute top-0 w-px origin-top bg-gradient-to-b from-gold via-gold/40 to-transparent;
+  }
+}
+
+/* Elegant scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(200,163,91,0.4); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(200,163,91,0.6); }
+
+/* Logical-direction helpers so layouts mirror correctly in RTL */
+.ms-auto { margin-inline-start: auto; }
+.me-auto { margin-inline-end: auto; }
