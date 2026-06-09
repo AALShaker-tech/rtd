@@ -109,3 +109,66 @@ html[dir="rtl"] {
 /* Logical-direction helpers so layouts mirror correctly in RTL */
 .ms-auto { margin-inline-start: auto; }
 .me-auto { margin-inline-end: auto; }
+
+/* ───────── SAFAR-style dark customer experience ───────── */
+@layer components {
+  .ink-shell {
+    @apply relative min-h-screen bg-ink text-cream;
+  }
+  .ink-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.7;
+    background-image: theme("backgroundImage.ink-grain");
+  }
+  .ink-wrap {
+    @apply relative z-[1] mx-auto w-full px-[18px];
+    max-width: 620px;
+  }
+  /* Dark card */
+  .dcard {
+    @apply rounded-2xl border bg-ink-800;
+    border-color: rgba(201, 168, 106, 0.22);
+  }
+  .dcard-soft {
+    @apply rounded-2xl border;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(201, 168, 106, 0.22);
+  }
+  .dcard-selected {
+    border-color: #c9a86a;
+    background: rgba(201, 168, 106, 0.12);
+  }
+  /* Dark gold button */
+  .gbtn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold transition;
+    background: linear-gradient(135deg, #c9a86a, #a8854a);
+    color: #0b1418;
+  }
+  .gbtn:hover { filter: brightness(1.05); transform: translateY(-1px); }
+  .gbtn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .obtn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-[15px] font-medium text-dim transition;
+    background: transparent;
+    border: 1px solid rgba(201, 168, 106, 0.22);
+  }
+  .obtn:hover { color: #f4ecdd; }
+  .dinput {
+    @apply w-full rounded-xl px-4 py-3 text-[15px] text-cream outline-none transition;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+  }
+  .dinput::placeholder { color: #8a9499; }
+  .dinput:focus { border-color: #c9a86a; }
+  .gold-line { border-color: rgba(201, 168, 106, 0.22); }
+  .disp { font-family: var(--font-serif); }
+  html[dir="rtl"] .disp { font-family: var(--font-arabic); }
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes dspin { to { transform: rotate(360deg); } }
+.dspin { animation: dspin 1s linear infinite; }

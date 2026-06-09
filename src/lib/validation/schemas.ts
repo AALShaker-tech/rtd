@@ -54,6 +54,8 @@ export const journeyStepSchema = z.object({
   bags: z.number().int().min(0).max(99).optional(),
   days: z.number().int().min(0).max(60).optional(),
   dailyHours: z.number().int().min(0).max(24).optional(),
+  flightData: z.any().optional(),
+  flightLookupStatus: z.enum(["MANUAL", "VERIFIED", "LOOKUP_FAILED"]).optional(),
   notes: z.string().max(1000).optional(),
 });
 

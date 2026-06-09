@@ -14,6 +14,7 @@ export function AdminNav({
   const nav = [
     { href: "/admin", label: pick(t.admin.overview) },
     { href: "/admin/requests", label: pick(t.admin.requests) },
+    { href: "/admin/pricing", label: pick(t.pricing.servicePricing) },
     { href: "/admin/employees", label: pick(t.admin.employees) },
     { href: "/admin/drivers", label: pick(t.admin.drivers) },
     { href: "/admin/settings", label: pick(t.admin.settings) },

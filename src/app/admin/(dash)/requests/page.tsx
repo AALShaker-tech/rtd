@@ -64,6 +64,8 @@ export default async function RequestsListPage({
         status: r.status,
         carCategory: r.carCategory,
         createdAt: r.createdAt,
+        estimatedTotal: r.estimatedTotal,
+        finalPrice: r.finalPrice,
         employee: r.assignedEmployee?.fullName ?? null,
         driver: r.assignedDriver?.fullName ?? null,
         cities: Array.from(new Set(r.journeySteps.map((s) => s.city).filter(Boolean))) as string[],

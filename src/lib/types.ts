@@ -5,6 +5,9 @@ import type {
   ServiceType,
   StepType,
 } from "./domain";
+import type { NormalizedFlight } from "./flight";
+
+export type FlightLookupStatus = "MANUAL" | "VERIFIED" | "LOOKUP_FAILED";
 
 /** A single journey step as held in the client draft / submitted to the API. */
 export interface JourneyStepInput {
@@ -36,6 +39,10 @@ export interface JourneyStepInput {
   // chauffeur
   days?: number;
   dailyHours?: number;
+
+  // flight lookup
+  flightData?: NormalizedFlight | null;
+  flightLookupStatus?: FlightLookupStatus;
 
   notes?: string;
 }

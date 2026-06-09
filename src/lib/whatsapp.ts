@@ -22,6 +22,7 @@ export interface WhatsAppSummaryInput {
   carCategory?: string;
   passengers?: number;
   bags?: number;
+  estimatedTotal?: number | null;
   notes?: string | null;
   locale: Locale;
 }
@@ -75,6 +76,14 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
       parts.push(`• ${L ? "الخدمة" : "Service"}: ${serviceName(s.serviceType, locale)}`);
       lines.push(parts.join("\n   "));
     });
+
+  if (input.estimatedTotal != null) {
+    lines.push("");
+    const amount = L
+      ? `${input.estimatedTotal.toLocaleString("ar-SA")} ﷼`
+      : `SAR ${input.estimatedTotal.toLocaleString("en-US")}`;
+    lines.push((L ? "الإجمالي التقديري: " : "Estimated Total: ") + amount);
+  }
 
   if (input.notes) {
     lines.push("");

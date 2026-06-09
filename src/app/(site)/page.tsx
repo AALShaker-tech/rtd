@@ -6,170 +6,120 @@ import { CITIES, STEPS, VEHICLES } from "@/lib/domain";
 
 export default function HomePage() {
   const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
+  const Fwd = ar ? "←" : "→";
 
   return (
-    <>
-      {/* ───────── Hero ───────── */}
-      <section className="relative overflow-hidden bg-charcoal-gradient text-ivory">
-        <div className="absolute inset-0 bg-hero-glow" aria-hidden />
-        <div className="luxe-container relative grid gap-12 py-20 md:grid-cols-12 md:py-28">
-          <div className="md:col-span-7">
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.25em] text-gold-light animate-fade-in">
-              {pick(t.home.eyebrow)}
-            </p>
-            <h1 className="max-w-2xl text-4xl font-semibold leading-[1.1] text-ivory sm:text-5xl md:text-6xl animate-fade-up">
-              {pick(t.home.heroTitle)}
-            </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-ivory/70 animate-fade-up">
-              {pick(t.home.heroSubtitle)}
-            </p>
-            <div className="mt-9 flex flex-wrap gap-4 animate-fade-up">
-              <Link href="/journey" className="btn-gold">
-                {pick(t.home.ctaBuild)}
-                <Arrow />
-              </Link>
-              <Link href="/packages" className="btn-outline border-ivory/25 text-ivory hover:border-gold hover:text-gold-light">
-                {pick(t.home.ctaPackages)}
-              </Link>
-            </div>
-            <p className="mt-6 text-xs text-gold-light/70">{pick(t.home.quoteNote)}</p>
-          </div>
-
-          {/* Floating journey preview card */}
-          <div className="hidden md:col-span-5 md:block">
-            <div className="relative ms-auto max-w-sm rounded-luxe border border-gold/20 bg-white/5 p-6 backdrop-blur-md animate-fade-up">
-              <div className="gold-rule mb-4" />
-              <p className="mb-4 font-serif text-lg text-gold-light">
-                {locale === "ar" ? "رحلتك في لمحة" : "Your journey at a glance"}
-              </p>
-              <ul className="space-y-4">
-                {STEPS.slice(0, 4).map((s, i) => (
-                  <li key={s.type} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-[0.7rem] font-bold text-charcoal">
-                      {i + 1}
-                    </span>
-                    <span className="text-sm text-ivory/80">{pick(s.shortName)}</span>
-                  </li>
-                ))}
-                <li className="ps-9 text-xs text-ivory/40">
-                  {locale === "ar" ? "و٥ خدمات أخرى…" : "+ 5 more services…"}
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
+    <div className="ink-wrap pb-16">
+      {/* Hero */}
+      <section className="rise pt-7">
+        <span className="inline-flex items-center gap-1.5 rounded-full border gold-line px-3 py-1.5 text-[13px] text-gold">
+          <Crown /> {pick(t.home.eyebrow)}
+        </span>
+        <h1 className="disp mt-4 text-[34px] font-bold leading-[1.25] text-cream sm:text-[40px]">
+          {pick(t.home.heroTitle)}
+        </h1>
+        <p className="mt-3 max-w-md text-[15.5px] leading-[1.8] text-dim">{pick(t.home.heroSubtitle)}</p>
+        <Link href="/journey" className="gbtn mt-6">
+          {pick(t.home.ctaBuild)} <span>{Fwd}</span>
+        </Link>
+        <p className="mt-3 text-[12.5px] text-gold/70">{pick(t.home.quoteNote)}</p>
       </section>
 
-      {/* ───────── Intro ───────── */}
-      <section className="luxe-container py-16 md:py-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="gold-rule mx-auto mb-6" />
-          <p className="text-xl leading-relaxed text-charcoal/80 md:text-2xl">{pick(t.home.intro)}</p>
+      {/* Destinations */}
+      <section className="dcard mt-8 p-[18px]">
+        <div className="mb-3 flex items-center gap-1.5 text-[12.5px] text-dim">
+          <Pin /> {pick(t.home.citiesTitle)}
         </div>
-      </section>
-
-      {/* ───────── Services ───────── */}
-      <section className="bg-ivory-warm py-16 md:py-24">
-        <div className="luxe-container">
-          <SectionTitle eyebrow={pick(t.home.servicesSubtitle)} title={pick(t.home.servicesTitle)} />
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {STEPS.map((s, i) => (
-              <div key={s.type} className="luxe-card luxe-card-hover group p-6 animate-fade-up">
-                <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-charcoal text-sm font-semibold text-gold-light transition group-hover:bg-gold-gradient group-hover:text-charcoal">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <h3 className="text-lg font-semibold text-charcoal">{pick(s.name)}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-charcoal/60">{pick(s.description)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ───────── Fleet ───────── */}
-      <section className="luxe-container py-16 md:py-24">
-        <SectionTitle eyebrow={pick(t.packages.requestQuote)} title={pick(t.home.fleetTitle)} />
-        <div className="grid gap-6 md:grid-cols-3">
-          {VEHICLES.map((v) => (
-            <div
-              key={v.category}
-              className={`luxe-card relative overflow-hidden p-7 ${v.isRecommended ? "ring-2 ring-gold" : ""}`}
+        <div className="flex flex-wrap gap-2">
+          {CITIES.filter((c) => c.code !== "RUH").map((d) => (
+            <span
+              key={d.code}
+              className="inline-flex items-center gap-1.5 rounded-full border gold-line px-3 py-2"
+              style={{ background: "rgba(201,168,106,.08)" }}
             >
-              {v.isRecommended && (
-                <span className="badge absolute end-4 top-4 bg-gold-gradient text-charcoal">
-                  {locale === "ar" ? "موصى به" : "Recommended"}
-                </span>
-              )}
-              <h3 className="gold-text text-2xl font-semibold">{pick(v.name)}</h3>
-              <p className="mt-1 text-sm font-medium text-charcoal/70">{v.exampleModels}</p>
-              <p className="mt-4 text-sm leading-relaxed text-charcoal/60">{pick(v.description)}</p>
-              <p className="mt-5 text-sm text-charcoal/50">
-                {locale === "ar" ? `حتى ${v.maxPassengers} ركاب` : `Up to ${v.maxPassengers} passengers`}
-              </p>
+              <span className="disp text-[15px] font-semibold text-cream">{pick(d.name)}</span>
+              <span className="text-[11px] tracking-widest text-dim">{d.airports[0].code}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="mt-9">
+        <h2 className="disp text-2xl font-semibold text-cream">{pick(t.home.servicesTitle)}</h2>
+        <p className="mb-4 mt-1 text-sm text-dim">{pick(t.home.servicesSubtitle)}</p>
+        <div className="relative">
+          <span
+            className="absolute top-2 bottom-2 w-0.5"
+            style={{ background: "rgba(201,168,106,.22)", insetInlineStart: 21 }}
+          />
+          {STEPS.map((s, i) => (
+            <div key={s.type} className="relative flex gap-3.5 pb-4">
+              <div className="z-[1] grid h-11 w-11 flex-shrink-0 place-items-center rounded-[13px] border gold-line bg-ink-800 text-gold">
+                <StepIcon n={i} />
+              </div>
+              <div className="pt-0.5">
+                <div className="flex items-center gap-1 text-[11.5px] text-dim">
+                  <Pin /> {pick(s.cityScope === "RIYADH" ? { en: "Riyadh", ar: "الرياض" } : { en: "Destination", ar: "الوجهة" })}
+                </div>
+                <div className="mt-0.5 text-[15.5px] font-medium text-cream">{pick(s.name)}</div>
+              </div>
             </div>
           ))}
         </div>
-        <p className="mt-8 text-center text-sm text-charcoal/50">{pick(t.home.quoteNote)}</p>
       </section>
 
-      {/* ───────── Cities ───────── */}
-      <section className="bg-charcoal-gradient py-16 text-ivory md:py-24">
-        <div className="luxe-container">
-          <SectionTitle light eyebrow={pick(t.brand.tagline)} title={pick(t.home.citiesTitle)} />
-          <div className="flex flex-wrap justify-center gap-4">
-            {CITIES.map((c) => (
-              <div
-                key={c.code}
-                className="rounded-luxe border border-gold/20 bg-white/5 px-7 py-5 text-center backdrop-blur-sm"
-              >
-                <p className="font-serif text-xl text-gold-light">{pick(c.name)}</p>
-                <p className="mt-1 text-xs uppercase tracking-widest text-ivory/40">{c.code}</p>
+      {/* Fleet */}
+      <section className="mt-6">
+        <h2 className="disp text-2xl font-semibold text-cream">{pick(t.home.fleetTitle)}</h2>
+        <div className="mt-4 grid gap-3">
+          {VEHICLES.map((v) => (
+            <div
+              key={v.category}
+              className={`dcard-soft p-4 ${v.isRecommended ? "dcard-selected" : ""}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="disp text-[17px] font-semibold text-cream">{pick(v.name)}</span>
+                  <span className="ms-2 text-[12px] text-dim">
+                    {ar ? `حتى ${v.maxPassengers}` : `up to ${v.maxPassengers}`} {pick(t.fields.passengers).toLowerCase?.() ?? ""}
+                  </span>
+                  <div className="mt-0.5 text-[12.5px] text-dim">{v.exampleModels}</div>
+                </div>
+                {v.isRecommended && (
+                  <span className="rounded-full px-2.5 py-1 text-[11px] text-gold" style={{ background: "rgba(201,168,106,.14)" }}>
+                    {ar ? "موصى به" : "Recommended"}
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ───────── CTA ───────── */}
-      <section className="luxe-container py-20 text-center">
-        <h2 className="mx-auto max-w-2xl text-3xl font-semibold text-charcoal md:text-4xl">
-          {locale === "ar" ? "جاهز لتصميم رحلتك؟" : "Ready to craft your journey?"}
-        </h2>
-        <div className="mt-8 flex justify-center">
-          <Link href="/journey" className="btn-gold">
-            {pick(t.home.ctaBuild)}
-            <Arrow />
-          </Link>
-        </div>
-      </section>
-    </>
-  );
-}
-
-function SectionTitle({
-  eyebrow,
-  title,
-  light,
-}: {
-  eyebrow: string;
-  title: string;
-  light?: boolean;
-}) {
-  return (
-    <div className="mb-12 text-center">
-      <p className={`mb-3 text-xs font-medium uppercase tracking-[0.3em] ${light ? "text-gold-light" : "text-gold-dark"}`}>
-        {eyebrow}
-      </p>
-      <h2 className={`text-3xl font-semibold md:text-4xl ${light ? "text-ivory" : "text-charcoal"}`}>{title}</h2>
-      <div className="gold-rule mx-auto mt-5" />
+      <Link href="/journey" className="gbtn mt-8 w-full">
+        {pick(t.home.ctaBuild)} <span>{Fwd}</span>
+      </Link>
     </div>
   );
 }
 
-function Arrow() {
+function Crown() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="rtl:rotate-180">
-      <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 7l4 5 5-7 5 7 4-5v11H3z" strokeLinejoin="round" />
     </svg>
   );
+}
+function Pin() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 21s7-5.2 7-11a7 7 0 10-14 0c0 5.8 7 11 7 11z" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+function StepIcon({ n }: { n: number }) {
+  return <span className="text-[15px] font-semibold">{String(n + 1).padStart(2, "0")}</span>;
 }

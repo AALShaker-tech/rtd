@@ -2,8 +2,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { buildReferenceNumber, combineDateTime } from "@/lib/utils";
 import { getStep, serviceHasCar } from "@/lib/domain";
+import { computeStepPrice } from "@/lib/pricing";
 import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
+import { getPricingConfig } from "./pricing.service";
 import type { CreateRequestInput } from "@/lib/validation/schemas";
 import type {
   CarCategory,
@@ -40,6 +42,16 @@ export async function createRequest(input: CreateRequestInput) {
   const passengers = carStep?.passengers ?? 1;
   const bags = carStep?.bags ?? 0;
 
+  // Authoritative server-side pricing — never trust the client estimate.
+  const pricingConfig = await getPricingConfig();
+  const stepBreakdowns = new Map(
+    input.steps.map((s) => [s.stepType, computeStepPrice(s, pricingConfig)]),
+  );
+  const estimatedTotal = input.steps.reduce(
+    (sum, s) => sum + (stepBreakdowns.get(s.stepType)?.computedPrice ?? 0),
+    0,
+  );
+
   const result = await prisma.$transaction(async (tx) => {
     const referenceNumber = await nextReference(tx);
 
@@ -69,6 +81,9 @@ export async function createRequest(input: CreateRequestInput) {
         contactMeInstead: input.customer.contactMeInstead,
         notes: input.customer.notes ?? null,
         validationStatus: "VALID",
+        estimatedTotal,
+        priceStatus: "ESTIMATED",
+        paymentStatus: "UNPAID",
       },
     });
 
@@ -81,6 +96,7 @@ export async function createRequest(input: CreateRequestInput) {
       const s = ordered[i];
       const scheduledAt = combineDateTime(s.date, s.time);
       const endAt = combineDateTime(s.endDate, s.endTime);
+      const breakdown = stepBreakdowns.get(s.stepType);
 
       const step = await tx.journeyStep.create({
         data: {
@@ -106,6 +122,11 @@ export async function createRequest(input: CreateRequestInput) {
           days: s.days ?? null,
           dailyHours: s.dailyHours ?? null,
           skipped: s.skipped,
+          basePrice: breakdown?.basePrice ?? null,
+          vehicleMultiplier: breakdown?.vehicleMultiplier ?? null,
+          computedPrice: breakdown?.computedPrice ?? null,
+          flightLookupStatus: s.flightLookupStatus ?? "MANUAL",
+          flightData: s.flightData ? (s.flightData as object) : undefined,
           notes: s.notes ?? null,
         },
       });
@@ -120,6 +141,10 @@ export async function createRequest(input: CreateRequestInput) {
 
     await tx.statusHistory.create({
       data: { requestId: request.id, toStatus: "REQUEST_RECEIVED" },
+    });
+
+    await tx.requestPriceHistory.create({
+      data: { requestId: request.id, changeType: "RECALCULATED", newPrice: estimatedTotal, reason: "Initial estimate" },
     });
 
     return request;
@@ -204,6 +229,66 @@ export async function assignDriver(requestId: string, driverId: string | null, a
     actorId,
     requestId,
     metadata: { driverId },
+  });
+}
+
+/**
+ * Admin sets the final price, or applies a discount/surcharge. Every change is
+ * recorded with the old/new value, who changed it, and a reason (audit trail).
+ */
+export async function changeRequestPrice(params: {
+  requestId: string;
+  newPrice: number;
+  changeType: "OVERRIDE" | "DISCOUNT" | "SURCHARGE";
+  reason: string;
+  actorId?: string;
+}) {
+  if (params.newPrice < 0) throw new Error("Price cannot be negative");
+  if (!params.reason?.trim()) throw new Error("A reason is required for price changes");
+
+  const current = await prisma.request.findUnique({ where: { id: params.requestId } });
+  if (!current) throw new Error("Request not found");
+  const oldPrice = current.finalPrice ?? current.estimatedTotal;
+
+  await prisma.$transaction([
+    prisma.request.update({
+      where: { id: params.requestId },
+      data: {
+        finalPrice: params.newPrice,
+        priceStatus: params.changeType === "OVERRIDE" ? "FINALIZED" : "ADJUSTED",
+      },
+    }),
+    prisma.requestPriceHistory.create({
+      data: {
+        requestId: params.requestId,
+        changeType: params.changeType,
+        oldPrice,
+        newPrice: params.newPrice,
+        reason: params.reason.trim(),
+        changedById: params.actorId ?? null,
+      },
+    }),
+  ]);
+
+  await logAudit({
+    action: "PRICE_CHANGED",
+    entity: "Request",
+    entityId: params.requestId,
+    actorId: params.actorId,
+    requestId: params.requestId,
+    metadata: { changeType: params.changeType, oldPrice, newPrice: params.newPrice, reason: params.reason },
+  });
+}
+
+export async function setPaymentStatus(requestId: string, paymentStatus: "UNPAID" | "PARTIALLY_PAID" | "PAID" | "REFUNDED", actorId?: string) {
+  await prisma.request.update({ where: { id: requestId }, data: { paymentStatus } });
+  await logAudit({
+    action: "PAYMENT_STATUS_CHANGED",
+    entity: "Request",
+    entityId: requestId,
+    actorId,
+    requestId,
+    metadata: { paymentStatus },
   });
 }
 

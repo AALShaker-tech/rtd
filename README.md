@@ -12,6 +12,17 @@ that flows through admin, operations and driver dashboards.
 
 ## ✨ Highlights
 
+- **SAFAR-style mobile-first customer flow** — dark luxury theme (charcoal/gold/ivory),
+  destination picker → step-by-step service cards with Add/Skip → sticky running total →
+  priced, editable review → success with reference number.
+- **Real pricing engine** (`src/lib/pricing.ts`) — `base × vehicleMultiplier × destinationFactor`,
+  chauffeur per-day, lounge-by-type. Admin-editable base prices, multipliers, lounge prices and
+  destination factors (`/admin/pricing`). Per-request **override / discount / surcharge** with a
+  full price-history audit trail. The server always recomputes authoritatively before saving —
+  the client estimate is never trusted.
+- **Flight lookup** via a provider abstraction (`FLIGHT_API_PROVIDER=mock|aviationstack|amadeus|flightaware`):
+  the client calls a backend action only, responses are normalized to one shape, manual entry is
+  always a fallback, and admin sees the lookup status (manual / verified / lookup failed).
 - **Journey builder** with 9 composable services, ready-made packages, skip/edit/reorder.
 - **Real-time validation engine** — field, step, and cross-step **timeline** checks
   (e.g. "this transfer is before your flight arrival"), all bilingual. Critical

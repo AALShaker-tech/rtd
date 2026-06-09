@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { formatPrice } from "@/lib/pricing";
 import { getStep } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
 import type { CarCategory, PackageType, RequestStatus } from "@/lib/domain";
@@ -17,6 +18,7 @@ export function SuccessView(props: {
   carCategory: CarCategory;
   passengers: number;
   bags: number;
+  estimatedTotal: number;
   notes: string | null;
   steps: JourneyStepInput[];
 }) {
@@ -31,6 +33,7 @@ export function SuccessView(props: {
     carCategory: props.carCategory,
     passengers: props.passengers,
     bags: props.bags,
+    estimatedTotal: props.estimatedTotal,
     notes: props.notes,
     locale,
   });
@@ -38,59 +41,54 @@ export function SuccessView(props: {
   const active = props.steps.filter((s) => !s.skipped && s.serviceType !== "SKIP");
 
   return (
-    <div className="luxe-container py-14 md:py-20">
-      <div className="mx-auto max-w-2xl">
-        {/* Hero */}
-        <div className="luxe-card overflow-hidden">
-          <div className="bg-charcoal-gradient p-8 text-center text-ivory">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gold-gradient">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#101012" strokeWidth="2.5">
-                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-semibold text-ivory">{pick(t.success.title)}</h1>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ivory/70">{pick(t.success.message)}</p>
-          </div>
-
-          <div className="p-8">
-            {/* Reference */}
-            <div className="mb-6 rounded-luxe border border-gold/30 bg-gold-50 p-5 text-center">
-              <p className="text-xs uppercase tracking-widest text-gold-dark">{pick(t.success.reference)}</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-charcoal">{props.referenceNumber}</p>
-            </div>
-
-            {/* Status */}
-            <div className="mb-6 flex items-center justify-between">
-              <span className="text-sm text-charcoal/50">{pick(t.success.statusTimeline)}</span>
-              <StatusBadge status={props.status} />
-            </div>
-
-            {/* Summary */}
-            <div className="mb-6 rounded-luxe bg-ivory-warm p-5">
-              <p className="mb-3 text-sm font-semibold text-charcoal">{pick(t.builder.summaryTitle)}</p>
-              <ol className="space-y-2">
-                {active.map((s, i) => (
-                  <li key={s.stepType} className="flex items-start gap-2 text-sm text-charcoal/70">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-charcoal text-[0.65rem] font-bold text-gold-light">
-                      {i + 1}
-                    </span>
-                    {pick(getStep(s.stepType).shortName)}
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {/* Actions */}
-            <a href={waLink} target="_blank" rel="noreferrer" className="btn-gold w-full">
-              <WhatsAppIcon />
-              {pick(t.success.continueWhatsapp)}
-            </a>
-            <Link href={`/status?ref=${props.referenceNumber}`} className="btn-outline mt-3 w-full">
-              {pick(t.success.trackRequest)}
-            </Link>
-          </div>
+    <div className="ink-wrap rise pb-20 pt-8">
+      <div className="text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gold-gradient text-ink">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
+        <h1 className="disp mt-4 text-[26px] font-semibold text-cream">{pick(t.success.title)}</h1>
+        <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-dim">{pick(t.success.message)}</p>
       </div>
+
+      {/* Reference */}
+      <div className="mt-6 rounded-2xl border gold-line p-5 text-center" style={{ background: "rgba(201,168,106,.08)" }}>
+        <p className="text-[11px] uppercase tracking-widest text-gold">{pick(t.success.reference)}</p>
+        <p className="disp mt-1 text-[26px] font-bold text-cream">{props.referenceNumber}</p>
+      </div>
+
+      {/* Estimated total */}
+      <div className="mt-3 flex items-center justify-between rounded-2xl border gold-line p-4" style={{ background: "linear-gradient(135deg, rgba(201,168,106,.14), rgba(201,168,106,.04))" }}>
+        <span className="text-[14px] text-cream">{pick(t.pricing.estimatedTotal)}</span>
+        <span className="disp text-[22px] font-semibold text-gold">{formatPrice(props.estimatedTotal, locale)}</span>
+      </div>
+      <p className="mt-2 text-center text-[12px] text-dim">{pick(t.pricing.finalNote)}</p>
+
+      {/* Status */}
+      <div className="mt-5 flex items-center justify-between">
+        <span className="text-[13px] text-dim">{pick(t.success.statusTimeline)}</span>
+        <StatusBadge status={props.status} />
+      </div>
+
+      {/* Summary */}
+      <div className="mt-3 rounded-2xl border gold-line bg-ink-800 p-4">
+        <p className="mb-2.5 text-[13px] font-semibold text-cream">{pick(t.builder.summaryTitle)}</p>
+        <ol className="grid gap-2">
+          {active.map((s, i) => (
+            <li key={s.stepType} className="flex items-center gap-2 text-[13.5px] text-dim">
+              <span className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-gold-gradient text-[0.62rem] font-bold text-ink">{i + 1}</span>
+              {pick(getStep(s.stepType).shortName)}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Actions */}
+      <a href={waLink} target="_blank" rel="noreferrer" className="gbtn mt-5 w-full">
+        <WhatsAppIcon /> {pick(t.success.continueWhatsapp)}
+      </a>
+      <Link href={`/status?ref=${props.referenceNumber}`} className="obtn mt-3 w-full justify-center text-cream">
+        {pick(t.success.trackRequest)}
+      </Link>
     </div>
   );
 }

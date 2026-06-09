@@ -34,3 +34,7 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# screenshots / scratch
+/shots
+_shots.mjs

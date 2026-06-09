@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { REQUEST_STATUSES, type RequestStatus } from "@/lib/domain";
+import { REQUEST_STATUSES, getStep, type RequestStatus } from "@/lib/domain";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RequestJourney, type DisplayStep } from "@/components/dashboard/RequestJourney";
 import { Select, TextArea } from "@/components/ui/Field";
 import { buildWhatsAppMessage } from "@/lib/whatsapp";
 import { formatDateTime } from "@/lib/utils";
+import { formatPrice } from "@/lib/pricing";
 import {
   adminAddNote,
   adminAssignDriver,
@@ -16,7 +17,10 @@ import {
   adminCancelRequest,
   adminChangeStatus,
 } from "@/server/actions/staff.actions";
+import { adminChangeRequestPrice, adminSetPaymentStatus } from "@/server/actions/pricing.actions";
+import { TextInput, Select as DSelect } from "@/components/ui/Field";
 import type { JourneyStepInput } from "@/lib/types";
+import type { PaymentStatus } from "@prisma/client";
 
 interface RequestData {
   id: string;
@@ -31,10 +35,16 @@ interface RequestData {
   notes: string | null;
   contactMeInstead: boolean;
   createdAt: string;
+  currency: string;
+  estimatedTotal: number;
+  finalPrice: number | null;
+  priceStatus: string;
+  paymentStatus: PaymentStatus;
   customer: { fullName: string; phone: string; email: string; phoneVerified: boolean; emailVerified: boolean; language: string };
   assignedEmployee: { id: string; fullName: string } | null;
   assignedDriver: { id: string; fullName: string } | null;
-  journeySteps: DisplayStep[];
+  journeySteps: (DisplayStep & { computedPrice: number | null })[];
+  priceHistory: { id: string; changeType: string; oldPrice: number | null; newPrice: number; reason: string | null; createdAt: string; changedBy: { fullName: string } | null }[];
   statusHistory: { id: string; fromStatus: RequestStatus | null; toStatus: RequestStatus; reason: string | null; createdAt: string; changedBy: { fullName: string } | null }[];
   internalNotes: { id: string; body: string; createdAt: string; author: { fullName: string } | null }[];
 }
@@ -90,6 +100,7 @@ export function RequestDetailView({
       carCategory: request.carCategory,
       passengers: request.passengers,
       bags: request.bags,
+      estimatedTotal: request.finalPrice ?? request.estimatedTotal,
       notes: request.notes,
       locale,
     });
@@ -143,6 +154,11 @@ export function RequestDetailView({
 
         {/* Right: actions */}
         <div className="space-y-5 print:hidden">
+          {/* Pricing */}
+          <Panel title={pick(t.pricing.estimatedTotal)}>
+            <PricingPanel request={request} />
+          </Panel>
+
           {/* Status */}
           <Panel title={pick(t.admin.changeStatus)}>
             <Select
@@ -242,6 +258,104 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
     <div className="luxe-card p-4">
       <h4 className="mb-3 text-sm font-semibold text-charcoal">{title}</h4>
       {children}
+    </div>
+  );
+}
+
+function PricingPanel({ request }: { request: RequestData }) {
+  const { t, pick, locale } = useI18n();
+  const router = useRouter();
+  const [mode, setMode] = useState<"OVERRIDE" | "DISCOUNT" | "SURCHARGE">("OVERRIDE");
+  const [amount, setAmount] = useState<string>(String(request.finalPrice ?? request.estimatedTotal));
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  async function apply() {
+    setError(undefined);
+    const value = parseInt(amount, 10);
+    if (Number.isNaN(value) || value < 0) return setError(locale === "ar" ? "قيمة غير صحيحة" : "Invalid amount");
+    if (reason.trim().length < 2) return setError(locale === "ar" ? "السبب مطلوب" : "Reason required");
+    setBusy(true);
+    const res = await adminChangeRequestPrice({ requestId: request.id, newPrice: value, changeType: mode, reason });
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    setReason("");
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-charcoal/50">{pick(t.pricing.estimatedTotal)}</span>
+        <span className="font-semibold text-charcoal">{formatPrice(request.estimatedTotal, locale)}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-charcoal/50">{pick(t.pricing.finalPrice)}</span>
+        <span className="font-semibold text-gold-dark">
+          {request.finalPrice != null ? formatPrice(request.finalPrice, locale) : "—"}
+        </span>
+      </div>
+
+      {/* Per-step prices */}
+      <details className="rounded-lg bg-ivory-warm p-2">
+        <summary className="cursor-pointer text-xs text-charcoal/60">{pick(t.admin.journey)}</summary>
+        <ul className="mt-2 space-y-1">
+          {request.journeySteps.filter((s) => !s.skipped).map((s) => (
+            <li key={s.stepOrder} className="flex justify-between text-xs">
+              <span className="text-charcoal/60">{pick(getStep(s.stepType as any).shortName)}</span>
+              <span className="text-charcoal">{s.computedPrice != null ? formatPrice(s.computedPrice, locale) : "—"}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      {/* Payment status */}
+      <label className="block">
+        <span className="field-label">{pick(t.pricing.paymentStatus)}</span>
+        <DSelect
+          value={request.paymentStatus}
+          onChange={async (e) => { await adminSetPaymentStatus(request.id, e.target.value as PaymentStatus); router.refresh(); }}
+        >
+          {["UNPAID", "PARTIALLY_PAID", "PAID", "REFUNDED"].map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </DSelect>
+      </label>
+
+      {/* Override / adjust */}
+      <div className="rounded-lg border border-charcoal/10 p-3">
+        <div className="mb-2 flex gap-1">
+          {(["OVERRIDE", "DISCOUNT", "SURCHARGE"] as const).map((m) => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`flex-1 rounded-md px-2 py-1 text-xs ${mode === m ? "bg-charcoal text-ivory" : "bg-charcoal/5 text-charcoal/60"}`}>
+              {m === "OVERRIDE" ? pick(t.pricing.override) : m === "DISCOUNT" ? pick(t.pricing.discount) : pick(t.pricing.surcharge)}
+            </button>
+          ))}
+        </div>
+        <TextInput type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="mb-2" />
+        <TextInput placeholder={pick(t.pricing.reason)} value={reason} onChange={(e) => setReason(e.target.value)} className="mb-2" />
+        {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+        <button onClick={apply} disabled={busy} className="btn-gold w-full py-2 text-xs">{pick(t.pricing.save)}</button>
+      </div>
+
+      {/* History */}
+      {request.priceHistory.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-medium text-charcoal/60">{pick(t.pricing.priceHistory)}</p>
+          <ul className="space-y-1">
+            {request.priceHistory.map((h) => (
+              <li key={h.id} className="rounded-md bg-ivory-warm px-2 py-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="font-medium text-charcoal">{h.changeType}</span>
+                  <span className="text-charcoal">{formatPrice(h.newPrice, locale)}</span>
+                </div>
+                {h.reason && <p className="text-charcoal/50">{h.reason}</p>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

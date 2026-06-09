@@ -19,6 +19,8 @@ interface Data {
   carCategory: any;
   passengers: number;
   bags: number;
+  estimatedTotal: number;
+  finalPrice: number | null;
   notes: string | null;
   contactMeInstead: boolean;
   customer: { fullName: string; phone: string; email: string; phoneVerified: boolean; emailVerified: boolean; language: string };
@@ -67,6 +69,7 @@ export function EmployeeRequestView({ request }: { request: Data }) {
       carCategory: request.carCategory,
       passengers: request.passengers,
       bags: request.bags,
+      estimatedTotal: request.finalPrice ?? request.estimatedTotal,
       notes: request.notes,
       locale,
     });

@@ -38,11 +38,14 @@ function blankStep(stepType: StepType): JourneyStepInput {
 
 interface JourneyState {
   selectedPackage?: PackageType;
+  destination?: string; // destination city code
   steps: JourneyStepInput[];
   customer: CustomerDetailsInput;
   phoneVerified: boolean;
   emailVerified: boolean;
 
+  setDestination: (code: string) => void;
+  initFlow: (destination: string) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
@@ -65,17 +68,50 @@ export const useJourneyStore = create<JourneyState>()(
   persist(
     (set, get) => ({
       selectedPackage: undefined,
+      destination: undefined,
       steps: [],
       customer: emptyCustomer,
       phoneVerified: false,
       emailVerified: false,
 
+      setDestination: (code) =>
+        set((st) => ({
+          destination: code,
+          steps: st.steps.map((s) =>
+            getStep(s.stepType).cityScope === "DESTINATION" ? { ...s, city: code } : s,
+          ),
+        })),
+
+      /**
+       * Start a SAFAR-style step-by-step flow: pre-build all 9 steps for the
+       * chosen destination, each starting as "skipped" (not counted) until the
+       * customer explicitly adds it.
+       */
+      initFlow: (destination) => {
+        const existing = new Map(get().steps.map((s) => [s.stepType, s]));
+        const steps = STEPS.map((def) => {
+          const prior = existing.get(def.type);
+          const base = blankStep(def.type);
+          const step: JourneyStepInput = prior ? { ...base, ...prior } : { ...base, skipped: true };
+          if (def.cityScope === "DESTINATION") step.city = destination;
+          return step;
+        });
+        set({ destination, selectedPackage: undefined, steps: sortByOrder(steps) });
+      },
+
       applyPackage: (pkg) => {
         const def = getPackage(pkg);
         if (!def) return;
+        const dest = get().destination;
         set({
           selectedPackage: pkg,
-          steps: sortByOrder(def.steps.map(blankStep)),
+          steps: sortByOrder(
+            def.steps.map((t) => {
+              const step = blankStep(t);
+              if (getStep(t).cityScope === "DESTINATION" && dest) step.city = dest;
+              return step;
+            }),
+          ),
         });
       },
 
@@ -83,7 +119,10 @@ export const useJourneyStore = create<JourneyState>()(
 
       addStep: (stepType) => {
         if (get().steps.some((s) => s.stepType === stepType)) return;
-        set((st) => ({ steps: sortByOrder([...st.steps, blankStep(stepType)]) }));
+        const step = blankStep(stepType);
+        const dest = get().destination;
+        if (getStep(stepType).cityScope === "DESTINATION" && dest) step.city = dest;
+        set((st) => ({ steps: sortByOrder([...st.steps, step]) }));
       },
 
       removeStep: (stepType) =>
@@ -115,6 +154,7 @@ export const useJourneyStore = create<JourneyState>()(
       reset: () =>
         set({
           selectedPackage: undefined,
+          destination: undefined,
           steps: [],
           customer: emptyCustomer,
           phoneVerified: false,

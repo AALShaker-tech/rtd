@@ -90,6 +90,8 @@ export interface VehicleDef {
   maxPassengers: number;
   exampleModels: string;
   description: Bilingual;
+  /** Price multiplier applied to car-based services. */
+  multiplier: number;
   isRecommended?: boolean;
   sortOrder: number;
 }
@@ -104,6 +106,7 @@ export const VEHICLES: VehicleDef[] = [
       en: "Our highest tier. The most premium chauffeured experience.",
       ar: "أعلى فئاتنا. تجربة القيادة الأكثر فخامة وتميزًا.",
     },
+    multiplier: 2.0,
     sortOrder: 1,
   },
   {
@@ -115,6 +118,7 @@ export const VEHICLES: VehicleDef[] = [
       en: "Luxurious and spacious. Our recommended choice for most journeys.",
       ar: "فخامة واتساع. خيارنا الموصى به لأغلب الرحلات.",
     },
+    multiplier: 1.4,
     isRecommended: true,
     sortOrder: 2,
   },
@@ -127,6 +131,7 @@ export const VEHICLES: VehicleDef[] = [
       en: "Practical and comfortable for everyday transfers.",
       ar: "خيار عملي ومريح للتنقلات اليومية.",
     },
+    multiplier: 1.0,
     sortOrder: 3,
   },
 ];
@@ -466,3 +471,40 @@ export const DRIVER_TASK_STATUSES: { value: string; name: Bilingual }[] = [
 export function statusLabel(value: RequestStatus, locale: Locale): string {
   return REQUEST_STATUSES.find((s) => s.value === value)?.name[locale] ?? value;
 }
+
+// ─────────────────────────── Pricing defaults (SAR) ───────────────────────────
+// These seed the admin-editable pricing tables. The database is authoritative
+// once seeded; these are the fallback/default values.
+
+export const CURRENCY = "SAR";
+
+/** Default base price per service, in whole SAR. */
+export const DEFAULT_SERVICE_PRICES: Record<StepType, number> = {
+  HOME_TO_RIYADH_AIRPORT: 250,
+  DEPARTURE_ASSIST_RIYADH: 320,
+  ARRIVAL_ASSIST_DESTINATION: 420,
+  AIRPORT_TO_HOTEL: 380,
+  CHAUFFEUR_DURING_STAY: 650, // per day
+  HOTEL_TO_AIRPORT: 380,
+  DEPARTURE_ASSIST_RETURN: 460,
+  ARRIVAL_ASSIST_RIYADH: 420,
+  RIYADH_AIRPORT_TO_HOME: 250,
+};
+
+/** Default price per lounge / assistance option, in whole SAR. */
+export const DEFAULT_LOUNGE_PRICES: Record<string, number> = {
+  EXECUTIVE_OFFICE: 320,
+  MARHABA: 240,
+  VIP_LOUNGE: 300,
+  MEET_ASSIST: 180,
+  FAST_TRACK: 200,
+};
+
+/** Default destination price factor. Riyadh = 1.0 (origin). */
+export const DEFAULT_DESTINATION_FACTORS: Record<string, number> = {
+  RUH: 1.0,
+  LON: 1.3,
+  PAR: 1.25,
+  DXB: 1.1,
+  CAI: 0.9,
+};

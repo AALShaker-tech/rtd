@@ -49,6 +49,7 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
       carCategory={request.carCategory}
       passengers={request.passengers}
       bags={request.bags}
+      estimatedTotal={request.estimatedTotal}
       notes={request.notes}
       steps={steps}
     />

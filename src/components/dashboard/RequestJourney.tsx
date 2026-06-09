@@ -27,6 +27,8 @@ export interface DisplayStep {
   dailyHours: number | null;
   skipped: boolean;
   notes: string | null;
+  flightLookupStatus?: string | null;
+  computedPrice?: number | null;
 }
 
 export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
@@ -45,7 +47,10 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
               {s.stepOrder}
             </span>
             <div className="luxe-card p-4">
-              <p className="font-medium text-charcoal">{pick(def.name)}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-charcoal">{pick(def.name)}</p>
+                {s.flightNumber && s.flightLookupStatus && <FlightBadge status={s.flightLookupStatus} />}
+              </div>
               <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {s.city && <Row k={pick(t.fields.city)} v={getCity(s.city)?.name[locale] ?? s.city} />}
                 {s.airport && <Row k={pick(t.fields.airport)} v={s.airport} />}
@@ -80,4 +85,15 @@ function Row({ k, v }: { k: string; v: string }) {
       <dd className="text-end font-medium text-charcoal">{v}</dd>
     </div>
   );
+}
+
+function FlightBadge({ status }: { status: string }) {
+  const { locale } = useI18n();
+  const map: Record<string, { en: string; ar: string; cls: string }> = {
+    VERIFIED: { en: "Flight verified", ar: "تم التحقق من الرحلة", cls: "bg-emerald-50 text-emerald-700" },
+    MANUAL: { en: "Manual entry", ar: "إدخال يدوي", cls: "bg-charcoal/5 text-charcoal/50" },
+    LOOKUP_FAILED: { en: "Lookup failed", ar: "تعذّر الجلب", cls: "bg-amber-50 text-amber-700" },
+  };
+  const m = map[status] ?? map.MANUAL;
+  return <span className={`badge ${m.cls}`}>{locale === "ar" ? m.ar : m.en}</span>;
 }
