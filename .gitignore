@@ -38,3 +38,5 @@ yarn-error.log*
 # screenshots / scratch
 /shots
 _shots.mjs
+_qa.mjs
+_repro.mjs

@@ -5,9 +5,9 @@ import { PricingProvider } from "@/components/pricing/PricingProvider";
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <PricingProvider>
-      <div className="ink-shell flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col bg-ivory text-charcoal">
         <SiteHeader />
-        <main className="relative z-[1] flex-1">{children}</main>
+        <main className="flex-1">{children}</main>
         <SiteFooter />
       </div>
     </PricingProvider>

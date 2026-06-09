@@ -12,7 +12,6 @@ type Result = Awaited<ReturnType<typeof lookupRequest>>;
 
 function StatusInner() {
   const { t, pick, locale } = useI18n();
-  const ar = locale === "ar";
   const params = useSearchParams();
   const [ref, setRef] = useState(params.get("ref") ?? "");
   const [result, setResult] = useState<Result | null>(null);
@@ -32,26 +31,27 @@ function StatusInner() {
   }, []);
 
   return (
-    <div className="ink-wrap rise pb-20 pt-8">
-      <h1 className="disp text-center text-[26px] font-semibold text-cream">{pick(t.status.title)}</h1>
+    <div className="luxe-container max-w-xl py-14 md:py-20">
+      <div className="mb-8 text-center">
+        <div className="gold-rule mx-auto mb-5" />
+        <h1 className="text-3xl font-semibold text-charcoal md:text-4xl">{pick(t.status.title)}</h1>
+      </div>
 
-      <div className="mt-6 dcard p-5">
-        <span className="mb-1.5 block text-[13px] text-dim">{pick(t.success.reference)}</span>
+      <div className="luxe-card p-6">
+        <label className="field-label">{pick(t.success.reference)}</label>
         <div className="flex gap-2">
-          <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder={pick(t.status.placeholder)} onKeyDown={(e) => e.key === "Enter" && search()} className="dinput flex-1 font-mono" />
-          <button onClick={() => search()} disabled={busy} className="gbtn px-5">{pick(t.status.lookup)}</button>
+          <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder={pick(t.status.placeholder)} onKeyDown={(e) => e.key === "Enter" && search()} className="field-input flex-1 font-mono" />
+          <button onClick={() => search()} disabled={busy} className="btn-gold shrink-0">{pick(t.status.lookup)}</button>
         </div>
 
-        {result && !result.ok && (
-          <p className="mt-4 rounded-lg px-4 py-3 text-[13px]" style={{ background: "rgba(211,112,95,.10)", color: "#e69384" }}>{pick(t.status.notFound)}</p>
-        )}
+        {result && !result.ok && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{pick(t.status.notFound)}</p>}
 
         {result && result.ok && (
           <div className="mt-6">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="disp text-[18px] font-bold text-cream">{result.request.referenceNumber}</p>
-                <p className="text-[13px] text-dim">{result.request.customer.fullName}</p>
+                <p className="font-mono text-lg font-bold text-charcoal">{result.request.referenceNumber}</p>
+                <p className="text-sm text-charcoal/50">{result.request.customer.fullName}</p>
               </div>
               <StatusBadge status={result.request.status} />
             </div>
@@ -67,7 +67,9 @@ function Timeline({ current, history }: { current: RequestStatus; history: { toS
   const { locale } = useI18n();
   if (current === "CANCELLED") {
     return (
-      <ol className="ps-7"><li className="relative"><span className="absolute -start-7 top-1 h-3.5 w-3.5 rounded-full bg-red-500 ring-4" style={{ ["--tw-ring-color" as string]: "#0f1d22" }} /><StatusBadge status="CANCELLED" /></li></ol>
+      <ol className="relative space-y-5 ps-7">
+        <li className="relative"><span className="absolute -start-7 top-1 h-3.5 w-3.5 rounded-full bg-red-500 ring-4 ring-white" /><StatusBadge status="CANCELLED" /></li>
+      </ol>
     );
   }
   const flow = REQUEST_STATUSES.filter((s) => s.value !== "CANCELLED");
@@ -76,15 +78,15 @@ function Timeline({ current, history }: { current: RequestStatus; history: { toS
 
   return (
     <ol className="relative space-y-5 ps-7">
-      <span className="absolute bottom-3 top-2 w-px" style={{ insetInlineStart: 6, background: "rgba(201,168,106,.3)" }} />
+      <span className="timeline-line bottom-3 start-[6px] top-2" aria-hidden />
       {flow.map((s) => {
         const done = s.order <= currentOrder;
         const at = reached.get(s.value);
         return (
           <li key={s.value} className="relative">
-            <span className={`absolute -start-7 top-1 h-3.5 w-3.5 rounded-full ${done ? "bg-gold-gradient" : ""}`} style={{ background: done ? undefined : "rgba(255,255,255,.15)" }} />
-            <p className={`text-[13.5px] font-medium ${done ? "text-cream" : "text-dim"}`}>{s.name[locale]}</p>
-            {at && <p className="text-[11.5px] text-dim">{formatDateTime(at, locale)}</p>}
+            <span className={`absolute -start-7 top-1 h-3.5 w-3.5 rounded-full ring-4 ring-white ${done ? "bg-gold-gradient" : "bg-charcoal/15"}`} />
+            <p className={`text-sm font-medium ${done ? "text-charcoal" : "text-charcoal/40"}`}>{s.name[locale]}</p>
+            {at && <p className="text-xs text-charcoal/40">{formatDateTime(at, locale)}</p>}
           </li>
         );
       })}
@@ -93,9 +95,5 @@ function Timeline({ current, history }: { current: RequestStatus; history: { toS
 }
 
 export default function StatusPage() {
-  return (
-    <Suspense>
-      <StatusInner />
-    </Suspense>
-  );
+  return (<Suspense><StatusInner /></Suspense>);
 }

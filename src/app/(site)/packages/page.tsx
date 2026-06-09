@@ -18,37 +18,45 @@ export default function PackagesPage() {
   }
 
   return (
-    <div className="ink-wrap rise pb-16 pt-6">
-      <h1 className="disp text-[26px] font-semibold text-cream">{pick(t.packages.title)}</h1>
-      <p className="mb-5 mt-1.5 text-[14.5px] text-dim">{pick(t.packages.subtitle)}</p>
+    <div className="luxe-container py-14 md:py-20">
+      <div className="mb-12 text-center">
+        <div className="gold-rule mx-auto mb-6" />
+        <h1 className="text-4xl font-semibold text-charcoal md:text-5xl">{pick(t.packages.title)}</h1>
+        <p className="mx-auto mt-4 max-w-xl text-charcoal/60">{pick(t.packages.subtitle)}</p>
+      </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {PACKAGES.map((p) => (
-          <div key={p.type} className={`dcard p-5 ${p.featured ? "dcard-selected" : ""}`}>
-            {p.featured && (
-              <span className="mb-2 inline-block rounded-full px-2.5 py-1 text-[11px] text-gold" style={{ background: "rgba(201,168,106,.14)" }}>
-                {ar ? "مميزة" : "Featured"}
-              </span>
-            )}
-            <h3 className="disp text-[20px] font-semibold text-cream">{pick(p.name)}</h3>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed text-dim">{pick(p.description)}</p>
-            <ul className="mt-3 grid gap-1.5">
-              {p.steps.slice(0, 5).map((st) => (
-                <li key={st} className="flex items-center gap-2 text-[13px] text-cream/90">
-                  <span className="text-gold">✓</span> {pick(getStep(st).shortName)}
-                </li>
-              ))}
-              {p.steps.length > 5 && <li className="text-[12px] text-dim">+ {p.steps.length - 5} {ar ? "أخرى" : "more"}</li>}
-            </ul>
-            <button onClick={() => choose(p.type)} className="gbtn mt-4 w-full">{pick(t.packages.choose)}</button>
-            <p className="mt-2 text-center text-[12px] text-dim">{pick(t.packages.tailoredOffer)}</p>
+          <div key={p.type} className={`luxe-card luxe-card-hover flex flex-col p-7 ${p.featured ? "ring-2 ring-gold" : ""}`}>
+            {p.featured && <span className="badge mb-3 w-fit bg-gold-gradient text-charcoal">{ar ? "مميزة" : "Featured"}</span>}
+            <h3 className="font-serif text-2xl font-semibold text-charcoal">{pick(p.name)}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-charcoal/60">{pick(p.description)}</p>
+            <div className="mt-5 flex-1">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gold-dark">{pick(t.packages.includes)}</p>
+              <ul className="space-y-1.5">
+                {p.steps.slice(0, 5).map((st) => (
+                  <li key={st} className="flex items-start gap-2 text-sm text-charcoal/70"><Check />{pick(getStep(st).shortName)}</li>
+                ))}
+                {p.steps.length > 5 && <li className="ps-6 text-xs text-charcoal/40">+ {p.steps.length - 5} {ar ? "أخرى" : "more"}</li>}
+              </ul>
+            </div>
+            <button onClick={() => choose(p.type)} className="btn-dark mt-6 w-full">{pick(t.packages.choose)}</button>
+            <p className="mt-3 text-center text-xs text-charcoal/40">{pick(t.packages.tailoredOffer)}</p>
           </div>
         ))}
       </div>
 
-      <button onClick={() => { startBlank(); router.push("/journey"); }} className="obtn mt-6 w-full justify-center text-cream">
-        {pick(t.packages.buildOwn)}
-      </button>
+      <div className="mt-12 text-center">
+        <button onClick={() => { startBlank(); router.push("/journey"); }} className="btn-outline">{pick(t.packages.buildOwn)}</button>
+      </div>
     </div>
+  );
+}
+
+function Check() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="mt-0.5 shrink-0 text-gold-dark">
+      <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

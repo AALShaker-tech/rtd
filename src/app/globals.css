@@ -98,6 +98,29 @@ html[dir="rtl"] {
   .timeline-line {
     @apply absolute top-0 w-px origin-top bg-gradient-to-b from-gold via-gold/40 to-transparent;
   }
+
+  /* ── Light-luxury selectable cards (customer flow) ── */
+  .sel-card {
+    @apply w-full rounded-2xl border border-charcoal/10 bg-white p-4 text-start shadow-sm
+           transition-all duration-200 hover:border-gold/40 hover:shadow-card;
+  }
+  .sel-card-on {
+    @apply border-gold bg-gold-50 shadow-card ring-1 ring-gold/40;
+  }
+  .stepper-btn {
+    @apply grid h-9 w-9 place-items-center rounded-lg border border-charcoal/15 bg-white text-lg
+           text-charcoal/70 transition hover:border-gold hover:text-gold-dark disabled:opacity-40;
+  }
+  .pill {
+    @apply rounded-full border border-charcoal/15 px-3 py-1.5 text-xs font-medium text-charcoal/60 transition hover:border-gold/40;
+  }
+  .pill-on {
+    @apply border-gold bg-gold-50 text-gold-dark;
+  }
+  /* Elegant dark band (hero / footer accents) */
+  .lux-dark {
+    @apply bg-charcoal-gradient text-ivory;
+  }
 }
 
 /* Elegant scrollbar */
