@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { LOUNGE_TYPES, VEHICLES, getCity, getStep, getVehicle } from "@/lib/domain";
+import { VEHICLES, getCity, getStep, getVehicle, loungeOptionsForCity } from "@/lib/domain";
 import { useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
-import { validateCustomer, validateJourney } from "@/lib/validation/journey";
+import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
 import { formatDateTime } from "@/lib/utils";
 
@@ -24,13 +24,14 @@ export default function ReviewPage() {
     selectedPackage: store.selectedPackage,
     steps: store.steps,
     customer: store.customer,
+    tripInfo: store.tripInfo,
     phoneVerified: store.phoneVerified,
     emailVerified: store.emailVerified,
   };
 
+  // validateJourney already folds in trip-info + customer validation.
   const validation = useMemo(() => validateJourney(draft), [JSON.stringify(draft)]);
-  const customerErrors = useMemo(() => validateCustomer(store.customer).filter((i) => i.severity === "error"), [JSON.stringify(store.customer)]);
-  const blocked = validation.hasErrors || customerErrors.length > 0;
+  const blocked = validation.hasErrors;
 
   const ordered = [...store.steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
   const estimatedTotal = ordered.filter((s) => !s.skipped && s.serviceType !== "SKIP").reduce((sum, s) => sum + computeStepPrice(s, config).computedPrice, 0);
@@ -45,7 +46,7 @@ export default function ReviewPage() {
     router.push(`/success/${ref}`);
   }
 
-  const allIssues = [...validation.timeline, ...customerErrors];
+  const allIssues = validation.timeline;
 
   return (
     <div className="luxe-container max-w-6xl py-10 md:py-14">
@@ -100,7 +101,7 @@ export default function ReviewPage() {
                 )}
                 {on && f.assistance && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {LOUNGE_TYPES.map((o) => {
+                    {loungeOptionsForCity(step.city).map((o) => {
                       const sel = step.loungeType === o.value;
                       return (
                         <button key={o.value} onClick={() => update({ loungeType: o.value })} className={`pill ${sel ? "pill-on" : ""}`}>

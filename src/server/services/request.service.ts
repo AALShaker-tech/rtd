@@ -36,11 +36,14 @@ export async function createRequest(input: CreateRequestInput) {
   const e164 = phone.e164 ?? input.customer.phone;
   const language = (input.customer.language.toUpperCase() as Language) ?? "EN";
 
-  // Derive trip-level defaults from the first transfer step that has a car.
+  // Trip-level passenger/bag counts come from the Trip Information step.
+  // Vehicle category is derived from the first transfer that has a car.
   const carStep = input.steps.find((s) => !s.skipped && serviceHasCar(s.serviceType) && s.carCategory);
   const carCategory = (carStep?.carCategory ?? "VIP") as CarCategory;
-  const passengers = carStep?.passengers ?? 1;
-  const bags = carStep?.bags ?? 0;
+  const passengers = input.tripInfo.passengers ?? carStep?.passengers ?? 1;
+  const bags = input.tripInfo.bags ?? carStep?.bags ?? 0;
+  const departureDate = combineDateTime(input.tripInfo.departureDate, null);
+  const returnDate = combineDateTime(input.tripInfo.returnDate, null);
 
   // Authoritative server-side pricing — never trust the client estimate.
   const pricingConfig = await getPricingConfig();
@@ -59,10 +62,10 @@ export async function createRequest(input: CreateRequestInput) {
       data: {
         fullName: input.customer.fullName,
         phone: e164,
-        email: input.customer.email,
+        email: input.customer.email ?? "",
         language,
-        phoneVerified: input.phoneVerified,
-        emailVerified: input.emailVerified,
+        phoneVerified: input.phoneVerified ?? false,
+        emailVerified: input.emailVerified ?? false,
       },
     });
 
@@ -78,6 +81,10 @@ export async function createRequest(input: CreateRequestInput) {
         bags,
         children: input.customer.children,
         childSeat: input.customer.childSeat,
+        departureDate,
+        returnDate,
+        specialAssistance: input.tripInfo.specialAssistance,
+        assistanceNotes: input.tripInfo.assistanceNotes ?? null,
         contactMeInstead: input.customer.contactMeInstead,
         notes: input.customer.notes ?? null,
         validationStatus: "VALID",
@@ -95,7 +102,12 @@ export async function createRequest(input: CreateRequestInput) {
     for (let i = 0; i < ordered.length; i++) {
       const s = ordered[i];
       const scheduledAt = combineDateTime(s.date, s.time);
-      const endAt = combineDateTime(s.endDate, s.endTime);
+      // Chauffeur end date is auto-calculated as start + days; otherwise unused.
+      let endAt: Date | null = null;
+      if (getStep(s.stepType).features.chauffeur && scheduledAt && s.days) {
+        endAt = new Date(scheduledAt);
+        endAt.setDate(endAt.getDate() + Math.max(1, s.days) - 1);
+      }
       const breakdown = stepBreakdowns.get(s.stepType);
 
       const step = await tx.journeyStep.create({
@@ -121,6 +133,7 @@ export async function createRequest(input: CreateRequestInput) {
           bags: s.bags ?? null,
           days: s.days ?? null,
           dailyHours: s.dailyHours ?? null,
+          dailyUsage: s.dailyUsage ?? null,
           skipped: s.skipped,
           basePrice: breakdown?.basePrice ?? null,
           vehicleMultiplier: breakdown?.vehicleMultiplier ?? null,

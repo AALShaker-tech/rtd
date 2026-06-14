@@ -184,6 +184,12 @@ model Request {
   children    Boolean     @default(false)
   childSeat   Boolean     @default(false)
 
+  // Trip-level information (collected once at the start of the journey)
+  departureDate     DateTime?
+  returnDate        DateTime?
+  specialAssistance Boolean   @default(false)
+  assistanceNotes   String?
+
   notes               String?
   contactMeInstead    Boolean @default(false) // "I don't know the details yet, please contact me"
   validationStatus    String  @default("PENDING") // PENDING | VALID | HAS_WARNINGS
@@ -245,6 +251,7 @@ model JourneyStep {
   // chauffeur specifics
   days       Int?
   dailyHours Int?
+  dailyUsage String? // SEVEN_HOURS | EIGHT_HOURS | FULL_DAY
 
   skipped Boolean @default(false)
 

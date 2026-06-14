@@ -32,6 +32,10 @@ interface RequestData {
   bags: number;
   children: boolean;
   childSeat: boolean;
+  departureDate: string | null;
+  returnDate: string | null;
+  specialAssistance: boolean;
+  assistanceNotes: string | null;
   notes: string | null;
   contactMeInstead: boolean;
   createdAt: string;
@@ -101,6 +105,8 @@ export function RequestDetailView({
       passengers: request.passengers,
       bags: request.bags,
       estimatedTotal: request.finalPrice ?? request.estimatedTotal,
+      specialAssistance: request.specialAssistance,
+      assistanceNotes: request.assistanceNotes,
       notes: request.notes,
       locale,
     });
@@ -134,12 +140,20 @@ export function RequestDetailView({
             <h3 className="mb-3 font-serif text-lg font-semibold text-charcoal">{pick(t.admin.customer)}</h3>
             <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
               <Row k={pick(t.fields.fullName)} v={request.customer.fullName} />
-              <Row k={pick(t.fields.phone)} v={request.customer.phone} ok={request.customer.phoneVerified} />
-              <Row k={pick(t.fields.email)} v={request.customer.email} ok={request.customer.emailVerified} />
+              <Row k={pick(t.fields.phone)} v={request.customer.phone} />
+              <Row k={pick(t.fields.email)} v={request.customer.email || "—"} />
               <Row k={pick(t.fields.language)} v={request.customer.language} />
-              <Row k={pick(t.fields.children)} v={request.children ? pick(t.common.yes) : pick(t.common.no)} />
-              <Row k={pick(t.fields.childSeat)} v={request.childSeat ? pick(t.common.yes) : pick(t.common.no)} />
+              <Row k={pick(t.tripInfo.departureDate)} v={request.departureDate ? formatDateTime(request.departureDate, locale, { dateStyle: "medium" }) : "—"} />
+              <Row k={pick(t.tripInfo.returnDate)} v={request.returnDate ? formatDateTime(request.returnDate, locale, { dateStyle: "medium" }) : "—"} />
+              <Row k={pick(t.fields.passengers)} v={String(request.passengers)} />
+              <Row k={pick(t.fields.bags)} v={String(request.bags)} />
             </dl>
+            {request.specialAssistance && (
+              <p className="mt-3 rounded-lg bg-gold-50 px-3 py-2 text-xs text-gold-dark">
+                <strong>{pick(t.tripInfo.specialAssistance)}</strong>
+                {request.assistanceNotes ? ` — ${request.assistanceNotes}` : ""}
+              </p>
+            )}
             {request.contactMeInstead && (
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.details.contactMe)}</p>
             )}

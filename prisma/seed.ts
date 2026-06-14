@@ -131,6 +131,10 @@ async function main() {
         emailVerified: false,
       },
     });
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+
     const request = await prisma.request.create({
       data: {
         referenceNumber: "RTD-2026-00001",
@@ -146,11 +150,11 @@ async function main() {
         validationStatus: "VALID",
         estimatedTotal: 650, // 250×1.4 (VIP transfer) + 300 (VIP lounge)
         priceStatus: "ESTIMATED",
+        departureDate: tomorrow,
+        returnDate: tomorrow,
+        specialAssistance: false,
       },
     });
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
 
     const step = await prisma.journeyStep.create({
       data: {

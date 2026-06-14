@@ -2,8 +2,16 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getPackage, getStep, STEPS, type PackageType, type StepType } from "@/lib/domain";
-import type { CustomerDetailsInput, JourneyStepInput } from "@/lib/types";
+import {
+  DEFAULT_CHAUFFEUR_USAGE,
+  getPackage,
+  getStep,
+  STEPS,
+  stepSide,
+  type PackageType,
+  type StepType,
+} from "@/lib/domain";
+import type { CustomerDetailsInput, JourneyStepInput, TripInfoInput } from "@/lib/types";
 
 /**
  * Client-side journey draft. Persisted to localStorage purely as a *draft*
@@ -21,6 +29,15 @@ const emptyCustomer: CustomerDetailsInput = {
   childSeat: false,
   contactMeInstead: false,
   notes: "",
+};
+
+const emptyTripInfo: TripInfoInput = {
+  departureDate: "",
+  returnDate: "",
+  passengers: 1,
+  bags: 0,
+  specialAssistance: false,
+  assistanceNotes: "",
 };
 
 function blankStep(stepType: StepType): JourneyStepInput {
@@ -41,11 +58,13 @@ interface JourneyState {
   destination?: string; // destination city code
   steps: JourneyStepInput[];
   customer: CustomerDetailsInput;
+  tripInfo: TripInfoInput;
   phoneVerified: boolean;
   emailVerified: boolean;
 
   setDestination: (code: string) => void;
-  initFlow: (destination: string) => void;
+  setTripInfo: (patch: Partial<TripInfoInput>) => void;
+  initFlow: (destination?: string) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
@@ -71,6 +90,7 @@ export const useJourneyStore = create<JourneyState>()(
       destination: undefined,
       steps: [],
       customer: emptyCustomer,
+      tripInfo: emptyTripInfo,
       phoneVerified: false,
       emailVerified: false,
 
@@ -82,21 +102,59 @@ export const useJourneyStore = create<JourneyState>()(
           ),
         })),
 
+      setTripInfo: (patch) => set((st) => ({ tripInfo: { ...st.tripInfo, ...patch } })),
+
       /**
-       * Start a SAFAR-style step-by-step flow: pre-build all 9 steps for the
-       * chosen destination, each starting as "skipped" (not counted) until the
-       * customer explicitly adds it.
+       * Build the step-by-step flow for the chosen destination, auto-filling
+       * shared Trip Information into each step:
+       *  - departure-side steps default to the departure date
+       *  - return-side steps default to the return date
+       *  - passengers / bags default to the global trip values
+       * User-customized fields from a prior pass are preserved.
        */
       initFlow: (destination) => {
-        const existing = new Map(get().steps.map((s) => [s.stepType, s]));
+        const { tripInfo } = get();
+        const dest = destination ?? get().destination;
+        const prior = new Map(get().steps.map((s) => [s.stepType, s]));
+
         const steps = STEPS.map((def) => {
-          const prior = existing.get(def.type);
           const base = blankStep(def.type);
-          const step: JourneyStepInput = prior ? { ...base, ...prior } : { ...base, skipped: true };
-          if (def.cityScope === "DESTINATION") step.city = destination;
+          const p = prior.get(def.type);
+          const side = stepSide(def.type);
+          const sideDate = side === "DEPARTURE" ? tripInfo.departureDate : tripInfo.returnDate;
+          const city = def.cityScope === "DESTINATION" ? dest : "RUH";
+
+          const step: JourneyStepInput = {
+            ...base,
+            city,
+            // preserve user customizations from a prior pass
+            skipped: p ? p.skipped : true,
+            serviceType: p?.serviceType ?? base.serviceType,
+            carCategory: p?.carCategory ?? base.carCategory,
+            loungeType: p?.loungeType,
+            flightNumber: p?.flightNumber,
+            flightData: p?.flightData,
+            flightLookupStatus: p?.flightLookupStatus,
+            hotelName: p?.hotelName,
+            hotelAddress: p?.hotelAddress,
+            homeAddress: p?.homeAddress,
+            notes: p?.notes,
+            time: p?.time,
+            // trip-info-driven defaults (kept editable per step)
+            date: p?.date ?? (sideDate || undefined),
+            passengers: def.features.transfer ? p?.passengers ?? tripInfo.passengers : undefined,
+            bags: def.features.transfer ? p?.bags ?? tripInfo.bags : undefined,
+          };
+
+          if (def.features.chauffeur) {
+            step.date = p?.date ?? (tripInfo.departureDate || undefined);
+            step.days = p?.days ?? 1;
+            step.dailyUsage = p?.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE;
+          }
           return step;
         });
-        set({ destination, selectedPackage: undefined, steps: sortByOrder(steps) });
+
+        set({ destination: dest, steps: sortByOrder(steps) });
       },
 
       applyPackage: (pkg) => {
@@ -157,6 +215,7 @@ export const useJourneyStore = create<JourneyState>()(
           destination: undefined,
           steps: [],
           customer: emptyCustomer,
+          tripInfo: emptyTripInfo,
           phoneVerified: false,
           emailVerified: false,
         }),

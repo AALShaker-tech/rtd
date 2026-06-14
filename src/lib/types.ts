@@ -39,6 +39,7 @@ export interface JourneyStepInput {
   // chauffeur
   days?: number;
   dailyHours?: number;
+  dailyUsage?: string; // SEVEN_HOURS | EIGHT_HOURS | FULL_DAY
 
   // flight lookup
   flightData?: NormalizedFlight | null;
@@ -47,12 +48,12 @@ export interface JourneyStepInput {
   notes?: string;
 }
 
-/** Customer contact + traveller details. */
+/** Customer contact details. */
 export interface CustomerDetailsInput {
   fullName: string;
   phone: string;
   phoneCountry: string; // ISO code for the dial selector
-  email: string;
+  email: string; // optional — may be empty
   language: Locale;
   children: boolean;
   childSeat: boolean;
@@ -60,11 +61,22 @@ export interface CustomerDetailsInput {
   notes?: string;
 }
 
+/** Trip-level information collected once at the start of the journey. */
+export interface TripInfoInput {
+  departureDate: string; // yyyy-mm-dd
+  returnDate: string; // yyyy-mm-dd
+  passengers: number;
+  bags: number;
+  specialAssistance: boolean;
+  assistanceNotes?: string;
+}
+
 /** The full journey draft built on the client. */
 export interface JourneyDraft {
   selectedPackage?: PackageType;
   steps: JourneyStepInput[];
   customer: CustomerDetailsInput;
+  tripInfo: TripInfoInput;
   phoneVerified: boolean;
   emailVerified: boolean;
 }

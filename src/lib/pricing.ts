@@ -5,7 +5,7 @@
  *
  * Formulas
  *  - Car transfer:   base × vehicleMultiplier × destinationFactor
- *  - Chauffeur:      base × vehicleMultiplier × days × destinationFactor
+ *  - Chauffeur:      base × vehicleMultiplier × days × usageMultiplier × destinationFactor
  *  - Lounge/assist:  loungePrice (if a lounge is chosen) else base, × destinationFactor
  *  - Skipped:        0
  */
@@ -15,6 +15,7 @@ import {
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
   VEHICLES,
+  chauffeurUsageMultiplier,
   getStep,
   serviceHasCar,
   type CarCategory,
@@ -56,7 +57,7 @@ function destinationFactor(config: PricingConfig, cityCode?: string | null): num
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days"
+    "stepType" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days" | "dailyUsage"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
@@ -67,15 +68,16 @@ export function computeStepPrice(
   const factor = destinationFactor(config, step.city);
   const base = config.services[step.stepType] ?? 0;
 
-  // Chauffeur — per-day pricing.
+  // Chauffeur — per-day pricing × daily-usage multiplier.
   if (def.features.chauffeur) {
     const mult = config.multipliers[step.carCategory ?? "VIP"] ?? 1;
     const days = Math.max(1, step.days ?? 1);
+    const usage = chauffeurUsageMultiplier(step.dailyUsage);
     return {
       basePrice: base,
       vehicleMultiplier: mult,
       destinationFactor: factor,
-      computedPrice: Math.round(base * mult * days * factor),
+      computedPrice: Math.round(base * mult * days * usage * factor),
     };
   }
 

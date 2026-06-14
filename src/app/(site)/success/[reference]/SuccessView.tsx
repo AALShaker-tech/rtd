@@ -19,6 +19,8 @@ export function SuccessView(props: {
   passengers: number;
   bags: number;
   estimatedTotal: number;
+  specialAssistance?: boolean;
+  assistanceNotes?: string | null;
   notes: string | null;
   steps: JourneyStepInput[];
 }) {
@@ -33,6 +35,8 @@ export function SuccessView(props: {
     passengers: props.passengers,
     bags: props.bags,
     estimatedTotal: props.estimatedTotal,
+    specialAssistance: props.specialAssistance,
+    assistanceNotes: props.assistanceNotes,
     notes: props.notes,
     locale,
   });

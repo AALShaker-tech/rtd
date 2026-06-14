@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/i18n/I18nProvider";
-import { SERVICE_TYPES, getCity, getStep, getVehicle } from "@/lib/domain";
+import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, getStep, getVehicle } from "@/lib/domain";
 import { formatDateTime } from "@/lib/utils";
 
 export interface DisplayStep {
@@ -25,6 +25,7 @@ export interface DisplayStep {
   bags: number | null;
   days: number | null;
   dailyHours: number | null;
+  dailyUsage: string | null;
   skipped: boolean;
   notes: string | null;
   flightLookupStatus?: string | null;
@@ -65,7 +66,7 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
                 {s.passengers != null && <Row k={pick(t.fields.passengers)} v={String(s.passengers)} />}
                 {s.bags != null && <Row k={pick(t.fields.bags)} v={String(s.bags)} />}
                 {s.days != null && <Row k={pick(t.fields.days)} v={String(s.days)} />}
-                {s.dailyHours != null && <Row k={pick(t.fields.dailyHours)} v={String(s.dailyHours)} />}
+                {s.dailyUsage && <Row k={pick(t.fields.dailyUsage)} v={CHAUFFEUR_USAGE.find((u) => u.value === s.dailyUsage)?.name[locale] ?? s.dailyUsage} />}
                 {service && <Row k={pick(t.builder.serviceType)} v={service} />}
                 {s.notes && <Row k={pick(t.fields.notes)} v={s.notes} />}
               </dl>

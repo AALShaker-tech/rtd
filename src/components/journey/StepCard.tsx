@@ -2,10 +2,11 @@
 
 import { useI18n } from "@/i18n/I18nProvider";
 import {
-  LOUNGE_TYPES,
+  CHAUFFEUR_USAGE,
   VEHICLES,
   getStep,
   getVehicle,
+  loungeOptionsForCity,
   serviceHasCar,
 } from "@/lib/domain";
 import { usePricing } from "@/components/pricing/PricingProvider";
@@ -15,6 +16,14 @@ import { FlightLookup } from "./FlightLookup";
 import type { JourneyStepInput } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** End date = start + (days - 1), formatted yyyy-mm-dd. */
+function chauffeurEndDate(start: string, days: number): string {
+  const d = new Date(`${start}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return start;
+  d.setDate(d.getDate() + Math.max(1, days) - 1);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * Editor for a single journey step. Every displayed price is derived from the
@@ -58,11 +67,11 @@ export function StepCard({
       {/* Flight lookup */}
       {f.flight && <FlightLookup step={step} onChange={onChange} />}
 
-      {/* Lounge / assistance options */}
+      {/* Lounge / assistance options — limited by the airport's country */}
       {f.assistance && (
         <div className="grid gap-2.5">
           <p className="text-sm font-medium text-charcoal/70">{pick(t.fields.loungeType)}</p>
-          {LOUNGE_TYPES.map((o) => {
+          {loungeOptionsForCity(step.city).map((o) => {
             const on = step.loungeType === o.value;
             return (
               <button key={o.value} onClick={() => onChange({ loungeType: o.value })} className={`sel-card flex items-center justify-between ${on ? "sel-card-on" : ""}`}>
@@ -98,17 +107,34 @@ export function StepCard({
         </div>
       )}
 
-      {/* Chauffeur days + dates */}
+      {/* Chauffeur — start date + number of days + daily usage (end date auto) */}
       {f.chauffeur ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Stepper label={pick(t.fields.days)} value={step.days ?? 1} min={1} onChange={(v) => onChange({ days: v })} />
-          <div />
-          <Field label={pick(t.fields.startDate)} error={errFor("date")}>
-            <input type="date" min={today()} value={step.date ?? ""} className="field-input" onChange={(e) => onChange({ date: e.target.value })} />
-          </Field>
-          <Field label={pick(t.fields.endDate)} error={errFor("endDate")}>
-            <input type="date" min={step.date ?? today()} value={step.endDate ?? ""} className="field-input" onChange={(e) => onChange({ endDate: e.target.value })} />
-          </Field>
+        <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={pick(t.fields.startDate)} error={errFor("date")}>
+              <input type="date" min={today()} value={step.date ?? ""} className="field-input" onChange={(e) => onChange({ date: e.target.value })} />
+            </Field>
+            <Stepper label={pick(t.fields.days)} value={step.days ?? 1} min={1} onChange={(v) => onChange({ days: v })} />
+          </div>
+          <div>
+            <p className="field-label">{pick(t.fields.dailyUsage)}</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {CHAUFFEUR_USAGE.map((u) => {
+                const sel = (step.dailyUsage ?? "EIGHT_HOURS") === u.value;
+                return (
+                  <button key={u.value} type="button" onClick={() => onChange({ dailyUsage: u.value })} className={`sel-card text-center ${sel ? "sel-card-on" : ""}`}>
+                    <span className="font-semibold text-charcoal">{pick(u.name)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {errFor("dailyUsage") && <p className="mt-1 text-xs text-red-600">{errFor("dailyUsage")}</p>}
+          </div>
+          {step.date && step.days ? (
+            <p className="rounded-xl bg-ivory-warm px-4 py-2.5 text-xs text-charcoal/60">
+              {pick(t.fields.endDate)}: <span className="font-medium text-charcoal">{chauffeurEndDate(step.date, step.days)}</span>
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">

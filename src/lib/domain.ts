@@ -204,8 +204,8 @@ export const STEPS: StepDef[] = [
     name: { en: "Departure Assistance at Riyadh Airport", ar: "خدمة المغادرة في مطار الرياض" },
     shortName: { en: "Riyadh Departure Assist", ar: "مساعدة المغادرة – الرياض" },
     description: {
-      en: "Executive Office, Marhaba, VIP lounge, Meet & Assist and Fast Track.",
-      ar: "المكتب التنفيذي، مرحبا، صالة كبار الزوار، الاستقبال والمساعدة والمسار السريع.",
+      en: "Executive Office or Marhaba lounge assistance at Riyadh Airport.",
+      ar: "خدمة المكتب التنفيذي أو مرحبا في مطار الرياض.",
     },
     features: F({ assistance: true, flight: true }),
   },
@@ -216,8 +216,8 @@ export const STEPS: StepDef[] = [
     name: { en: "Arrival Assistance at Destination", ar: "خدمة الوصول في الوجهة" },
     shortName: { en: "Destination Arrival Assist", ar: "مساعدة الوصول – الوجهة" },
     description: {
-      en: "VIP arrival, Fast Track and Meet & Assist in London, Paris, Dubai or Cairo.",
-      ar: "وصول كبار الشخصيات، المسار السريع والاستقبال في لندن أو باريس أو دبي أو القاهرة.",
+      en: "Meet & Assist or Fast Track on arrival in London, Paris, Dubai or Cairo.",
+      ar: "الاستقبال والمساعدة أو المسار السريع عند الوصول في لندن أو باريس أو دبي أو القاهرة.",
     },
     features: F({ assistance: true, flight: true }),
   },
@@ -264,8 +264,8 @@ export const STEPS: StepDef[] = [
     name: { en: "Departure Assistance at Return Airport", ar: "خدمة المغادرة في مطار العودة" },
     shortName: { en: "Return Departure Assist", ar: "مساعدة المغادرة – العودة" },
     description: {
-      en: "Fast Track, Meet & Assist, VIP lounge and farewell assistance.",
-      ar: "المسار السريع، الاستقبال والمساعدة، صالة كبار الزوار ومساعدة التوديع.",
+      en: "Meet & Assist or Fast Track for your departure from the destination.",
+      ar: "الاستقبال والمساعدة أو المسار السريع لمغادرتك من الوجهة.",
     },
     features: F({ assistance: true, flight: true }),
   },
@@ -332,9 +332,51 @@ export const LOUNGE_TYPES: { value: string; name: Bilingual }[] = [
   { value: "EXECUTIVE_OFFICE", name: { en: "Executive Office", ar: "المكتب التنفيذي" } },
   { value: "MARHABA", name: { en: "Marhaba", ar: "مرحبا" } },
   { value: "VIP_LOUNGE", name: { en: "VIP Lounge", ar: "صالة كبار الزوار" } },
-  { value: "MEET_ASSIST", name: { en: "Meet & Assist", ar: "استقبال ومساعدة" } },
+  { value: "MEET_ASSIST", name: { en: "Meet & Assist", ar: "الاستقبال والمساعدة" } },
   { value: "FAST_TRACK", name: { en: "Fast Track", ar: "المسار السريع" } },
 ];
+
+/** Riyadh / Saudi airports offer Executive Office & Marhaba. */
+const SAUDI_LOUNGES = ["EXECUTIVE_OFFICE", "MARHABA"];
+/** Airports outside Saudi Arabia offer Meet & Assist & Fast Track. */
+const INTL_LOUNGES = ["MEET_ASSIST", "FAST_TRACK"];
+
+/**
+ * Airport assistance options depend on the airport's country:
+ *  - Saudi Arabia → Executive Office, Marhaba
+ *  - elsewhere    → Meet & Assist, Fast Track
+ */
+export function loungeOptionsForCity(cityCode?: string | null): typeof LOUNGE_TYPES {
+  const country = cityCode ? getCity(cityCode)?.country : undefined;
+  const allowed = country === "SA" ? SAUDI_LOUNGES : INTL_LOUNGES;
+  return LOUNGE_TYPES.filter((l) => allowed.includes(l.value));
+}
+
+/** Is a lounge option valid for the given city's country? */
+export function isLoungeValidForCity(loungeType: string, cityCode?: string | null): boolean {
+  return loungeOptionsForCity(cityCode).some((l) => l.value === loungeType);
+}
+
+// ─────────────────────────── Chauffeur daily usage ───────────────────────────
+
+export type ChauffeurUsage = "SEVEN_HOURS" | "EIGHT_HOURS" | "FULL_DAY";
+
+export const CHAUFFEUR_USAGE: { value: ChauffeurUsage; name: Bilingual; multiplier: number }[] = [
+  { value: "SEVEN_HOURS", name: { en: "7 hours", ar: "٧ ساعات" }, multiplier: 1.0 },
+  { value: "EIGHT_HOURS", name: { en: "8 hours", ar: "٨ ساعات" }, multiplier: 1.1 },
+  { value: "FULL_DAY", name: { en: "Full day", ar: "يوم كامل" }, multiplier: 1.4 },
+];
+
+export const DEFAULT_CHAUFFEUR_USAGE: ChauffeurUsage = "EIGHT_HOURS";
+
+export function chauffeurUsageMultiplier(usage?: string | null): number {
+  return CHAUFFEUR_USAGE.find((u) => u.value === usage)?.multiplier ?? 1;
+}
+
+/** Which leg of the trip a step belongs to (drives default date auto-fill). */
+export function stepSide(stepType: StepType): "DEPARTURE" | "RETURN" {
+  return getStep(stepType).order <= 5 ? "DEPARTURE" : "RETURN";
+}
 
 // ─────────────────────────── Packages ───────────────────────────
 

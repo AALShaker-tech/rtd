@@ -159,6 +159,7 @@ export const dict = {
     bags: { en: "Bags", ar: "الحقائب" },
     days: { en: "Number of days", ar: "عدد الأيام" },
     dailyHours: { en: "Daily hours", ar: "الساعات اليومية" },
+    dailyUsage: { en: "Daily usage", ar: "الاستخدام اليومي" },
     notes: { en: "Special notes", ar: "ملاحظات خاصة" },
     flightLabel: { en: "Enter your flight number to fetch details", ar: "أدخل رقم رحلتك لجلب التفاصيل" },
     fullName: { en: "Full name", ar: "الاسم الكامل" },
@@ -167,6 +168,24 @@ export const dict = {
     language: { en: "Preferred language", ar: "اللغة المفضّلة" },
     children: { en: "Children included?", ar: "هل يوجد أطفال؟" },
     childSeat: { en: "Child seat required?", ar: "هل تحتاج مقعد أطفال؟" },
+  },
+  tripInfo: {
+    title: { en: "Trip Information", ar: "معلومات الرحلة" },
+    subtitle: {
+      en: "Tell us about your trip once — we'll carry it through your journey.",
+      ar: "أخبرنا بتفاصيل رحلتك مرة واحدة — وسنطبّقها على كل خطوات رحلتك.",
+    },
+    departureDate: { en: "Departure date", ar: "تاريخ المغادرة" },
+    returnDate: { en: "Return date", ar: "تاريخ العودة" },
+    specialAssistance: {
+      en: "Does the passenger require special assistance?",
+      ar: "هل يحتاج المسافر إلى مساعدة خاصة؟",
+    },
+    assistanceNotes: { en: "Please describe the assistance needed", ar: "يرجى توضيح نوع المساعدة المطلوبة" },
+    assistanceHint: {
+      en: "e.g. wheelchair assistance if needed",
+      ar: "مثال: كرسي متحرك عند الحاجة",
+    },
   },
   details: {
     title: { en: "Your Details", ar: "بياناتك" },

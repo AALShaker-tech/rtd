@@ -11,6 +11,7 @@
 import {
   getStep,
   getVehicle,
+  isLoungeValidForCity,
   serviceHasCar,
   type CarCategory,
   type StepType,
@@ -23,6 +24,7 @@ import type {
   JourneyStepInput,
   JourneyValidationResult,
   StepValidationResult,
+  TripInfoInput,
   ValidationIssue,
 } from "@/lib/types";
 
@@ -89,24 +91,13 @@ export function validateStep(step: JourneyStepInput, now: Date = new Date()): St
   // Date / time
   const when = combineDateTime(step.date, step.time);
   if (f.chauffeur) {
+    // End date is auto-calculated (start + days); the customer no longer enters it.
     if (!step.date) errors.push(req("start date", "تاريخ البداية", "date"));
-    if (!step.endDate) errors.push(req("end date", "تاريخ النهاية", "endDate"));
-    const start = combineDateTime(step.date, step.time);
-    const end = combineDateTime(step.endDate, step.endTime);
+    const start = combineDateTime(step.date, null);
     if (start && start < startOfDay(now)) errors.push(pastDate());
-    if (start && end && end < start) {
-      errors.push(
-        issue(
-          "error",
-          "Chauffeur end date cannot be before the start date.",
-          "تاريخ انتهاء خدمة السائق لا يمكن أن يكون قبل تاريخ البداية.",
-          "endDate",
-        ),
-      );
-    }
     if (!step.days || step.days < 1) errors.push(req("number of days", "عدد الأيام", "days"));
-    if (!step.dailyHours || step.dailyHours < 1)
-      errors.push(req("daily hours", "عدد الساعات اليومية", "dailyHours"));
+    if (!step.dailyUsage)
+      errors.push(req("daily usage", "نوع الاستخدام اليومي", "dailyUsage"));
     if (!step.city) errors.push(req("city", "المدينة", "city"));
   } else {
     if (!step.date) errors.push(req("date", "التاريخ", "date"));
@@ -144,6 +135,17 @@ export function validateStep(step: JourneyStepInput, now: Date = new Date()): St
         "warning",
         "Select a lounge or assistance type so we can prepare the right service.",
         "اختر نوع الصالة أو المساعدة حتى نهيّئ الخدمة المناسبة.",
+        "loungeType",
+      ),
+    );
+  }
+  // Lounge option must match the airport's country (Saudi vs international).
+  if (f.assistance && step.loungeType && !isLoungeValidForCity(step.loungeType, step.city)) {
+    errors.push(
+      issue(
+        "error",
+        "This assistance option isn't available at the selected airport. Please choose a valid option.",
+        "خيار المساعدة هذا غير متاح في المطار المحدد. الرجاء اختيار خيار صحيح.",
         "loungeType",
       ),
     );
@@ -204,18 +206,47 @@ export function validateCustomer(c: CustomerDetailsInput): ValidationIssue[] {
       issue("error", "Please enter a valid mobile number.", "الرجاء إدخال رقم جوال صحيح.", "phone"),
     );
   }
-  if (!c.email || !isValidEmail(c.email)) {
+  // Email is optional — only validate the format if one was entered.
+  if (c.email && c.email.trim() && !isValidEmail(c.email)) {
     errors.push(
       issue("error", "Please enter a valid email address.", "الرجاء إدخال بريد إلكتروني صحيح.", "email"),
     );
   }
-  if (c.childSeat && !c.children) {
+  return errors;
+}
+
+// ─────────────────────────── Trip information ───────────────────────────
+
+export function validateTripInfo(trip: TripInfoInput): ValidationIssue[] {
+  const errors: ValidationIssue[] = [];
+  if (!trip.departureDate) {
+    errors.push(req("departure date", "تاريخ المغادرة", "departureDate"));
+  }
+  if (trip.returnDate && trip.departureDate && trip.returnDate < trip.departureDate) {
+    errors.push(
+      issue(
+        "error",
+        "Return date cannot be before the departure date.",
+        "تاريخ العودة لا يمكن أن يكون قبل تاريخ المغادرة.",
+        "returnDate",
+      ),
+    );
+  }
+  if (trip.passengers == null || trip.passengers < 1) {
+    errors.push(
+      issue("error", "At least one passenger is required.", "يجب إدخال راكب واحد على الأقل.", "passengers"),
+    );
+  }
+  if (trip.bags != null && trip.bags < 0) {
+    errors.push(issue("error", "Bag count cannot be negative.", "عدد الحقائب لا يمكن أن يكون سالبًا.", "bags"));
+  }
+  if (trip.specialAssistance && !(trip.assistanceNotes && trip.assistanceNotes.trim())) {
     errors.push(
       issue(
         "warning",
-        "You selected a child seat but indicated no children are travelling.",
-        "لقد اخترت مقعد أطفال مع الإشارة إلى عدم وجود أطفال في الرحلة.",
-        "childSeat",
+        "Please describe the assistance needed so we can prepare.",
+        "يرجى توضيح نوع المساعدة المطلوبة حتى نتمكن من التحضير.",
+        "assistanceNotes",
       ),
     );
   }
@@ -359,6 +390,11 @@ export function validateJourney(draft: JourneyDraft, now: Date = new Date()): Jo
   const active = draft.steps.filter((s) => !s.skipped && s.serviceType !== "SKIP");
   const steps = active.map((s) => validateStep(s, now));
   const timeline = validateTimeline(draft.steps);
+
+  // Fold trip-info and customer validation into the journey result so the server
+  // (which calls validateJourney) enforces everything authoritatively.
+  if (draft.tripInfo) timeline.push(...validateTripInfo(draft.tripInfo));
+  if (draft.customer) timeline.push(...validateCustomer(draft.customer));
 
   // A journey with zero active steps is itself an error.
   if (active.length === 0) {
