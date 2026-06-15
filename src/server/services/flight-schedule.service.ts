@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { AIRPORT_META } from "@/lib/flight-schedule";
+import { AIRPORT_META, parseFlightSchedule, routeDuration } from "@/lib/flight-schedule";
 import { normalizeFlightNumber, type ResolvedFlight } from "@/lib/flight";
 
 /** Convert a yyyy-mm-dd date to ISO weekday 1=Mon … 7=Sun. */
@@ -29,41 +29,92 @@ function estimateArrival(
   };
 }
 
+/** Build a ResolvedFlight from a route + departure time. */
+function buildResolved(
+  flightCode: string,
+  airline: string,
+  origin: string,
+  destination: string,
+  dateISO: string,
+  depTimeLocal: string,
+  durationMinutes: number,
+): ResolvedFlight {
+  return {
+    flightCode,
+    airline,
+    originAirport: origin,
+    destinationAirport: destination,
+    departureDate: dateISO,
+    departureTimeLocal: depTimeLocal,
+    durationMinutes,
+    lookupSource: "static_schedule",
+    lookupStatus: "static_matched",
+    ...estimateArrival(dateISO, depTimeLocal, origin, destination, durationMinutes),
+  };
+}
+
+/** Resolve from the bundled CSV (fallback when the DB schedule isn't seeded). */
+function resolveFromCsv(flightCode: string, weekday: number, dateISO: string): ResolvedFlight[] {
+  return parseFlightSchedule()
+    .filter((r) => r.flightCode === flightCode && r.dayOfWeek === weekday)
+    .map((r) =>
+      buildResolved(
+        r.flightCode,
+        r.airlineName,
+        r.origin,
+        r.destination,
+        dateISO,
+        r.departureTimeLocal,
+        routeDuration(r.origin, r.destination),
+      ),
+    );
+}
+
 /**
  * Resolve a flight code against the static weekly schedule for a given trip date.
  * Returns every match for that weekday (usually one). Empty = not found.
+ *
+ * Primary source is the DB (WeeklyFlightSchedule); if the DB has no matching
+ * rows we fall back to the bundled CSV (same authoritative data) so lookup works
+ * even when the database hasn't been seeded (e.g. a fresh deployment).
  */
 export async function resolveFlight(rawCode: string, dateISO: string): Promise<ResolvedFlight[]> {
   const flightCode = normalizeFlightNumber(rawCode || "");
   if (!flightCode || !dateISO) return [];
 
   const weekday = isoWeekday(dateISO);
-  const rows = await prisma.weeklyFlightSchedule.findMany({
-    where: { flightCode, dayOfWeek: weekday, isActive: true },
-    include: { route: true, airline: true },
-  });
 
-  return rows.map((r) => {
-    const arrival = estimateArrival(
-      dateISO,
-      r.departureTimeLocal,
+  let rows: Array<{
+    flightCode: string;
+    departureTimeLocal: string;
+    route: { originAirportCode: string; destinationAirportCode: string; approxDurationMinutes: number };
+    airline: { name: string };
+  }> = [];
+  try {
+    rows = await prisma.weeklyFlightSchedule.findMany({
+      where: { flightCode, dayOfWeek: weekday, isActive: true },
+      include: { route: true, airline: true },
+    });
+  } catch {
+    rows = [];
+  }
+
+  if (rows.length === 0) {
+    // DB miss (no match, or table not seeded) → resolve from the bundled CSV.
+    return resolveFromCsv(flightCode, weekday, dateISO);
+  }
+
+  return rows.map((r) =>
+    buildResolved(
+      r.flightCode,
+      r.airline.name,
       r.route.originAirportCode,
       r.route.destinationAirportCode,
+      dateISO,
+      r.departureTimeLocal,
       r.route.approxDurationMinutes,
-    );
-    return {
-      flightCode: r.flightCode,
-      airline: r.airline.name,
-      originAirport: r.route.originAirportCode,
-      destinationAirport: r.route.destinationAirportCode,
-      departureDate: dateISO,
-      departureTimeLocal: r.departureTimeLocal,
-      durationMinutes: r.route.approxDurationMinutes,
-      lookupSource: "static_schedule",
-      lookupStatus: "static_matched",
-      ...arrival,
-    } satisfies ResolvedFlight;
-  });
+    ),
+  );
 }
 
 /** Free-text schedule search (admin / debugging). */
