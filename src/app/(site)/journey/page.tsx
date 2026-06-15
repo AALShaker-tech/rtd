@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { CITIES, getCity } from "@/lib/domain";
 import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
@@ -308,6 +308,18 @@ function FlightField({ leg }: { leg: "DEPARTURE" | "RETURN" }) {
       setMatches(res.matches);
     }
   }
+
+  // Re-resolve automatically when the trip date changes (the weekday — hence the
+  // schedule match — depends on it). Clears any stale "not found" result.
+  const prevDate = useRef(date);
+  useEffect(() => {
+    if (prevDate.current === date) return;
+    prevDate.current = date;
+    setMatches(null);
+    if (code && date) void find();
+    else patch(isDep ? { departureFlight: null, departureLookupStatus: undefined } : { returnFlight: null, returnLookupStatus: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   function choose(f: ResolvedFlight) {
     patch(isDep ? { departureFlight: f, departureLookupStatus: "static_matched", departureTime: "" } : { returnFlight: f, returnLookupStatus: "static_matched", returnTime: "" });
