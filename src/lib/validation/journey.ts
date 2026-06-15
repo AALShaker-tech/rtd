@@ -240,6 +240,27 @@ export function validateTripInfo(trip: TripInfoInput): ValidationIssue[] {
   if (trip.bags != null && trip.bags < 0) {
     errors.push(issue("error", "Bag count cannot be negative.", "عدد الحقائب لا يمكن أن يكون سالبًا.", "bags"));
   }
+  // Flight: a resolved flight provides the time. If not found, require a manual time.
+  if (!trip.departureFlight && !trip.departureTime) {
+    errors.push(
+      issue(
+        "error",
+        "Enter your departure flight time (we couldn't resolve a flight automatically).",
+        "أدخل وقت رحلة المغادرة (لم نتمكن من تحديد الرحلة تلقائيًا).",
+        "departureTime",
+      ),
+    );
+  }
+  if (trip.returnDate && !trip.returnFlight && !trip.returnTime) {
+    errors.push(
+      issue(
+        "warning",
+        "Add your return flight time so we can plan the return services.",
+        "أضف وقت رحلة العودة حتى نتمكن من تخطيط خدمات العودة.",
+        "returnTime",
+      ),
+    );
+  }
   if (trip.specialAssistance && !(trip.assistanceNotes && trip.assistanceNotes.trim())) {
     errors.push(
       issue(
@@ -268,12 +289,15 @@ export function validateTimeline(steps: JourneyStepInput[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const active = steps.filter((s) => !s.skipped && s.serviceType !== "SKIP");
 
-  // 1) Active steps must be in non-decreasing chronological order.
+  // 1) Active steps must be in non-decreasing order by DAY. We compare calendar
+  //    days (not clock time) so estimated same-day buffers and date-only services
+  //    (e.g. chauffeur) don't produce false ordering errors.
   const ordered = [...active].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
   let prev: { step: JourneyStepInput; t: Date } | null = null;
   for (const s of ordered) {
-    const t = stepTime(s);
-    if (!t) continue;
+    const full = stepTime(s);
+    if (!full) continue;
+    const t = startOfDay(full);
     if (prev && t < prev.t) {
       issues.push(
         issue(

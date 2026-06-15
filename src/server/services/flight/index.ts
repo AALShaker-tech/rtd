@@ -4,19 +4,27 @@ import { aviationstackProvider } from "./aviationstack.provider";
 import { amadeusProvider } from "./amadeus.provider";
 import { flightawareProvider } from "./flightaware.provider";
 import { mockProvider } from "./mock.provider";
+import { staticScheduleProvider } from "./static.provider";
 import type { FlightProvider } from "./types";
 
-/** Resolve the active provider from FLIGHT_API_PROVIDER (defaults to mock). */
+/**
+ * Resolve the active provider. FLIGHT_LOOKUP_PROVIDER selects the implementation
+ * (the static schedule is the active default); FLIGHT_API_PROVIDER kept as a
+ * legacy fallback for the future real-API providers.
+ */
 function resolveProvider(): FlightProvider {
-  switch ((process.env.FLIGHT_API_PROVIDER ?? "mock").toLowerCase()) {
+  const selected = (process.env.FLIGHT_LOOKUP_PROVIDER ?? process.env.FLIGHT_API_PROVIDER ?? "static_schedule").toLowerCase();
+  switch (selected) {
     case "aviationstack":
       return aviationstackProvider;
     case "amadeus":
       return amadeusProvider;
     case "flightaware":
       return flightawareProvider;
-    default:
+    case "mock":
       return mockProvider;
+    default:
+      return staticScheduleProvider;
   }
 }
 

@@ -23,6 +23,52 @@ async function nextReference(tx: Prisma.TransactionClient): Promise<string> {
   return buildReferenceNumber(count + 1);
 }
 
+/** Build a FlightSnapshot row for a leg, or null when no flight info exists. */
+function buildSnapshot(
+  leg: "DEPARTURE" | "RETURN",
+  requestId: string,
+  resolved: any,
+  code: string | undefined,
+  manualTime: string | undefined,
+  date: string | undefined,
+  status: string | undefined,
+  destination: string | null,
+) {
+  if (resolved && resolved.flightCode) {
+    return {
+      requestId,
+      leg,
+      flightCode: resolved.flightCode,
+      airline: resolved.airline ?? null,
+      originAirport: resolved.originAirport ?? null,
+      destinationAirport: resolved.destinationAirport ?? null,
+      departureDate: combineDateTime(resolved.departureDate, resolved.departureTimeLocal),
+      departureTimeLocal: resolved.departureTimeLocal ?? null,
+      estimatedArrivalDate: combineDateTime(resolved.estimatedArrivalDate, resolved.estimatedArrivalTimeLocal),
+      estimatedArrivalTimeLocal: resolved.estimatedArrivalTimeLocal ?? null,
+      lookupSource: "static_schedule",
+      lookupStatus: "static_matched",
+    };
+  }
+  if (code || manualTime) {
+    return {
+      requestId,
+      leg,
+      flightCode: code ?? null,
+      airline: null,
+      originAirport: leg === "DEPARTURE" ? "RUH" : destination,
+      destinationAirport: leg === "DEPARTURE" ? destination : "RUH",
+      departureDate: combineDateTime(date, manualTime),
+      departureTimeLocal: manualTime ?? null,
+      estimatedArrivalDate: null,
+      estimatedArrivalTimeLocal: null,
+      lookupSource: "manual",
+      lookupStatus: status ?? (code ? "not_found" : "manual"),
+    };
+  }
+  return null;
+}
+
 const STEP_DRIVER_TASK = new Set([
   "HOME_TO_RIYADH_AIRPORT",
   "AIRPORT_TO_HOTEL",
@@ -159,6 +205,14 @@ export async function createRequest(input: CreateRequestInput) {
     await tx.requestPriceHistory.create({
       data: { requestId: request.id, changeType: "RECALCULATED", newPrice: estimatedTotal, reason: "Initial estimate" },
     });
+
+    // Preserve the flight details as resolved at request time.
+    const ti = input.tripInfo;
+    const snapshots = [
+      buildSnapshot("DEPARTURE", request.id, ti.departureFlight, ti.departureFlightCode, ti.departureTime, ti.departureDate, ti.departureLookupStatus, input.destination ?? null),
+      buildSnapshot("RETURN", request.id, ti.returnFlight, ti.returnFlightCode, ti.returnTime, ti.returnDate, ti.returnLookupStatus, input.destination ?? null),
+    ].filter((s): s is NonNullable<typeof s> => s !== null);
+    if (snapshots.length) await tx.flightSnapshot.createMany({ data: snapshots });
 
     return request;
   });

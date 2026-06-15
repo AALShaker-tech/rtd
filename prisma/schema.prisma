@@ -215,6 +215,7 @@ model Request {
   driverTasks   DriverTask[]
   auditLogs     AuditLog[]
   priceHistory  RequestPriceHistory[]
+  flightSnapshots FlightSnapshot[]
 
   @@index([status])
   @@index([assignedEmployeeId])
@@ -381,6 +382,71 @@ model Airport {
   cityId  String
   city    City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
   terminals String[] @default([])
+  country  String?
+  timezone String? // IANA, e.g. Asia/Riyadh
+  utcOffsetMinutes Int @default(0) // offset for the schedule window (June 2026)
+}
+
+/// Airlines referenced by the static weekly flight schedule.
+model Airline {
+  id        String                 @id @default(cuid())
+  code      String                 @unique // SV, EK, XY…
+  name      String
+  schedules WeeklyFlightSchedule[]
+}
+
+/// A direct route between two airports (by IATA code).
+model Route {
+  id                     String                 @id @default(cuid())
+  originAirportCode      String
+  destinationAirportCode String
+  isDirect               Boolean                @default(true)
+  approxDurationMinutes  Int
+  schedules              WeeklyFlightSchedule[]
+
+  @@unique([originAirportCode, destinationAirportCode])
+}
+
+/// One row per active weekday for a scheduled flight (static, not live data).
+model WeeklyFlightSchedule {
+  id                 String  @id @default(cuid())
+  routeId            String
+  route              Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  airlineId          String
+  airline            Airline @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  flightCode         String
+  dayOfWeek          Int // 1=Mon … 7=Sun
+  departureTimeLocal String // "HH:MM" local to the origin airport
+  isActive           Boolean @default(true)
+  sourceWeek         String
+  sourceName         String
+  isStaticSchedule   Boolean @default(true)
+
+  @@index([flightCode])
+  @@index([routeId])
+  @@index([airlineId])
+}
+
+/// A snapshot of the flight as resolved at request time (preserved even if the
+/// static schedule later changes).
+model FlightSnapshot {
+  id                        String   @id @default(cuid())
+  requestId                 String
+  request                   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  leg                       String // DEPARTURE | RETURN
+  flightCode                String?
+  airline                   String?
+  originAirport             String?
+  destinationAirport        String?
+  departureDate             DateTime?
+  departureTimeLocal        String?
+  estimatedArrivalDate      DateTime?
+  estimatedArrivalTimeLocal String?
+  lookupSource              String // static_schedule | manual
+  lookupStatus              String // static_matched | manual | not_found
+  createdAt                 DateTime @default(now())
+
+  @@index([requestId])
 }
 
 model Hotel {

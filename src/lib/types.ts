@@ -5,7 +5,7 @@ import type {
   ServiceType,
   StepType,
 } from "./domain";
-import type { NormalizedFlight } from "./flight";
+import type { NormalizedFlight, ResolvedFlight, FlightLookupStatusValue } from "./flight";
 
 export type FlightLookupStatus = "MANUAL" | "VERIFIED" | "LOOKUP_FAILED";
 
@@ -69,6 +69,16 @@ export interface TripInfoInput {
   bags: number;
   specialAssistance: boolean;
   assistanceNotes?: string;
+
+  // Flight details (resolved from the static schedule, or manual fallback)
+  departureFlightCode?: string;
+  returnFlightCode?: string;
+  departureTime?: string; // manual fallback (origin local) when no match
+  returnTime?: string; // manual fallback
+  departureFlight?: ResolvedFlight | null;
+  returnFlight?: ResolvedFlight | null;
+  departureLookupStatus?: FlightLookupStatusValue;
+  returnLookupStatus?: FlightLookupStatusValue;
 }
 
 /** The full journey draft built on the client. */

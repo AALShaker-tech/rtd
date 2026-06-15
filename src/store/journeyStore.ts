@@ -11,7 +11,49 @@ import {
   type PackageType,
   type StepType,
 } from "@/lib/domain";
+import { estimateServiceTime } from "@/lib/service-timing";
 import type { CustomerDetailsInput, JourneyStepInput, TripInfoInput } from "@/lib/types";
+
+/** Build a step's trip-derived fields (city, date, time, flight, pax, bags). */
+function applyTripToStep(
+  base: JourneyStepInput,
+  tripInfo: TripInfoInput,
+  dest: string | undefined,
+  prior?: JourneyStepInput,
+): JourneyStepInput {
+  const def = getStep(base.stepType);
+  const side = stepSide(base.stepType);
+  const est = estimateServiceTime(base.stepType, tripInfo, tripInfo.departureFlight, tripInfo.returnFlight);
+  const flightCode = side === "DEPARTURE" ? tripInfo.departureFlightCode : tripInfo.returnFlightCode;
+
+  const step: JourneyStepInput = {
+    ...base,
+    city: def.cityScope === "DESTINATION" ? dest : "RUH",
+    // user customizations preserved
+    skipped: prior ? prior.skipped : true,
+    serviceType: prior?.serviceType ?? base.serviceType,
+    carCategory: prior?.carCategory ?? base.carCategory,
+    loungeType: prior?.loungeType,
+    hotelName: prior?.hotelName,
+    hotelAddress: prior?.hotelAddress,
+    homeAddress: prior?.homeAddress,
+    notes: prior?.notes,
+    // trip-info-driven (auto), editable per step
+    date: prior?.date ?? est.date,
+    time: def.features.flight || def.features.transfer ? prior?.time ?? est.time : prior?.time,
+    flightNumber: def.features.flight ? flightCode : undefined,
+    passengers: def.features.transfer ? prior?.passengers ?? tripInfo.passengers : undefined,
+    bags: def.features.transfer ? prior?.bags ?? tripInfo.bags : undefined,
+  };
+
+  if (def.features.chauffeur) {
+    step.date = prior?.date ?? tripInfo.departureFlight?.estimatedArrivalDate ?? (tripInfo.departureDate || undefined);
+    step.time = undefined;
+    step.days = prior?.days ?? 1;
+    step.dailyUsage = prior?.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE;
+  }
+  return step;
+}
 
 /**
  * Client-side journey draft. Persisted to localStorage purely as a *draft*
@@ -38,6 +80,14 @@ const emptyTripInfo: TripInfoInput = {
   bags: 0,
   specialAssistance: false,
   assistanceNotes: "",
+  departureFlightCode: "",
+  returnFlightCode: "",
+  departureTime: "",
+  returnTime: "",
+  departureFlight: null,
+  returnFlight: null,
+  departureLookupStatus: undefined,
+  returnLookupStatus: undefined,
 };
 
 function blankStep(stepType: StepType): JourneyStepInput {
@@ -111,26 +161,9 @@ export const useJourneyStore = create<JourneyState>()(
        * Trip Info is the source of truth, so these values propagate everywhere.
        */
       applyTripInfoToSteps: () =>
-        set((st) => {
-          const { tripInfo } = st;
-          return {
-            steps: st.steps.map((s) => {
-              const def = getStep(s.stepType);
-              const sideDate =
-                stepSide(s.stepType) === "DEPARTURE" ? tripInfo.departureDate : tripInfo.returnDate;
-              const patch: Partial<JourneyStepInput> = {
-                date: def.features.chauffeur
-                  ? tripInfo.departureDate || s.date
-                  : sideDate || s.date,
-              };
-              if (def.features.transfer) {
-                patch.passengers = tripInfo.passengers;
-                patch.bags = tripInfo.bags;
-              }
-              return { ...s, ...patch };
-            }),
-          };
-        }),
+        set((st) => ({
+          steps: st.steps.map((s) => applyTripToStep(blankStep(s.stepType), st.tripInfo, st.destination, s)),
+        })),
 
       /**
        * Build the step-by-step flow for the chosen destination, auto-filling
@@ -144,44 +177,7 @@ export const useJourneyStore = create<JourneyState>()(
         const { tripInfo } = get();
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
-
-        const steps = STEPS.map((def) => {
-          const base = blankStep(def.type);
-          const p = prior.get(def.type);
-          const side = stepSide(def.type);
-          const sideDate = side === "DEPARTURE" ? tripInfo.departureDate : tripInfo.returnDate;
-          const city = def.cityScope === "DESTINATION" ? dest : "RUH";
-
-          const step: JourneyStepInput = {
-            ...base,
-            city,
-            // preserve user customizations from a prior pass
-            skipped: p ? p.skipped : true,
-            serviceType: p?.serviceType ?? base.serviceType,
-            carCategory: p?.carCategory ?? base.carCategory,
-            loungeType: p?.loungeType,
-            flightNumber: p?.flightNumber,
-            flightData: p?.flightData,
-            flightLookupStatus: p?.flightLookupStatus,
-            hotelName: p?.hotelName,
-            hotelAddress: p?.hotelAddress,
-            homeAddress: p?.homeAddress,
-            notes: p?.notes,
-            time: p?.time,
-            // trip-info-driven defaults (kept editable per step)
-            date: p?.date ?? (sideDate || undefined),
-            passengers: def.features.transfer ? p?.passengers ?? tripInfo.passengers : undefined,
-            bags: def.features.transfer ? p?.bags ?? tripInfo.bags : undefined,
-          };
-
-          if (def.features.chauffeur) {
-            step.date = p?.date ?? (tripInfo.departureDate || undefined);
-            step.days = p?.days ?? 1;
-            step.dailyUsage = p?.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE;
-          }
-          return step;
-        });
-
+        const steps = STEPS.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
         set({ destination: dest, steps: sortByOrder(steps) });
       },
 

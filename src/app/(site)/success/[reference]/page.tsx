@@ -11,10 +11,27 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
       customer: true,
       journeySteps: { orderBy: { stepOrder: "asc" } },
       statusHistory: { orderBy: { createdAt: "asc" } },
+      flightSnapshots: true,
     },
   });
 
   if (!request) notFound();
+
+  const snapToLine = (s: (typeof request.flightSnapshots)[number] | undefined) =>
+    s
+      ? {
+          flightCode: s.flightCode,
+          airline: s.airline,
+          originAirport: s.originAirport,
+          destinationAirport: s.destinationAirport,
+          departureDate: s.departureDate ? s.departureDate.toISOString().slice(0, 10) : null,
+          departureTimeLocal: s.departureTimeLocal,
+          estimatedArrivalDate: s.estimatedArrivalDate ? s.estimatedArrivalDate.toISOString().slice(0, 10) : null,
+          estimatedArrivalTimeLocal: s.estimatedArrivalTimeLocal,
+        }
+      : null;
+  const departureFlight = snapToLine(request.flightSnapshots.find((s) => s.leg === "DEPARTURE"));
+  const returnFlight = snapToLine(request.flightSnapshots.find((s) => s.leg === "RETURN"));
 
   // Map DB steps → the shared input shape for the WhatsApp summary builder.
   const steps: JourneyStepInput[] = request.journeySteps.map((s) => ({
@@ -52,6 +69,8 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
       estimatedTotal={request.estimatedTotal}
       specialAssistance={request.specialAssistance}
       assistanceNotes={request.assistanceNotes}
+      departureFlight={departureFlight}
+      returnFlight={returnFlight}
       notes={request.notes}
       steps={steps}
     />

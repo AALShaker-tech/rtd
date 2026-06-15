@@ -9,6 +9,9 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES, isValidEmail, parsePhone } from "@/lib/phone";
+import { resolveFlightAction } from "@/server/actions/flight.actions";
+import { formatDateOnly } from "@/lib/utils";
+import type { ResolvedFlight } from "@/lib/flight";
 import { StepCard } from "@/components/journey/StepCard";
 import { JourneySummary } from "@/components/journey/JourneySummary";
 import { TripSummaryBar } from "@/components/journey/TripSummaryBar";
@@ -233,6 +236,11 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
           </Field>
         </div>
 
+        {/* Flight details (resolved from the static schedule) */}
+        <FlightField leg="DEPARTURE" />
+        {tripInfo.returnDate && <FlightField leg="RETURN" />}
+        <p className="rounded-lg bg-ivory-warm px-3 py-2 text-[11px] text-charcoal/50">{pick(t.tripInfo.scheduleDisclaimer)}</p>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Stepper label={pick(t.fields.passengers)} value={tripInfo.passengers} min={1} onChange={(v) => setTripInfo({ passengers: v })} />
           <Stepper label={pick(t.fields.bags)} value={tripInfo.bags} min={0} onChange={(v) => setTripInfo({ bags: v })} />
@@ -264,6 +272,99 @@ function Field({ label, error, children }: { label: string; error?: string; chil
       {children}
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
+  );
+}
+
+/** Flight number entry with static-schedule lookup + manual fallback. */
+function FlightField({ leg }: { leg: "DEPARTURE" | "RETURN" }) {
+  const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
+  const tripInfo = useJourneyStore((s) => s.tripInfo);
+  const setTripInfo = useJourneyStore((s) => s.setTripInfo);
+  const [matches, setMatches] = useState<ResolvedFlight[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const isDep = leg === "DEPARTURE";
+  const code = (isDep ? tripInfo.departureFlightCode : tripInfo.returnFlightCode) ?? "";
+  const date = isDep ? tripInfo.departureDate : tripInfo.returnDate;
+  const resolved = isDep ? tripInfo.departureFlight : tripInfo.returnFlight;
+  const status = isDep ? tripInfo.departureLookupStatus : tripInfo.returnLookupStatus;
+  const manualTime = (isDep ? tripInfo.departureTime : tripInfo.returnTime) ?? "";
+
+  function patch(p: Partial<typeof tripInfo>) { setTripInfo(p); }
+
+  async function find() {
+    if (!code || !date) return;
+    setBusy(true);
+    setMatches(null);
+    const res = await resolveFlightAction(code, date);
+    setBusy(false);
+    if (res.status === "not_found") {
+      patch(isDep ? { departureFlight: null, departureLookupStatus: "not_found" } : { returnFlight: null, returnLookupStatus: "not_found" });
+      setMatches([]);
+    } else if (res.matches.length === 1) {
+      choose(res.matches[0]);
+    } else {
+      setMatches(res.matches);
+    }
+  }
+
+  function choose(f: ResolvedFlight) {
+    patch(isDep ? { departureFlight: f, departureLookupStatus: "static_matched", departureTime: "" } : { returnFlight: f, returnLookupStatus: "static_matched", returnTime: "" });
+    setMatches(null);
+  }
+
+  return (
+    <div>
+      <span className="field-label">{pick(isDep ? t.tripInfo.departureFlight : t.tripInfo.returnFlight)}{!isDep ? ` — ${pick(t.common.optional)}` : ""}</span>
+      <div className="flex gap-2">
+        <input
+          className="field-input flex-1"
+          value={code}
+          placeholder="SV111"
+          onChange={(e) => {
+            const v = e.target.value.toUpperCase();
+            patch(isDep ? { departureFlightCode: v, departureFlight: null, departureLookupStatus: undefined } : { returnFlightCode: v, returnFlight: null, returnLookupStatus: undefined });
+            setMatches(null);
+          }}
+        />
+        <button onClick={find} disabled={busy || !code || !date} className="btn-outline shrink-0 px-4 py-2 text-xs">
+          {busy ? "…" : pick(t.tripInfo.findFlight)}
+        </button>
+      </div>
+
+      {/* Multiple matches → selection */}
+      {matches && matches.length > 1 && (
+        <div className="mt-2 grid gap-2">
+          <p className="text-xs text-charcoal/60">{pick(t.tripInfo.chooseFlight)}</p>
+          {matches.map((f, i) => (
+            <button key={i} onClick={() => choose(f)} className="sel-card flex items-center justify-between p-3 text-start">
+              <span className="text-sm font-medium text-charcoal">{f.flightCode} · {f.airline}</span>
+              <span className="text-xs text-charcoal/60">{f.originAirport}→{f.destinationAirport} · {f.departureTimeLocal}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Matched */}
+      {resolved && (
+        <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+          ✓ {pick(t.tripInfo.flightMatched)} — {resolved.airline} {resolved.flightCode} · {resolved.originAirport}→{resolved.destinationAirport} · {resolved.departureTimeLocal}
+          <span className="text-emerald-700/70"> · {pick(t.tripInfo.estArrival)} {resolved.estimatedArrivalTimeLocal} ({formatDateOnly(resolved.estimatedArrivalDate, locale)})</span>
+        </div>
+      )}
+
+      {/* Not found → manual time */}
+      {status === "not_found" && !resolved && (
+        <div className="mt-2 space-y-2">
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
+          <label className="block">
+            <span className="field-label">{pick(t.tripInfo.flightTime)}</span>
+            <input type="time" className="field-input" value={manualTime} onChange={(e) => patch(isDep ? { departureTime: e.target.value } : { returnTime: e.target.value })} />
+          </label>
+        </div>
+      )}
+    </div>
   );
 }
 

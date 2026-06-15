@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { buildWhatsAppLink, type WhatsAppFlightLine } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/pricing";
 import { getStep } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
@@ -21,6 +21,8 @@ export function SuccessView(props: {
   estimatedTotal: number;
   specialAssistance?: boolean;
   assistanceNotes?: string | null;
+  departureFlight?: WhatsAppFlightLine | null;
+  returnFlight?: WhatsAppFlightLine | null;
   notes: string | null;
   steps: JourneyStepInput[];
 }) {
@@ -37,6 +39,8 @@ export function SuccessView(props: {
     estimatedTotal: props.estimatedTotal,
     specialAssistance: props.specialAssistance,
     assistanceNotes: props.assistanceNotes,
+    departureFlight: props.departureFlight,
+    returnFlight: props.returnFlight,
     notes: props.notes,
     locale,
   });

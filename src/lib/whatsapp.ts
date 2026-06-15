@@ -13,6 +13,17 @@ import { formatDateTime } from "@/lib/utils";
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "966550832444";
 export const WHATSAPP_DISPLAY = process.env.NEXT_PUBLIC_WHATSAPP_DISPLAY ?? "+966 55 083 2444";
 
+export interface WhatsAppFlightLine {
+  flightCode?: string | null;
+  airline?: string | null;
+  originAirport?: string | null;
+  destinationAirport?: string | null;
+  departureDate?: string | null; // display string
+  departureTimeLocal?: string | null;
+  estimatedArrivalDate?: string | null;
+  estimatedArrivalTimeLocal?: string | null;
+}
+
 export interface WhatsAppSummaryInput {
   referenceNumber: string;
   customerName: string;
@@ -25,8 +36,20 @@ export interface WhatsAppSummaryInput {
   estimatedTotal?: number | null;
   specialAssistance?: boolean;
   assistanceNotes?: string | null;
+  departureFlight?: WhatsAppFlightLine | null;
+  returnFlight?: WhatsAppFlightLine | null;
   notes?: string | null;
   locale: Locale;
+}
+
+function flightLine(f: WhatsAppFlightLine, L: boolean): string {
+  const parts = [f.flightCode, f.airline].filter(Boolean).join(" ");
+  const route = [f.originAirport, f.destinationAirport].filter(Boolean).join("→");
+  const dep = [f.departureDate, f.departureTimeLocal].filter(Boolean).join(" ");
+  const arr = f.estimatedArrivalTimeLocal
+    ? `${L ? "وصول تقديري" : "est. arr"} ${[f.estimatedArrivalDate, f.estimatedArrivalTimeLocal].filter(Boolean).join(" ")}`
+    : "";
+  return [parts, route, dep, arr].filter(Boolean).join(" · ");
 }
 
 function serviceName(type: string, locale: Locale): string {
@@ -54,6 +77,13 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
   }
   if (input.passengers != null) lines.push((L ? "الركاب: " : "Passengers: ") + input.passengers);
   if (input.bags != null) lines.push((L ? "الحقائب: " : "Bags: ") + input.bags);
+
+  if (input.departureFlight || input.returnFlight) {
+    lines.push("");
+    lines.push(L ? "— الرحلات —" : "— Flights —");
+    if (input.departureFlight) lines.push((L ? "الذهاب: " : "Departure: ") + flightLine(input.departureFlight, L));
+    if (input.returnFlight) lines.push((L ? "العودة: " : "Return: ") + flightLine(input.returnFlight, L));
+  }
 
   lines.push("");
   lines.push(L ? "— تفاصيل الرحلة —" : "— Journey —");

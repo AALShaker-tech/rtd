@@ -29,6 +29,7 @@ export default async function RequestDetailPage({
         orderBy: { createdAt: "desc" },
         include: { changedBy: { select: { fullName: true } } },
       },
+      flightSnapshots: true,
     },
   });
   if (!request) notFound();

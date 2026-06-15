@@ -17,6 +17,13 @@ import {
   VEHICLES,
 } from "../src/lib/domain";
 import type { StepType } from "../src/lib/domain";
+import {
+  AIRPORT_META,
+  SOURCE_NAME,
+  SOURCE_WEEK,
+  parseFlightSchedule,
+  routeDuration,
+} from "../src/lib/flight-schedule";
 
 const prisma = new PrismaClient();
 
@@ -92,13 +99,70 @@ async function main() {
       create: { code: c.code, nameEn: c.name.en, nameAr: c.name.ar, country: c.country },
     });
     for (const a of c.airports) {
+      const meta = AIRPORT_META[a.code];
       await prisma.airport.upsert({
         where: { code: a.code },
-        update: {},
-        create: { code: a.code, nameEn: a.name.en, nameAr: a.name.ar, cityId: city.id, terminals: a.terminals },
+        update: { country: meta?.country, timezone: meta?.timezone, utcOffsetMinutes: meta?.offsetMin ?? 0 },
+        create: {
+          code: a.code,
+          nameEn: a.name.en,
+          nameAr: a.name.ar,
+          cityId: city.id,
+          terminals: a.terminals,
+          country: meta?.country ?? c.country,
+          timezone: meta?.timezone,
+          utcOffsetMinutes: meta?.offsetMin ?? 0,
+        },
       });
     }
   }
+
+  // ── Static weekly flight schedule (from CSV) ──
+  const scheduleRows = parseFlightSchedule();
+  // Airlines (unique by code)
+  const airlineByCode = new Map<string, string>();
+  for (const r of scheduleRows) {
+    if (airlineByCode.has(r.airlineCode)) continue;
+    const airline = await prisma.airline.upsert({
+      where: { code: r.airlineCode },
+      update: { name: r.airlineName },
+      create: { code: r.airlineCode, name: r.airlineName },
+    });
+    airlineByCode.set(r.airlineCode, airline.id);
+  }
+  // Routes (unique by origin+destination)
+  const routeByPair = new Map<string, string>();
+  for (const r of scheduleRows) {
+    const key = `${r.origin}-${r.destination}`;
+    if (routeByPair.has(key)) continue;
+    const route = await prisma.route.upsert({
+      where: { originAirportCode_destinationAirportCode: { originAirportCode: r.origin, destinationAirportCode: r.destination } },
+      update: { approxDurationMinutes: routeDuration(r.origin, r.destination) },
+      create: {
+        originAirportCode: r.origin,
+        destinationAirportCode: r.destination,
+        isDirect: true,
+        approxDurationMinutes: routeDuration(r.origin, r.destination),
+      },
+    });
+    routeByPair.set(key, route.id);
+  }
+  // Schedule rows — one per active weekday. Reset first to stay idempotent.
+  await prisma.weeklyFlightSchedule.deleteMany({ where: { sourceWeek: SOURCE_WEEK } });
+  await prisma.weeklyFlightSchedule.createMany({
+    data: scheduleRows.map((r) => ({
+      routeId: routeByPair.get(`${r.origin}-${r.destination}`)!,
+      airlineId: airlineByCode.get(r.airlineCode)!,
+      flightCode: r.flightCode,
+      dayOfWeek: r.dayOfWeek,
+      departureTimeLocal: r.departureTimeLocal,
+      isActive: true,
+      sourceWeek: SOURCE_WEEK,
+      sourceName: SOURCE_NAME,
+      isStaticSchedule: true,
+    })),
+  });
+  console.log(`   Flight schedule: ${airlineByCode.size} airlines, ${routeByPair.size} routes, ${scheduleRows.length} weekly rows.`);
 
   // ── Staff accounts ──
   const password = await bcrypt.hash("Passw0rd!", 12);

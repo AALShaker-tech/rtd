@@ -6,7 +6,6 @@ import {
   CHAUFFEUR_USAGE,
   VEHICLES,
   getStep,
-  getVehicle,
   loungeOptionsForCity,
   serviceHasCar,
 } from "@/lib/domain";
@@ -14,7 +13,6 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
 import { formatDateOnly } from "@/lib/utils";
-import { FlightLookup } from "./FlightLookup";
 import type { JourneyStepInput } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,7 +47,6 @@ export function StepCard({
   const errFor = (field: string) => result.errors.find((e) => e.field === field)?.[ar ? "messageAr" : "messageEn"];
 
   const selVeh = step.carCategory ?? "VIP";
-  const capacity = step.carCategory ? getVehicle(step.carCategory).maxPassengers : Infinity;
   const capacityIssue = validateVehicleCapacity(step.carCategory, step.passengers);
 
   // Single source of truth for the price of any option/state. Force `skipped:false`
@@ -58,16 +55,24 @@ export function StepCard({
   const priceFor = (override: Partial<JourneyStepInput>) =>
     computeStepPrice({ ...step, skipped: false, ...override }, config).computedPrice;
 
-  function changePassengers(next: number) {
-    // Enforce capacity while changing — never allow exceeding the selected vehicle.
-    if (step.carCategory && next > capacity) return; // blocked; message shown below
-    onChange({ passengers: Math.max(1, next) });
-  }
+  // Compact read-only trip summary (the data lives in Trip Information).
+  const summaryBits = [
+    step.flightNumber,
+    step.date ? formatDateOnly(step.date, locale) : undefined,
+    !f.chauffeur ? step.time : undefined,
+    f.transfer && step.passengers != null ? `${step.passengers} ${pick(t.fields.passengers)}` : undefined,
+    f.transfer && step.bags != null ? `${step.bags} ${pick(t.fields.bags)}` : undefined,
+  ].filter(Boolean);
 
   return (
     <div className="grid gap-5">
-      {/* Flight lookup */}
-      {f.flight && <FlightLookup step={step} onChange={onChange} />}
+      {/* Read-only trip summary for this step — no repeated entry */}
+      {summaryBits.length > 0 && (
+        <div className="rounded-xl bg-ivory-warm px-4 py-3 text-sm">
+          <span className="text-charcoal/45">{pick(t.tripInfo.usingTripInfo)}: </span>
+          <span className="font-medium text-charcoal">{summaryBits.join(" · ")}</span>
+        </div>
+      )}
 
       {/* Lounge / assistance options — limited by the airport's country */}
       {f.assistance && (
@@ -110,7 +115,7 @@ export function StepCard({
       )}
 
       {/* Chauffeur — start date + number of days + daily usage (end date auto) */}
-      {f.chauffeur ? (
+      {f.chauffeur && (
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <PrefilledDate label={pick(t.fields.startDate)} value={step.date} min={today()} onChange={(v) => onChange({ date: v })} error={errFor("date")} />
@@ -136,24 +141,15 @@ export function StepCard({
             </p>
           ) : null}
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <PrefilledDate
-            label={pick(t.fields.date)}
-            value={step.date}
-            min={today()}
-            onChange={(v) => onChange({ date: v })}
-            error={errFor("date")}
-            note={
-              step.stepType === "ARRIVAL_ASSIST_DESTINATION" || step.stepType === "AIRPORT_TO_HOTEL"
-                ? pick(t.tripInfo.arrivalDateNote)
-                : undefined
-            }
-          />
-          <Field label={pick(t.fields.time)} error={errFor("time")}>
-            <input type="time" value={step.time ?? ""} className="field-input" onChange={(e) => onChange({ time: e.target.value })} />
-          </Field>
-        </div>
+      )}
+
+      {/* Suggested service time (auto-estimated, read-only) */}
+      {!f.chauffeur && step.time && (
+        <p className="rounded-xl bg-gold-50 px-4 py-2.5 text-xs text-gold-dark">
+          {pick(t.tripInfo.suggestedTime)}: <span className="font-semibold">{step.time}</span>
+          {step.date ? ` · ${formatDateOnly(step.date, locale)}` : ""}
+          {step.stepType === "ARRIVAL_ASSIST_DESTINATION" || step.stepType === "AIRPORT_TO_HOTEL" ? ` — ${pick(t.tripInfo.arrivalDateNote)}` : ""}
+        </p>
       )}
 
       {/* Locations */}
@@ -166,14 +162,6 @@ export function StepCard({
         <Field label={pick(t.fields.hotelName)}>
           <input value={step.hotelName ?? ""} className="field-input" placeholder={ar ? "اسم الفندق" : "Hotel name"} onChange={(e) => onChange({ hotelName: e.target.value })} />
         </Field>
-      )}
-
-      {/* Passengers + bags (capacity-enforced) */}
-      {f.transfer && hasCar && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Stepper label={pick(t.fields.passengers)} value={step.passengers ?? 1} min={1} max={capacity} onChange={changePassengers} />
-          <Stepper label={pick(t.fields.bags)} value={step.bags ?? 0} min={0} onChange={(v) => onChange({ bags: v })} />
-        </div>
       )}
 
       {/* Capacity message (bilingual, with suggestion) */}

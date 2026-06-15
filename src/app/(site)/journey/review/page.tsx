@@ -9,7 +9,7 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateOnly, formatDateTime } from "@/lib/utils";
 
 export default function ReviewPage() {
   const { t, pick, locale } = useI18n();
@@ -38,7 +38,7 @@ export default function ReviewPage() {
 
   async function confirm() {
     setSubmitting(true); setServerError(undefined);
-    const res = await submitJourney({ ...draft });
+    const res = await submitJourney({ ...draft, destination: store.destination });
     setSubmitting(false);
     if (!res.ok) return setServerError(res.error);
     const ref = res.referenceNumber!;
@@ -57,6 +57,9 @@ export default function ReviewPage() {
         </p>
         <p className="mt-1 text-xs text-gold-dark">{pick(t.builder.editHint)}</p>
       </div>
+
+      {/* Flight summary */}
+      <FlightSummary />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         {/* Itinerary */}
@@ -162,6 +165,56 @@ export default function ReviewPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Flight summary card: departure/return flight, route, times, and source. */
+function FlightSummary() {
+  const { t, pick, locale } = useI18n();
+  const tripInfo = useJourneyStore((s) => s.tripInfo);
+  const dep = tripInfo.departureFlight;
+  const ret = tripInfo.returnFlight;
+  const hasAny = dep || ret || tripInfo.departureFlightCode || tripInfo.returnFlightCode;
+  if (!hasAny) return null;
+
+  const sourceLabel = (status?: string) =>
+    status === "static_matched" ? pick(t.tripInfo.sourceStatic) : status === "not_found" ? pick(t.tripInfo.sourceNotFound) : pick(t.tripInfo.sourceManual);
+
+  const Leg = ({ label, code, resolved, manualTime, status }: { label: string; code?: string; resolved?: any; manualTime?: string; status?: string }) => {
+    if (!resolved && !code) return null;
+    return (
+      <div className="rounded-xl border border-charcoal/10 bg-white p-3 text-sm">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs uppercase tracking-wide text-charcoal/45">{label}</span>
+          <span className={`badge ${status === "static_matched" ? "bg-emerald-50 text-emerald-700" : status === "not_found" ? "bg-amber-50 text-amber-700" : "bg-charcoal/5 text-charcoal/50"}`}>
+            {sourceLabel(status)}
+          </span>
+        </div>
+        {resolved ? (
+          <p className="text-charcoal">
+            <span className="font-semibold">{resolved.flightCode}</span> · {resolved.airline} · {resolved.originAirport}→{resolved.destinationAirport}
+            <br />
+            <span className="text-charcoal/60">{formatDateOnly(resolved.departureDate, locale)} {resolved.departureTimeLocal} · {pick(t.tripInfo.estArrival)} {formatDateOnly(resolved.estimatedArrivalDate, locale)} {resolved.estimatedArrivalTimeLocal}</span>
+          </p>
+        ) : (
+          <p className="text-charcoal">
+            <span className="font-semibold">{code}</span>
+            {manualTime ? <span className="text-charcoal/60"> · {manualTime}</span> : null}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="mb-6 luxe-card p-5">
+      <h3 className="mb-3 font-serif text-lg font-semibold text-charcoal">{pick(t.fields.flightNumber)}</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Leg label={pick(t.tripInfo.departureFlight)} code={tripInfo.departureFlightCode} resolved={dep} manualTime={tripInfo.departureTime} status={tripInfo.departureLookupStatus} />
+        <Leg label={pick(t.tripInfo.returnFlight)} code={tripInfo.returnFlightCode} resolved={ret} manualTime={tripInfo.returnTime} status={tripInfo.returnLookupStatus} />
+      </div>
+      <p className="mt-3 text-[11px] text-charcoal/45">{pick(t.tripInfo.scheduleDisclaimer)}</p>
     </div>
   );
 }

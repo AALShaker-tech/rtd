@@ -80,10 +80,19 @@ export const tripInfoSchema = z.object({
   bags: z.number().int().min(0).max(99),
   specialAssistance: z.boolean().default(false),
   assistanceNotes: z.string().max(1000).optional(),
+  departureFlightCode: z.string().max(10).optional(),
+  returnFlightCode: z.string().max(10).optional(),
+  departureTime: z.string().optional(),
+  returnTime: z.string().optional(),
+  departureFlight: z.any().optional(),
+  returnFlight: z.any().optional(),
+  departureLookupStatus: z.enum(["static_matched", "manual", "not_found"]).optional(),
+  returnLookupStatus: z.enum(["static_matched", "manual", "not_found"]).optional(),
 });
 
 export const createRequestSchema = z.object({
   selectedPackage: packageEnum.optional(),
+  destination: z.string().optional(),
   steps: z.array(journeyStepSchema).min(1),
   customer: customerDetailsSchema,
   tripInfo: tripInfoSchema,

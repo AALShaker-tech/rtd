@@ -19,6 +19,24 @@ export interface NormalizedFlight {
   source: string;
 }
 
+export type FlightLookupSource = "static_schedule" | "manual";
+export type FlightLookupStatusValue = "static_matched" | "manual" | "not_found";
+
+/** A flight resolved from the static weekly schedule (or manual entry). */
+export interface ResolvedFlight {
+  flightCode: string;
+  airline: string;
+  originAirport: string;
+  destinationAirport: string;
+  departureDate: string; // yyyy-mm-dd
+  departureTimeLocal: string; // HH:MM (origin local)
+  estimatedArrivalDate: string; // yyyy-mm-dd
+  estimatedArrivalTimeLocal: string; // HH:MM (destination local)
+  durationMinutes: number;
+  lookupSource: FlightLookupSource;
+  lookupStatus: FlightLookupStatusValue;
+}
+
 export type FlightLookupResult =
   | { ok: true; flight: NormalizedFlight }
   | { ok: false; reason: "NOT_FOUND" | "PROVIDER_ERROR" | "INVALID_INPUT"; message?: string };

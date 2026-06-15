@@ -48,6 +48,7 @@ interface RequestData {
   assignedEmployee: { id: string; fullName: string } | null;
   assignedDriver: { id: string; fullName: string } | null;
   journeySteps: (DisplayStep & { computedPrice: number | null })[];
+  flightSnapshots: { id: string; leg: string; flightCode: string | null; airline: string | null; originAirport: string | null; destinationAirport: string | null; departureDate: string | null; departureTimeLocal: string | null; estimatedArrivalDate: string | null; estimatedArrivalTimeLocal: string | null; lookupSource: string; lookupStatus: string }[];
   priceHistory: { id: string; changeType: string; oldPrice: number | null; newPrice: number; reason: string | null; createdAt: string; changedBy: { fullName: string } | null }[];
   statusHistory: { id: string; fromStatus: RequestStatus | null; toStatus: RequestStatus; reason: string | null; createdAt: string; changedBy: { fullName: string } | null }[];
   internalNotes: { id: string; body: string; createdAt: string; author: { fullName: string } | null }[];
@@ -94,6 +95,21 @@ export function RequestDetailView({
     bags: s.bags ?? undefined,
   }));
 
+  const snap = (leg: string) => request.flightSnapshots.find((s) => s.leg === leg) ?? null;
+  const toWaFlight = (s: ReturnType<typeof snap>) =>
+    s
+      ? {
+          flightCode: s.flightCode,
+          airline: s.airline,
+          originAirport: s.originAirport,
+          destinationAirport: s.destinationAirport,
+          departureDate: s.departureDate ? s.departureDate.slice(0, 10) : null,
+          departureTimeLocal: s.departureTimeLocal,
+          estimatedArrivalDate: s.estimatedArrivalDate ? s.estimatedArrivalDate.slice(0, 10) : null,
+          estimatedArrivalTimeLocal: s.estimatedArrivalTimeLocal,
+        }
+      : null;
+
   async function copyWhatsapp() {
     const msg = buildWhatsAppMessage({
       referenceNumber: request.referenceNumber,
@@ -107,6 +123,8 @@ export function RequestDetailView({
       estimatedTotal: request.finalPrice ?? request.estimatedTotal,
       specialAssistance: request.specialAssistance,
       assistanceNotes: request.assistanceNotes,
+      departureFlight: toWaFlight(snap("DEPARTURE")),
+      returnFlight: toWaFlight(snap("RETURN")),
       notes: request.notes,
       locale,
     });
@@ -159,6 +177,33 @@ export function RequestDetailView({
             )}
             {request.notes && <p className="mt-3 text-sm text-charcoal/70">“{request.notes}”</p>}
           </div>
+
+          {/* Flights */}
+          {request.flightSnapshots.length > 0 && (
+            <div className="luxe-card p-5">
+              <h3 className="mb-3 font-serif text-lg font-semibold text-charcoal">{pick(t.fields.flightNumber)}</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {request.flightSnapshots.map((s) => (
+                  <div key={s.id} className="rounded-xl border border-charcoal/10 p-3 text-sm">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-wide text-charcoal/45">
+                        {s.leg === "DEPARTURE" ? pick(t.tripInfo.departureFlight) : pick(t.tripInfo.returnFlight)}
+                      </span>
+                      <span className={`badge ${s.lookupStatus === "static_matched" ? "bg-emerald-50 text-emerald-700" : s.lookupStatus === "not_found" ? "bg-amber-50 text-amber-700" : "bg-charcoal/5 text-charcoal/50"}`}>
+                        {s.lookupStatus === "static_matched" ? pick(t.tripInfo.sourceStatic) : s.lookupStatus === "not_found" ? pick(t.tripInfo.sourceNotFound) : pick(t.tripInfo.sourceManual)}
+                      </span>
+                    </div>
+                    <p className="font-medium text-charcoal">{[s.flightCode, s.airline].filter(Boolean).join(" · ") || "—"}</p>
+                    <p className="text-xs text-charcoal/55">
+                      {[s.originAirport, s.destinationAirport].filter(Boolean).join("→")}
+                      {s.departureDate ? ` · ${formatDateTime(s.departureDate, locale, { dateStyle: "medium", timeStyle: s.departureTimeLocal ? "short" : undefined })}` : ""}
+                      {s.estimatedArrivalTimeLocal ? ` · ${pick(t.tripInfo.estArrival)} ${s.estimatedArrivalTimeLocal}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <h3 className="mb-3 font-serif text-lg font-semibold text-charcoal">{pick(t.admin.journey)}</h3>
