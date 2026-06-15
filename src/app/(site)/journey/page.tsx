@@ -11,6 +11,7 @@ import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validati
 import { COUNTRY_CODES, isValidEmail, parsePhone } from "@/lib/phone";
 import { StepCard } from "@/components/journey/StepCard";
 import { JourneySummary } from "@/components/journey/JourneySummary";
+import { TripSummaryBar } from "@/components/journey/TripSummaryBar";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -104,6 +105,9 @@ export default function JourneyPage() {
         </span>
         <button onClick={() => setStage("destination")} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
       </div>
+
+      {/* Trip summary (pre-filled from Trip Information; editable) */}
+      <TripSummaryBar />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div>

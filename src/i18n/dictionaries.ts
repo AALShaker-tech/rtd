@@ -186,6 +186,16 @@ export const dict = {
       en: "e.g. wheelchair assistance if needed",
       ar: "مثال: كرسي متحرك عند الحاجة",
     },
+    specialAssistanceLabel: { en: "Special assistance", ar: "المساعدة الخاصة" },
+    autoFilledNote: {
+      en: "These details were auto-filled from your trip information.",
+      ar: "تم تعبئة هذه البيانات تلقائيًا من معلومات الرحلة.",
+    },
+    editTitle: { en: "Edit trip information", ar: "تعديل معلومات الرحلة" },
+    arrivalDateNote: {
+      en: "Using your departure date — adjust the time if your arrival differs.",
+      ar: "نستخدم تاريخ مغادرتك — عدّل الوقت إذا اختلف وقت الوصول.",
+    },
   },
   details: {
     title: { en: "Your Details", ar: "بياناتك" },

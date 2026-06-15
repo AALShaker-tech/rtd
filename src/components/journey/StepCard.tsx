@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   CHAUFFEUR_USAGE,
@@ -12,6 +13,7 @@ import {
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
+import { formatDateOnly } from "@/lib/utils";
 import { FlightLookup } from "./FlightLookup";
 import type { JourneyStepInput } from "@/lib/types";
 
@@ -111,9 +113,7 @@ export function StepCard({
       {f.chauffeur ? (
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={pick(t.fields.startDate)} error={errFor("date")}>
-              <input type="date" min={today()} value={step.date ?? ""} className="field-input" onChange={(e) => onChange({ date: e.target.value })} />
-            </Field>
+            <PrefilledDate label={pick(t.fields.startDate)} value={step.date} min={today()} onChange={(v) => onChange({ date: v })} error={errFor("date")} />
             <Stepper label={pick(t.fields.days)} value={step.days ?? 1} min={1} onChange={(v) => onChange({ days: v })} />
           </div>
           <div>
@@ -138,9 +138,18 @@ export function StepCard({
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={pick(t.fields.date)} error={errFor("date")}>
-            <input type="date" min={today()} value={step.date ?? ""} className="field-input" onChange={(e) => onChange({ date: e.target.value })} />
-          </Field>
+          <PrefilledDate
+            label={pick(t.fields.date)}
+            value={step.date}
+            min={today()}
+            onChange={(v) => onChange({ date: v })}
+            error={errFor("date")}
+            note={
+              step.stepType === "ARRIVAL_ASSIST_DESTINATION" || step.stepType === "AIRPORT_TO_HOTEL"
+                ? pick(t.tripInfo.arrivalDateNote)
+                : undefined
+            }
+          />
           <Field label={pick(t.fields.time)} error={errFor("time")}>
             <input type="time" value={step.time ?? ""} className="field-input" onChange={(e) => onChange({ time: e.target.value })} />
           </Field>
@@ -195,6 +204,57 @@ function Field({ label, error, children }: { label: string; error?: string; chil
       {children}
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
+  );
+}
+
+/**
+ * A date that is pre-filled from Trip Information. Shows the value as a fixed,
+ * elegant read-only field with a small "Edit" toggle so the customer isn't asked
+ * to re-enter it. Falls back to a plain date input when no value is set.
+ */
+function PrefilledDate({
+  label,
+  value,
+  min,
+  onChange,
+  error,
+  note,
+}: {
+  label: string;
+  value?: string;
+  min?: string;
+  onChange: (v: string) => void;
+  error?: string;
+  note?: string;
+}) {
+  const { t, pick, locale } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const showInput = editing || !value;
+
+  return (
+    <div>
+      <span className="field-label">{label}</span>
+      {showInput ? (
+        <input
+          type="date"
+          min={min}
+          value={value ?? ""}
+          autoFocus={editing}
+          className="field-input"
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => value && setEditing(false)}
+        />
+      ) : (
+        <div className="flex items-center justify-between rounded-xl border border-charcoal/10 bg-ivory-warm px-4 py-2.5">
+          <span className="text-sm font-medium text-charcoal">{formatDateOnly(value, locale)}</span>
+          <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-gold-dark hover:underline">
+            {pick(t.common.edit)}
+          </button>
+        </div>
+      )}
+      {note && !error && <p className="mt-1 text-[11px] text-charcoal/45">{note}</p>}
+      {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
+    </div>
   );
 }
 

@@ -64,6 +64,7 @@ interface JourneyState {
 
   setDestination: (code: string) => void;
   setTripInfo: (patch: Partial<TripInfoInput>) => void;
+  applyTripInfoToSteps: () => void;
   initFlow: (destination?: string) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
@@ -103,6 +104,33 @@ export const useJourneyStore = create<JourneyState>()(
         })),
 
       setTripInfo: (patch) => set((st) => ({ tripInfo: { ...st.tripInfo, ...patch } })),
+
+      /**
+       * Re-apply Trip Information to every step's auto-filled fields (dates by
+       * side, passengers & bags). Called after the customer edits Trip Info —
+       * Trip Info is the source of truth, so these values propagate everywhere.
+       */
+      applyTripInfoToSteps: () =>
+        set((st) => {
+          const { tripInfo } = st;
+          return {
+            steps: st.steps.map((s) => {
+              const def = getStep(s.stepType);
+              const sideDate =
+                stepSide(s.stepType) === "DEPARTURE" ? tripInfo.departureDate : tripInfo.returnDate;
+              const patch: Partial<JourneyStepInput> = {
+                date: def.features.chauffeur
+                  ? tripInfo.departureDate || s.date
+                  : sideDate || s.date,
+              };
+              if (def.features.transfer) {
+                patch.passengers = tripInfo.passengers;
+                patch.bags = tripInfo.bags;
+              }
+              return { ...s, ...patch };
+            }),
+          };
+        }),
 
       /**
        * Build the step-by-step flow for the chosen destination, auto-filling
