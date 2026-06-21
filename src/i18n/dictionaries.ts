@@ -118,6 +118,10 @@ export const dict = {
       en: "Your previous draft expired. Please start again.",
       ar: "انتهت صلاحية المسودة السابقة. يرجى البدء من جديد.",
     },
+    selectServicePrompt: {
+      en: "Please select a service or skip this step.",
+      ar: "يرجى اختيار خدمة أو تخطي هذه الخطوة.",
+    },
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },

@@ -6,6 +6,7 @@ import {
   DEFAULT_CHAUFFEUR_USAGE,
   getPackage,
   getStep,
+  loungeOptionsForCity,
   STEPS,
   stepSide,
   type PackageType,
@@ -210,6 +211,21 @@ export const useJourneyStore = create<JourneyState>()(
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
         const steps = STEPS.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
+
+        // For the chosen package, pre-select the recommended lounge option on its
+        // assistance steps so the customer sees a default selection (they still
+        // explicitly Add each step — nothing is auto-added).
+        const pkg = get().selectedPackage;
+        const pkgSteps = pkg ? new Set(getPackage(pkg)?.steps ?? []) : null;
+        if (pkgSteps) {
+          for (const s of steps) {
+            const d = getStep(s.stepType);
+            if (d.features.assistance && !s.loungeType && pkgSteps.has(s.stepType)) {
+              s.loungeType = loungeOptionsForCity(s.city)[0]?.value;
+            }
+          }
+        }
+
         set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
       },
 
@@ -223,6 +239,9 @@ export const useJourneyStore = create<JourneyState>()(
           steps: sortByOrder(
             def.steps.map((t) => {
               const step = blankStep(t);
+              // Packages no longer auto-add: the customer explicitly Adds each
+              // service (or Skips). Steps start un-added.
+              step.skipped = true;
               if (getStep(t).cityScope === "DESTINATION" && dest) step.city = dest;
               return step;
             }),

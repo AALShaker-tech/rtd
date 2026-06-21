@@ -78,7 +78,16 @@ export default function ReviewPage() {
             return (
               <div key={step.stepType} className={`luxe-card p-5 ${on ? "" : "opacity-60"} ${overCap ? "ring-1 ring-red-300" : ""}`}>
                 <div className="flex items-center gap-4">
-                  <button onClick={() => update({ skipped: on })} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-base ${on ? "border-emerald-300 bg-emerald-50 text-emerald-600" : "border-charcoal/15 bg-white text-charcoal/40"}`}>
+                  <button
+                    onClick={() => {
+                      if (on) { update({ skipped: true }); return; }
+                      // Adding an assistance step → ensure a selected option (recommended default).
+                      const patch: Parameters<typeof store.updateStep>[1] = { skipped: false };
+                      if (f.assistance && !step.loungeType) patch.loungeType = catalog.loungeOptions(step.city)[0]?.value;
+                      update(patch);
+                    }}
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-base ${on ? "border-emerald-300 bg-emerald-50 text-emerald-600" : "border-charcoal/15 bg-white text-charcoal/40"}`}
+                  >
                     {on ? "✓" : "+"}
                   </button>
                   <div className="min-w-0 flex-1">

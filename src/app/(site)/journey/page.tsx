@@ -123,7 +123,10 @@ export default function JourneyPage() {
 
   const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
   const stepValidation = validateStep({ ...step, skipped: false });
-  const blockAdd = stepValidation.errors.some((e) => e.field === "passengers");
+  // Assistance steps require an explicit option (lounge / airport service) before
+  // they can be added. Transfer/chauffeur steps have a visible default vehicle.
+  const needsService = def.features.assistance && !step.loungeType;
+  const blockAdd = stepValidation.errors.some((e) => e.field === "passengers") || needsService;
 
   return (
     <div className="luxe-container max-w-6xl py-8 md:py-12">
@@ -173,6 +176,9 @@ export default function JourneyPage() {
               <span className="text-sm text-charcoal/60">{pick(t.builder.estimatedPrice)}</span>
               <span className="font-serif text-lg font-semibold text-gold-dark">{formatPrice(subtotal, locale)}</span>
             </div>
+            {needsService && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.builder.selectServicePrompt)}</p>
+            )}
             <div className="mt-4 flex gap-3">
               <button onClick={() => { if (blockAdd) return; updateStep(def.type, { skipped: false }); advance(); }} disabled={blockAdd} className="btn-gold flex-1">
                 ✓ {pick(t.builder.addService)}
