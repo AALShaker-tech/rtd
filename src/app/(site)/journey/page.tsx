@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { CITIES, getCity } from "@/lib/domain";
 import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
+import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES, isValidEmail, parsePhone } from "@/lib/phone";
@@ -30,6 +30,7 @@ export default function JourneyPage() {
   const initFlow = useJourneyStore((s) => s.initFlow);
   const updateStep = useJourneyStore((s) => s.updateStep);
   const { config } = usePricing();
+  const catalog = useCatalog();
 
   const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
     destination ? (tripInfo.departureDate ? "flow" : "tripinfo") : "destination",
@@ -64,15 +65,15 @@ export default function JourneyPage() {
           <p className="mx-auto mt-3 max-w-md text-charcoal/60">{pick(t.builder.chooseDestinationSub)}</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {CITIES.filter((c) => c.code !== "RUH").map((d) => (
+          {catalog.destinations.map((d) => (
             <button key={d.code} onClick={() => pickDestination(d.code)} className="sel-card flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
                 <span className="grid h-12 w-12 place-items-center rounded-xl bg-charcoal text-gold-light">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
                 </span>
                 <div>
-                  <div className="font-serif text-lg font-semibold text-charcoal">{pick(d.name)}</div>
-                  <div className="text-xs text-charcoal/50">{d.airports[0].code} · {pick(d.airports[0].name)}</div>
+                  <div className="font-serif text-lg font-semibold text-charcoal">{ar ? d.nameAr : d.nameEn}</div>
+                  {d.airports[0] && <div className="text-xs text-charcoal/50">{d.airports[0].code} · {ar ? d.airports[0].nameAr : d.airports[0].nameEn}</div>}
                 </div>
               </div>
               <span className="text-gold-dark rtl:rotate-180">→</span>
@@ -104,7 +105,7 @@ export default function JourneyPage() {
       <div className="mb-5 flex items-center justify-between rounded-2xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
         <span className="flex items-center gap-2 text-sm font-medium text-charcoal">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
-          {ar ? "الرياض" : "Riyadh"} ✈ {destination ? getCity(destination)?.name[locale] : ""} ✈ {ar ? "الرياض" : "Riyadh"}
+          {ar ? "الرياض" : "Riyadh"} ✈ {catalog.cityName(destination, locale)} ✈ {ar ? "الرياض" : "Riyadh"}
         </span>
         <button onClick={() => setStage("destination")} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
       </div>

@@ -371,7 +371,38 @@ model City {
   nameAr    String
   country   String
   active    Boolean  @default(true)
+  isOrigin  Boolean  @default(false) // Riyadh is the journey origin
+  multiplier Float   @default(1.0) // destination price factor
+  currency  String?
+  approxDurationMinutes Int? // approx flight time from Riyadh
+  notes     String?
   airports  Airport[]
+  servicePricing CityServicePricing[]
+  loungePricing  CityLoungePricing[]
+}
+
+/// Per-city override of a service (journey step) base price + availability.
+model CityServicePricing {
+  id       String   @id @default(cuid())
+  cityCode String
+  city     City     @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  stepType StepType
+  price    Int? // null → use the global base price
+  enabled  Boolean  @default(true) // false → service unavailable in this city
+
+  @@unique([cityCode, stepType])
+}
+
+/// Per-city override of a lounge / airport-service price + availability.
+model CityLoungePricing {
+  id         String  @id @default(cuid())
+  cityCode   String
+  city       City    @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  loungeType String
+  price      Int? // null → use the global lounge price
+  enabled    Boolean @default(true)
+
+  @@unique([cityCode, loungeType])
 }
 
 model Airport {

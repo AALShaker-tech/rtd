@@ -6,10 +6,10 @@ import {
   CHAUFFEUR_USAGE,
   VEHICLES,
   getStep,
-  loungeOptionsForCity,
   serviceHasCar,
 } from "@/lib/domain";
 import { usePricing } from "@/components/pricing/PricingProvider";
+import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
 import { formatDateOnly } from "@/lib/utils";
@@ -39,6 +39,7 @@ export function StepCard({
 }) {
   const { t, pick, locale } = useI18n();
   const { config } = usePricing();
+  const catalog = useCatalog();
   const ar = locale === "ar";
   const def = getStep(step.stepType);
   const f = def.features;
@@ -78,7 +79,7 @@ export function StepCard({
       {f.assistance && (
         <div className="grid gap-2.5">
           <p className="text-sm font-medium text-charcoal/70">{pick(t.fields.loungeType)}</p>
-          {loungeOptionsForCity(step.city).map((o) => {
+          {catalog.loungeOptions(step.city).map((o) => {
             const on = step.loungeType === o.value;
             return (
               <button key={o.value} onClick={() => onChange({ loungeType: o.value })} className={`sel-card flex items-center justify-between ${on ? "sel-card-on" : ""}`}>

@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { VEHICLES, getCity, getStep, getVehicle, loungeOptionsForCity } from "@/lib/domain";
+import { VEHICLES, getStep, getVehicle } from "@/lib/domain";
 import { useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
+import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
@@ -17,6 +18,7 @@ export default function ReviewPage() {
   const ar = locale === "ar";
   const store = useJourneyStore();
   const { config } = usePricing();
+  const catalog = useCatalog();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | undefined>();
 
@@ -53,7 +55,7 @@ export default function ReviewPage() {
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-semibold text-charcoal md:text-4xl">{pick(t.review.title)}</h1>
         <p className="mt-2 text-sm text-charcoal/60">
-          {ar ? "الرياض" : "Riyadh"} ✈ {store.destination ? getCity(store.destination)?.name[locale] : ""} ✈ {ar ? "الرياض" : "Riyadh"}
+          {ar ? "الرياض" : "Riyadh"} ✈ {catalog.cityName(store.destination, locale)} ✈ {ar ? "الرياض" : "Riyadh"}
         </p>
         <p className="mt-1 text-xs text-gold-dark">{pick(t.builder.editHint)}</p>
       </div>
@@ -82,7 +84,7 @@ export default function ReviewPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-charcoal">{pick(def.name)}</p>
                     <p className="truncate text-xs text-charcoal/45">
-                      {step.city ? getCity(step.city)?.name[locale] : ""}
+                      {catalog.cityName(step.city, locale)}
                       {step.date ? ` · ${formatDateTime(`${step.date}T${step.time ?? "00:00"}`, locale, { dateStyle: "short", timeStyle: step.time ? "short" : undefined })}` : ""}
                       {step.flightNumber ? ` · ${step.flightNumber}` : ""}
                     </p>
@@ -104,7 +106,7 @@ export default function ReviewPage() {
                 )}
                 {on && f.assistance && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {loungeOptionsForCity(step.city).map((o) => {
+                    {catalog.loungeOptions(step.city).map((o) => {
                       const sel = step.loungeType === o.value;
                       return (
                         <button key={o.value} onClick={() => update({ loungeType: o.value })} className={`pill ${sel ? "pill-on" : ""}`}>

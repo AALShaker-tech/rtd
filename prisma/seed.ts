@@ -93,10 +93,19 @@ async function main() {
 
   // ── Cities + airports ──
   for (const c of CITIES) {
+    const isOrigin = c.code === "RUH";
+    const cityFields = {
+      nameEn: c.name.en,
+      nameAr: c.name.ar,
+      country: c.country,
+      isOrigin,
+      multiplier: DEFAULT_DESTINATION_FACTORS[c.code] ?? 1.0,
+      approxDurationMinutes: isOrigin ? null : routeDuration("RUH", c.airports[0]?.code ?? c.code),
+    };
     const city = await prisma.city.upsert({
       where: { code: c.code },
-      update: {},
-      create: { code: c.code, nameEn: c.name.en, nameAr: c.name.ar, country: c.country },
+      update: cityFields,
+      create: { code: c.code, ...cityFields },
     });
     for (const a of c.airports) {
       const meta = AIRPORT_META[a.code];

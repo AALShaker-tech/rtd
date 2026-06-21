@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { getStep, LOUNGE_TYPES, getCity } from "@/lib/domain";
+import { getStep, LOUNGE_TYPES } from "@/lib/domain";
 import {
-  updateDestinationPricing,
   updateLoungePrice,
   updateServicePrice,
   updateVehicleMultiplier,
@@ -16,13 +15,12 @@ interface Props {
   services: { stepType: string; basePrice: number; active: boolean }[];
   lounges: { loungeType: string; price: number; active: boolean }[];
   vehicles: { category: string; nameEn: string; multiplier: number }[];
-  destinations: { cityCode: string; factor: number; surcharge: number }[];
 }
 
-export function PricingManager({ services, lounges, vehicles, destinations }: Props) {
+export function PricingManager({ services, lounges, vehicles }: Props) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
-  const [tab, setTab] = useState<"services" | "vehicles" | "lounges" | "destinations">("services");
+  const [tab, setTab] = useState<"services" | "vehicles" | "lounges">("services");
   const [saving, setSaving] = useState<string | null>(null);
 
   async function run(key: string, fn: () => Promise<unknown>) {
@@ -36,7 +34,6 @@ export function PricingManager({ services, lounges, vehicles, destinations }: Pr
     { key: "services", label: pick(t.pricing.servicePricing) },
     { key: "vehicles", label: pick(t.pricing.vehiclePricing) },
     { key: "lounges", label: pick(t.pricing.loungePricing) },
-    { key: "destinations", label: pick(t.pricing.destinationPricing) },
   ] as const;
 
   return (
@@ -96,22 +93,6 @@ export function PricingManager({ services, lounges, vehicles, destinations }: Pr
         </div>
       )}
 
-      {tab === "destinations" && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {destinations.map((d) => (
-            <EditRow
-              key={d.cityCode}
-              title={getCity(d.cityCode)?.name[locale] ?? d.cityCode}
-              fields={[
-                { key: "factor", label: pick(t.pricing.factor), value: d.factor, step: 0.05, float: true },
-                { key: "surcharge", label: pick(t.pricing.surcharge), value: d.surcharge, step: 10 },
-              ]}
-              busy={saving === d.cityCode}
-              onSave={(vals) => run(d.cityCode, () => updateDestinationPricing(d.cityCode, vals.factor, vals.surcharge))}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

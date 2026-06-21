@@ -24,11 +24,14 @@ import {
 import type { JourneyStepInput } from "@/lib/types";
 
 export interface PricingConfig {
-  services: Record<string, number>; // StepType → base price
-  lounges: Record<string, number>; // loungeType → price
+  services: Record<string, number>; // StepType → global base price
+  lounges: Record<string, number>; // loungeType → global price
   multipliers: Record<string, number>; // CarCategory → multiplier
-  destinationFactors: Record<string, number>; // cityCode → factor
+  destinationFactors: Record<string, number>; // cityCode → factor (City.multiplier)
   destinationSurcharges?: Record<string, number>; // cityCode → flat surcharge
+  // Per-city overrides (admin-managed). Take precedence over the global values.
+  cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
+  cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
@@ -38,6 +41,8 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   multipliers: Object.fromEntries(VEHICLES.map((v) => [v.category, v.multiplier])),
   destinationFactors: { ...DEFAULT_DESTINATION_FACTORS },
   destinationSurcharges: {},
+  cityServicePrices: {},
+  cityLoungePrices: {},
 };
 
 export interface StepPriceBreakdown {
@@ -66,7 +71,10 @@ export function computeStepPrice(
 
   const def = getStep(step.stepType);
   const factor = destinationFactor(config, step.city);
-  const base = config.services[step.stepType] ?? 0;
+  // Per-city service override takes precedence over the global base; the city
+  // multiplier (factor) still applies on top so it stays a consistent dial.
+  const cityBase = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
+  const base = cityBase ?? config.services[step.stepType] ?? 0;
 
   // Chauffeur — per-day pricing × daily-usage multiplier.
   if (def.features.chauffeur) {
@@ -92,8 +100,11 @@ export function computeStepPrice(
     };
   }
 
-  // Lounge / assistance — lounge price overrides base when one is selected.
-  const loungePrice = step.loungeType ? config.lounges[step.loungeType] : undefined;
+  // Lounge / assistance — lounge price overrides base when one is selected
+  // (per-city lounge price takes precedence over the global lounge price).
+  const loungePrice = step.loungeType
+    ? (step.city ? config.cityLoungePrices?.[step.city]?.[step.loungeType] : undefined) ?? config.lounges[step.loungeType]
+    : undefined;
   const effectiveBase = loungePrice ?? base;
   return {
     basePrice: effectiveBase,
