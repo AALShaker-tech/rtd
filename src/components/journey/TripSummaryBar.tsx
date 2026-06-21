@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useJourneyStore } from "@/store/journeyStore";
+import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { formatDateOnly } from "@/lib/utils";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -60,9 +61,25 @@ function EditModal({ onClose }: { onClose: () => void }) {
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const setTripInfo = useJourneyStore((s) => s.setTripInfo);
   const applyTripInfoToSteps = useJourneyStore((s) => s.applyTripInfoToSteps);
+  const [saving, setSaving] = useState(false);
 
-  function save() {
+  async function save() {
+    setSaving(true);
+    // Re-resolve flights for the (possibly changed) dates so service times resync.
+    if (tripInfo.departureFlightCode && tripInfo.departureDate) {
+      const r = await resolveFlightAction(tripInfo.departureFlightCode, tripInfo.departureDate);
+      setTripInfo(r.status === "matched" && r.matches.length === 1
+        ? { departureFlight: r.matches[0], departureLookupStatus: "static_matched" }
+        : { departureFlight: null, departureLookupStatus: r.status === "matched" ? undefined : "not_found" });
+    }
+    if (tripInfo.returnFlightCode && tripInfo.returnDate) {
+      const r = await resolveFlightAction(tripInfo.returnFlightCode, tripInfo.returnDate);
+      setTripInfo(r.status === "matched" && r.matches.length === 1
+        ? { returnFlight: r.matches[0], returnLookupStatus: "static_matched" }
+        : { returnFlight: null, returnLookupStatus: r.status === "matched" ? undefined : "not_found" });
+    }
     applyTripInfoToSteps();
+    setSaving(false);
     onClose();
   }
 
@@ -112,7 +129,7 @@ function EditModal({ onClose }: { onClose: () => void }) {
 
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="btn-ghost">{pick(t.common.cancel)}</button>
-          <button onClick={save} className="btn-gold">{pick(t.common.save)}</button>
+          <button onClick={save} disabled={saving} className="btn-gold">{saving ? pick(t.common.loading) : pick(t.common.save)}</button>
         </div>
       </div>
     </div>

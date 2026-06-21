@@ -29,6 +29,9 @@ export default function JourneyPage() {
   const setDestination = useJourneyStore((s) => s.setDestination);
   const initFlow = useJourneyStore((s) => s.initFlow);
   const updateStep = useJourneyStore((s) => s.updateStep);
+  const draftExpired = useJourneyStore((s) => s.draftExpired);
+  const clearExpiredNotice = useJourneyStore((s) => s.clearExpiredNotice);
+  const resetDraft = useJourneyStore((s) => s.reset);
   const { config } = usePricing();
   const catalog = useCatalog();
 
@@ -37,10 +40,32 @@ export default function JourneyPage() {
   );
   const [idx, setIdx] = useState(0);
 
+  // If the persisted draft expired while away, snap back to a clean first step.
+  useEffect(() => {
+    if (draftExpired) {
+      setStage("destination");
+      setIdx(0);
+    }
+  }, [draftExpired]);
+
   function pickDestination(code: string) {
+    clearExpiredNotice();
     setDestination(code);
     setStage("tripinfo");
   }
+
+  function startNewBooking() {
+    resetDraft();
+    setStage("destination");
+    setIdx(0);
+  }
+
+  const expiredBanner = draftExpired ? (
+    <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <span>{pick(t.builder.draftExpired)}</span>
+      <button onClick={clearExpiredNotice} className="shrink-0 text-amber-700 hover:text-amber-900" aria-label="dismiss">✕</button>
+    </div>
+  ) : null;
   function startFlow() {
     initFlow();
     setIdx(0);
@@ -59,6 +84,7 @@ export default function JourneyPage() {
   if (stage === "destination") {
     return (
       <div className="luxe-container max-w-4xl py-12 md:py-16">
+        {expiredBanner}
         <div className="mb-10 text-center">
           <div className="gold-rule mx-auto mb-5" />
           <h1 className="text-3xl font-semibold text-charcoal md:text-4xl">{pick(t.builder.chooseDestination)}</h1>
@@ -101,13 +127,17 @@ export default function JourneyPage() {
 
   return (
     <div className="luxe-container max-w-6xl py-8 md:py-12">
+      {expiredBanner}
       {/* Route bar */}
       <div className="mb-5 flex items-center justify-between rounded-2xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
         <span className="flex items-center gap-2 text-sm font-medium text-charcoal">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
           {ar ? "الرياض" : "Riyadh"} ✈ {catalog.cityName(destination, locale)} ✈ {ar ? "الرياض" : "Riyadh"}
         </span>
-        <button onClick={() => setStage("destination")} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setStage("destination")} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
+          <button onClick={startNewBooking} className="text-sm font-medium text-charcoal/50 hover:text-charcoal">{pick(t.builder.startNew)}</button>
+        </div>
       </div>
 
       {/* Trip summary (pre-filled from Trip Information; editable) */}

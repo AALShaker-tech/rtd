@@ -14,7 +14,18 @@ import {
 import { estimateServiceTime } from "@/lib/service-timing";
 import type { CustomerDetailsInput, JourneyStepInput, TripInfoInput } from "@/lib/types";
 
-/** Build a step's trip-derived fields (city, date, time, flight, pax, bags). */
+/** How long an inactive customer draft survives before it's cleared. */
+export const DRAFT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Build a step's trip-derived fields from Trip Information.
+ *
+ * Trip Information is the SINGLE SOURCE OF TRUTH: date, time, flight number,
+ * passengers and bags are always (re)computed from it so editing trip info
+ * immediately syncs everywhere and never leaves stale values. Only genuinely
+ * service-specific choices (service type, vehicle, lounge, hotel/home address,
+ * notes, chauffeur days/usage, skipped) are preserved from a prior pass.
+ */
 function applyTripToStep(
   base: JourneyStepInput,
   tripInfo: TripInfoInput,
@@ -29,7 +40,7 @@ function applyTripToStep(
   const step: JourneyStepInput = {
     ...base,
     city: def.cityScope === "DESTINATION" ? dest : "RUH",
-    // user customizations preserved
+    // service-specific choices preserved
     skipped: prior ? prior.skipped : true,
     serviceType: prior?.serviceType ?? base.serviceType,
     carCategory: prior?.carCategory ?? base.carCategory,
@@ -38,16 +49,17 @@ function applyTripToStep(
     hotelAddress: prior?.hotelAddress,
     homeAddress: prior?.homeAddress,
     notes: prior?.notes,
-    // trip-info-driven (auto), editable per step
-    date: prior?.date ?? est.date,
-    time: def.features.flight || def.features.transfer ? prior?.time ?? est.time : prior?.time,
+    // trip-info-driven — always recomputed (no stale values)
+    date: est.date,
+    time: def.features.flight || def.features.transfer ? est.time : undefined,
     flightNumber: def.features.flight ? flightCode : undefined,
-    passengers: def.features.transfer ? prior?.passengers ?? tripInfo.passengers : undefined,
-    bags: def.features.transfer ? prior?.bags ?? tripInfo.bags : undefined,
+    passengers: def.features.transfer ? tripInfo.passengers : undefined,
+    bags: def.features.transfer ? tripInfo.bags : undefined,
   };
 
   if (def.features.chauffeur) {
-    step.date = prior?.date ?? tripInfo.departureFlight?.estimatedArrivalDate ?? (tripInfo.departureDate || undefined);
+    // Chauffeur starts at destination arrival (or departure date); days/usage are service-specific.
+    step.date = tripInfo.departureFlight?.estimatedArrivalDate ?? (tripInfo.departureDate || undefined);
     step.time = undefined;
     step.days = prior?.days ?? 1;
     step.dailyUsage = prior?.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE;
@@ -103,7 +115,7 @@ function blankStep(stepType: StepType): JourneyStepInput {
   };
 }
 
-interface JourneyState {
+interface JourneyDraftData {
   selectedPackage?: PackageType;
   destination?: string; // destination city code
   steps: JourneyStepInput[];
@@ -111,7 +123,13 @@ interface JourneyState {
   tripInfo: TripInfoInput;
   phoneVerified: boolean;
   emailVerified: boolean;
+  /** Epoch ms of last user activity — drives draft expiry. */
+  lastTouched: number;
+  /** Transient (not persisted): set when a stale draft was just cleared. */
+  draftExpired: boolean;
+}
 
+interface JourneyState extends JourneyDraftData {
   setDestination: (code: string) => void;
   setTripInfo: (patch: Partial<TripInfoInput>) => void;
   applyTripInfoToSteps: () => void;
@@ -127,33 +145,46 @@ interface JourneyState {
   setCustomer: (patch: Partial<CustomerDetailsInput>) => void;
   setPhoneVerified: (v: boolean) => void;
   setEmailVerified: (v: boolean) => void;
+  clearExpiredNotice: () => void;
   reset: () => void;
+}
+
+/** A fresh, empty draft (data only). */
+function freshDraft(): JourneyDraftData {
+  return {
+    selectedPackage: undefined,
+    destination: undefined,
+    steps: [],
+    customer: emptyCustomer,
+    tripInfo: emptyTripInfo,
+    phoneVerified: false,
+    emailVerified: false,
+    lastTouched: Date.now(),
+    draftExpired: false,
+  };
 }
 
 function sortByOrder(steps: JourneyStepInput[]): JourneyStepInput[] {
   return [...steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
 }
 
+const NOW = () => Date.now();
+
 export const useJourneyStore = create<JourneyState>()(
   persist(
     (set, get) => ({
-      selectedPackage: undefined,
-      destination: undefined,
-      steps: [],
-      customer: emptyCustomer,
-      tripInfo: emptyTripInfo,
-      phoneVerified: false,
-      emailVerified: false,
+      ...freshDraft(),
 
       setDestination: (code) =>
         set((st) => ({
           destination: code,
+          lastTouched: NOW(),
           steps: st.steps.map((s) =>
             getStep(s.stepType).cityScope === "DESTINATION" ? { ...s, city: code } : s,
           ),
         })),
 
-      setTripInfo: (patch) => set((st) => ({ tripInfo: { ...st.tripInfo, ...patch } })),
+      setTripInfo: (patch) => set((st) => ({ tripInfo: { ...st.tripInfo, ...patch }, lastTouched: NOW() })),
 
       /**
        * Re-apply Trip Information to every step's auto-filled fields (dates by
@@ -162,6 +193,7 @@ export const useJourneyStore = create<JourneyState>()(
        */
       applyTripInfoToSteps: () =>
         set((st) => ({
+          lastTouched: NOW(),
           steps: st.steps.map((s) => applyTripToStep(blankStep(s.stepType), st.tripInfo, st.destination, s)),
         })),
 
@@ -178,7 +210,7 @@ export const useJourneyStore = create<JourneyState>()(
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
         const steps = STEPS.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
-        set({ destination: dest, steps: sortByOrder(steps) });
+        set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
       },
 
       applyPackage: (pkg) => {
@@ -187,6 +219,7 @@ export const useJourneyStore = create<JourneyState>()(
         const dest = get().destination;
         set({
           selectedPackage: pkg,
+          lastTouched: NOW(),
           steps: sortByOrder(
             def.steps.map((t) => {
               const step = blankStep(t);
@@ -204,11 +237,11 @@ export const useJourneyStore = create<JourneyState>()(
         const step = blankStep(stepType);
         const dest = get().destination;
         if (getStep(stepType).cityScope === "DESTINATION" && dest) step.city = dest;
-        set((st) => ({ steps: sortByOrder([...st.steps, step]) }));
+        set((st) => ({ steps: sortByOrder([...st.steps, step]), lastTouched: NOW() }));
       },
 
       removeStep: (stepType) =>
-        set((st) => ({ steps: st.steps.filter((s) => s.stepType !== stepType) })),
+        set((st) => ({ steps: st.steps.filter((s) => s.stepType !== stepType), lastTouched: NOW() })),
 
       toggleStep: (stepType) => {
         if (get().steps.some((s) => s.stepType === stepType)) get().removeStep(stepType);
@@ -217,11 +250,13 @@ export const useJourneyStore = create<JourneyState>()(
 
       updateStep: (stepType, patch) =>
         set((st) => ({
+          lastTouched: NOW(),
           steps: st.steps.map((s) => (s.stepType === stepType ? { ...s, ...patch } : s)),
         })),
 
       setSkipped: (stepType, skipped) =>
         set((st) => ({
+          lastTouched: NOW(),
           steps: st.steps.map((s) =>
             s.stepType === stepType ? { ...s, skipped, serviceType: skipped ? "SKIP" : "CAR_ONLY" } : s,
           ),
@@ -229,22 +264,55 @@ export const useJourneyStore = create<JourneyState>()(
 
       hasStep: (stepType) => get().steps.some((s) => s.stepType === stepType),
 
-      setCustomer: (patch) => set((st) => ({ customer: { ...st.customer, ...patch } })),
+      setCustomer: (patch) => set((st) => ({ customer: { ...st.customer, ...patch }, lastTouched: NOW() })),
       setPhoneVerified: (v) => set({ phoneVerified: v }),
       setEmailVerified: (v) => set({ emailVerified: v }),
 
-      reset: () =>
-        set({
-          selectedPackage: undefined,
-          destination: undefined,
-          steps: [],
-          customer: emptyCustomer,
-          tripInfo: emptyTripInfo,
-          phoneVerified: false,
-          emailVerified: false,
-        }),
+      clearExpiredNotice: () => set({ draftExpired: false }),
+
+      reset: () => {
+        set({ ...freshDraft() });
+        // also wipe the persisted copy so a fresh start is truly clean
+        try {
+          useJourneyStore.persist.clearStorage();
+        } catch {
+          /* noop */
+        }
+      },
     }),
-    { name: "rtd_journey_draft" },
+    {
+      name: "rtd_journey_draft",
+      version: 3,
+      // Persist only user inputs — never computed prices. Derived dates/times are
+      // recomputed from Trip Information whenever it changes.
+      partialize: (s) => ({
+        selectedPackage: s.selectedPackage,
+        destination: s.destination,
+        steps: s.steps,
+        customer: s.customer,
+        tripInfo: s.tripInfo,
+        lastTouched: s.lastTouched,
+      }),
+      // Drop drafts saved by older (incompatible) versions.
+      migrate: (persisted, version) => {
+        if (version < 3 || !persisted) {
+          const f = freshDraft();
+          return { selectedPackage: f.selectedPackage, destination: f.destination, steps: f.steps, customer: f.customer, tripInfo: f.tripInfo, lastTouched: f.lastTouched } as any;
+        }
+        return persisted as any;
+      },
+      // On load, clear a stale draft and flag it so the UI can inform the user.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const ts = state.lastTouched;
+        if (ts && Date.now() - ts > DRAFT_TTL_MS) {
+          setTimeout(() => {
+            useJourneyStore.setState({ ...freshDraft(), draftExpired: true });
+            useJourneyStore.persist.clearStorage();
+          }, 0);
+        }
+      },
+    },
   ),
 );
 

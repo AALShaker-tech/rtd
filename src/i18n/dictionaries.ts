@@ -113,6 +113,11 @@ export const dict = {
     loungeHint: { en: "Tap an option to add it, or continue without selecting", ar: "اضغط الخيار لإضافته، أو تابع دون اختيار" },
     estimatedPrice: { en: "Estimated price", ar: "السعر التقديري" },
     editHint: { en: "Tap any service to add or remove it", ar: "اضغط على أي خدمة لإضافتها أو إلغائها" },
+    startNew: { en: "Start New Booking", ar: "بدء حجز جديد" },
+    draftExpired: {
+      en: "Your previous draft expired. Please start again.",
+      ar: "انتهت صلاحية المسودة السابقة. يرجى البدء من جديد.",
+    },
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
