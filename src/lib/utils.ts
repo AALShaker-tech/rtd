@@ -6,27 +6,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Compose a structured Saudi National Address into a readable one-line string. */
-export function composeHomeAddress(h?: {
-  shortAddress?: string;
-  buildingNumber?: string;
-  street?: string;
-  district?: string;
-  city?: string;
-  postalCode?: string;
-  additionalNumber?: string;
-  unitNumber?: string;
-  notes?: string;
-}): string {
-  if (!h) return "";
-  const line1 = [h.buildingNumber, h.street].filter(Boolean).join(" ");
-  const unit = h.unitNumber ? `Unit ${h.unitNumber}` : "";
-  return [h.shortAddress, line1, h.district, h.city, h.postalCode, h.additionalNumber, unit, h.notes]
-    .map((p) => (p || "").trim())
-    .filter(Boolean)
-    .join(" · ");
-}
-
 /** Format a Date for display in the chosen locale. */
 export function formatDateTime(
   value: Date | string | null | undefined,

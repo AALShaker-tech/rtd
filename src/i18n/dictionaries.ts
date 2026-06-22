@@ -206,30 +206,14 @@ export const dict = {
     childSeat: { en: "Child seat required?", ar: "هل تحتاج مقعد أطفال؟" },
   },
   address: {
-    title: { en: "Home address", ar: "عنوان بيتك" },
-    hint: {
-      en: "Use your Saudi National Address, or just tell us what you know — we'll confirm the rest with you.",
-      ar: "تقدر تكتب عنوانك الوطني، أو بس اللي تعرفه — وإحنا نأكّد الباقي معك.",
+    label: { en: "National Address or Location Description", ar: "العنوان الوطني أو وصف الموقع" },
+    placeholder: {
+      en: "National Address (e.g. RABA1234) or a short location description",
+      ar: "العنوان الوطني (مثال: RABA1234) أو وصف مختصر للموقع",
     },
-    shortAddress: { en: "Short address", ar: "العنوان المختصر" },
-    shortAddressHint: { en: "e.g. RABA1234", ar: "مثال: RABA1234" },
-    buildingNumber: { en: "Building number", ar: "رقم المبنى" },
-    street: { en: "Street name", ar: "اسم الشارع" },
-    district: { en: "District", ar: "الحي" },
-    city: { en: "City", ar: "المدينة" },
-    postalCode: { en: "Postal code", ar: "الرمز البريدي" },
-    additionalNumber: { en: "Additional number", ar: "الرقم الإضافي" },
-    unitNumber: { en: "Unit number", ar: "رقم الوحدة" },
-    notes: { en: "Extra location notes", ar: "ملاحظات إضافية عن الموقع" },
-    notesHint: {
-      en: "Landmarks, gate, or anything that helps the driver find you.",
-      ar: "أقرب معلم، البوابة، أو أي شي يساعد السائق يوصلك بسهولة.",
-    },
-    manualToggle: { en: "I don't know my National Address", ar: "ما أعرف عنواني الوطني" },
-    manualLabel: { en: "Describe your location", ar: "اوصف لنا موقعك" },
-    manualHint: {
-      en: "e.g. Al Olaya district, Riyadh — near…",
-      ar: "مثال: حي العليا، الرياض — قريب من…",
+    info: {
+      en: "You can enter your National Address or a short location description.",
+      ar: "يمكنك إدخال العنوان الوطني أو وصف الموقع بشكل مختصر.",
     },
   },
   tripInfo: {

@@ -6,6 +6,7 @@ import { useJourneyStore } from "@/store/journeyStore";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { formatDateOnly } from "@/lib/utils";
+import { DateField } from "@/components/ui/DateTimeField";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -149,14 +150,14 @@ function EditModal({ onClose }: { onClose: () => void }) {
 
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
+            <div className="block">
               <span className="field-label">{pick(t.tripInfo.departureDate)}</span>
-              <input type="date" min={today()} className="field-input" value={tripInfo.departureDate} onChange={(e) => setTripInfo({ departureDate: e.target.value })} />
-            </label>
-            <label className="block">
+              <DateField value={tripInfo.departureDate} min={today()} onChange={(v) => setTripInfo({ departureDate: v })} />
+            </div>
+            <div className="block">
               <span className="field-label">{pick(t.tripInfo.returnDate)}</span>
-              <input type="date" min={tripInfo.departureDate || today()} className="field-input" value={tripInfo.returnDate} onChange={(e) => setTripInfo({ returnDate: e.target.value })} />
-            </label>
+              <DateField value={tripInfo.returnDate} min={tripInfo.departureDate || today()} onChange={(v) => setTripInfo({ returnDate: v })} />
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

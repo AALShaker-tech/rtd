@@ -9,19 +9,6 @@ import type { NormalizedFlight, ResolvedFlight, FlightLookupStatusValue } from "
 
 export type FlightLookupStatus = "MANUAL" | "VERIFIED" | "LOOKUP_FAILED";
 
-/** Saudi National Address — all fields optional (customer can enter what they know). */
-export interface HomeAddressInput {
-  shortAddress?: string;
-  buildingNumber?: string;
-  street?: string;
-  district?: string;
-  city?: string;
-  postalCode?: string;
-  additionalNumber?: string;
-  unitNumber?: string;
-  notes?: string;
-}
-
 /** A single journey step as held in the client draft / submitted to the API. */
 export interface JourneyStepInput {
   stepType: StepType;
@@ -43,8 +30,7 @@ export interface JourneyStepInput {
   dropoffLocation?: string;
   hotelName?: string;
   hotelAddress?: string;
-  homeAddress?: string; // composed display string (persisted)
-  home?: HomeAddressInput; // structured Saudi National Address (client draft)
+  homeAddress?: string; // National Address or short location description
 
   carCategory?: CarCategory;
   passengers?: number;

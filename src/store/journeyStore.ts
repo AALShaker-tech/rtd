@@ -45,7 +45,6 @@ function applyTripToStep(
     hotelName: prior?.hotelName,
     hotelAddress: prior?.hotelAddress,
     homeAddress: prior?.homeAddress,
-    home: prior?.home,
     notes: prior?.notes,
     // trip-info-driven — always recomputed (no stale values)
     date: est.date,

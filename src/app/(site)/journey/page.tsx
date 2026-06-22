@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
+import { stepSide } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { estimateServiceTime } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
@@ -16,15 +17,7 @@ import type { ResolvedFlight } from "@/lib/flight";
 import { StepCard } from "@/components/journey/StepCard";
 import { JourneySummary } from "@/components/journey/JourneySummary";
 import { TripSummaryBar } from "@/components/journey/TripSummaryBar";
-
-/** Open the native date/time picker when the user clicks anywhere in the input. */
-function openPicker(e: React.MouseEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>) {
-  try {
-    (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
-  } catch {
-    /* showPicker can throw without a user gesture — safe to ignore */
-  }
-}
+import { DateField, TimeField } from "@/components/ui/DateTimeField";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -132,15 +125,18 @@ export default function JourneyPage() {
   if (!step) return null;
 
   const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
-  // Can this step's time be auto-estimated? If not (e.g. return steps with no
-  // return info, or arrival with no flight), show editable date/time fields.
+  // Date/time is the Trip Information's job — it auto-fills every step. The only
+  // place we re-ask is a RETURN-side step whose time couldn't be derived because
+  // the customer didn't enter return date/time up front. Departure-side steps
+  // (home pickup, Riyadh departure assist, destination arrival, airport→hotel)
+  // NEVER show editable date/time; they only display the computed suggestion.
   const autoEst = estimateServiceTime(
     def.type,
     { departureDate: tripInfo.departureDate, returnDate: tripInfo.returnDate, departureTime: tripInfo.departureTime, returnTime: tripInfo.returnTime },
     tripInfo.departureFlight,
     tripInfo.returnFlight,
   );
-  const needsTimeInput = !def.features.chauffeur && !autoEst.time;
+  const needsTimeInput = !def.features.chauffeur && stepSide(def.type) === "RETURN" && !autoEst.time;
   const stepValidation = validateStep({ ...step, skipped: false });
   // Assistance steps require an explicit option (lounge / airport service) before
   // they can be added. Transfer/chauffeur steps have a visible default vehicle.
@@ -287,10 +283,14 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={pick(t.tripInfo.departureDate)} error={showErr("departureDate")}>
-            <input id="ti-departureDate" type="date" min={today()} className={cn("field-input", showErr("departureDate") && "field-input-error")} value={tripInfo.departureDate} onClick={openPicker} onChange={(e) => setTripInfo({ departureDate: e.target.value })} />
+            <div id="ti-departureDate">
+              <DateField value={tripInfo.departureDate} min={today()} error={!!showErr("departureDate")} onChange={(v) => setTripInfo({ departureDate: v })} />
+            </div>
           </Field>
           <Field label={`${pick(t.tripInfo.returnDate)} — ${pick(t.common.optional)}`} error={showErr("returnDate")}>
-            <input id="ti-returnDate" type="date" min={tripInfo.departureDate || today()} className={cn("field-input", showErr("returnDate") && "field-input-error")} value={tripInfo.returnDate} onClick={openPicker} onChange={(e) => setTripInfo({ returnDate: e.target.value })} />
+            <div id="ti-returnDate">
+              <DateField value={tripInfo.returnDate} min={tripInfo.departureDate || today()} error={!!showErr("returnDate")} onChange={(v) => setTripInfo({ returnDate: v })} />
+            </div>
           </Field>
         </div>
 
@@ -436,18 +436,17 @@ function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeErro
           {status === "not_found" && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
           )}
-          <label className="block">
+          <div className="block">
             <span className="field-label">{pick(t.tripInfo.flightTime)}{!isDep ? ` — ${pick(t.common.optional)}` : ""}</span>
-            <input
-              id={isDep ? "ti-departureTime" : "ti-returnTime"}
-              type="time"
-              className={cn("field-input", timeError && "field-input-error")}
-              value={manualTime}
-              onClick={openPicker}
-              onChange={(e) => patch(isDep ? { departureTime: e.target.value } : { returnTime: e.target.value })}
-            />
+            <div id={isDep ? "ti-departureTime" : "ti-returnTime"}>
+              <TimeField
+                value={manualTime}
+                error={!!timeError}
+                onChange={(v) => patch(isDep ? { departureTime: v } : { returnTime: v })}
+              />
+            </div>
             {timeError && <span className="mt-1 block text-xs text-red-600">{timeError}</span>}
-          </label>
+          </div>
         </div>
       )}
     </div>
