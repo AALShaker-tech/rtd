@@ -7,6 +7,7 @@ import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
+import { estimateServiceTime } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES } from "@/lib/phone";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
@@ -131,6 +132,15 @@ export default function JourneyPage() {
   if (!step) return null;
 
   const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
+  // Can this step's time be auto-estimated? If not (e.g. return steps with no
+  // return info, or arrival with no flight), show editable date/time fields.
+  const autoEst = estimateServiceTime(
+    def.type,
+    { departureDate: tripInfo.departureDate, returnDate: tripInfo.returnDate, departureTime: tripInfo.departureTime, returnTime: tripInfo.returnTime },
+    tripInfo.departureFlight,
+    tripInfo.returnFlight,
+  );
+  const needsTimeInput = !def.features.chauffeur && !autoEst.time;
   const stepValidation = validateStep({ ...step, skipped: false });
   // Assistance steps require an explicit option (lounge / airport service) before
   // they can be added. Transfer/chauffeur steps have a visible default vehicle.
@@ -140,20 +150,8 @@ export default function JourneyPage() {
   return (
     <div className="luxe-container max-w-6xl py-8 md:py-12">
       {expiredBanner}
-      {/* Route bar */}
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
-        <span className="flex items-center gap-2 text-sm font-medium text-charcoal">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
-          {ar ? "الرياض" : "Riyadh"} ✈ {catalog.cityName(destination, locale)} ✈ {ar ? "الرياض" : "Riyadh"}
-        </span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setStage("destination")} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
-          <button onClick={startNewBooking} className="text-sm font-medium text-charcoal/50 hover:text-charcoal">{pick(t.builder.startNew)}</button>
-        </div>
-      </div>
-
-      {/* Trip summary (pre-filled from Trip Information; editable) */}
-      <TripSummaryBar />
+      {/* Single integrated summary card: route · auto-filled trip info · actions */}
+      <TripSummaryBar onChangeDestination={() => setStage("destination")} onStartNew={startNewBooking} />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div>
@@ -178,7 +176,7 @@ export default function JourneyPage() {
             </div>
 
             <div className="mt-6">
-              <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} />
+              <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
             </div>
 
             <div className="mt-6 flex items-center justify-between rounded-xl bg-ivory-warm px-4 py-3">

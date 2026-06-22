@@ -12,16 +12,25 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
-import { formatDateOnly } from "@/lib/utils";
+import { cn, formatDateOnly } from "@/lib/utils";
 import type { JourneyStepInput } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** End date = start + (days - 1), formatted yyyy-mm-dd. */
+/** Open the native picker when clicking anywhere in a date/time input. */
+function openPicker(e: React.MouseEvent<HTMLInputElement>) {
+  try {
+    (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Business rule: end date = start date + number of days, formatted yyyy-mm-dd. */
 function chauffeurEndDate(start: string, days: number): string {
   const d = new Date(`${start}T00:00:00`);
   if (Number.isNaN(d.getTime())) return start;
-  d.setDate(d.getDate() + Math.max(1, days) - 1);
+  d.setDate(d.getDate() + Math.max(1, days));
   return d.toISOString().slice(0, 10);
 }
 
@@ -33,9 +42,13 @@ function chauffeurEndDate(start: string, days: number): string {
 export function StepCard({
   step,
   onChange,
+  needsTimeInput = false,
 }: {
   step: JourneyStepInput;
   onChange: (patch: Partial<JourneyStepInput>) => void;
+  /** True when the time can't be auto-estimated (e.g. return/arrival with no
+   *  flight) — show editable date/time instead of a read-only suggestion. */
+  needsTimeInput?: boolean;
 }) {
   const { t, pick, locale } = useI18n();
   const { config } = usePricing();
@@ -56,25 +69,8 @@ export function StepCard({
   const priceFor = (override: Partial<JourneyStepInput>) =>
     computeStepPrice({ ...step, skipped: false, ...override }, config).computedPrice;
 
-  // Compact read-only trip summary (the data lives in Trip Information).
-  const summaryBits = [
-    step.flightNumber,
-    step.date ? formatDateOnly(step.date, locale) : undefined,
-    !f.chauffeur ? step.time : undefined,
-    f.transfer && step.passengers != null ? `${step.passengers} ${pick(t.fields.passengers)}` : undefined,
-    f.transfer && step.bags != null ? `${step.bags} ${pick(t.fields.bags)}` : undefined,
-  ].filter(Boolean);
-
   return (
     <div className="grid gap-5">
-      {/* Read-only trip summary for this step — no repeated entry */}
-      {summaryBits.length > 0 && (
-        <div className="rounded-xl bg-ivory-warm px-4 py-3 text-sm">
-          <span className="text-charcoal/45">{pick(t.tripInfo.usingTripInfo)}: </span>
-          <span className="font-medium text-charcoal">{summaryBits.join(" · ")}</span>
-        </div>
-      )}
-
       {/* Lounge / assistance options — limited by the airport's country */}
       {f.assistance && (
         <div className="grid gap-2.5">
@@ -144,13 +140,29 @@ export function StepCard({
         </div>
       )}
 
-      {/* Suggested service time (auto-estimated, read-only) */}
-      {!f.chauffeur && step.time && (
-        <p className="rounded-xl bg-gold-50 px-4 py-2.5 text-xs text-gold-dark">
-          {pick(t.tripInfo.suggestedTime)}: <span className="font-semibold">{step.time}</span>
-          {step.date ? ` · ${formatDateOnly(step.date, locale)}` : ""}
-          {step.stepType === "ARRIVAL_ASSIST_DESTINATION" || step.stepType === "AIRPORT_TO_HOTEL" ? ` — ${pick(t.tripInfo.arrivalDateNote)}` : ""}
-        </p>
+      {/* Time: auto-estimated → read-only suggestion; otherwise (return steps with
+          no return info, or arrival with no flight) → editable date/time fields. */}
+      {!f.chauffeur && (
+        needsTimeInput ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <PrefilledDate label={pick(t.fields.date)} value={step.date} min={today()} onChange={(v) => onChange({ date: v })} error={errFor("date")} />
+            <Field label={pick(t.fields.time)} error={errFor("time")}>
+              <input
+                type="time"
+                value={step.time ?? ""}
+                onClick={openPicker}
+                onChange={(e) => onChange({ time: e.target.value })}
+                className={cn("field-input", errFor("time") && "field-input-error")}
+              />
+            </Field>
+          </div>
+        ) : step.time ? (
+          <p className="rounded-xl bg-gold-50 px-4 py-2.5 text-xs text-gold-dark">
+            {pick(t.tripInfo.suggestedTime)}: <span className="font-semibold">{step.time}</span>
+            {step.date ? ` · ${formatDateOnly(step.date, locale)}` : ""}
+            {step.stepType === "ARRIVAL_ASSIST_DESTINATION" || step.stepType === "AIRPORT_TO_HOTEL" ? ` — ${pick(t.tripInfo.arrivalDateNote)}` : ""}
+          </p>
+        ) : null
       )}
 
       {/* Locations */}
@@ -230,6 +242,7 @@ function PrefilledDate({
           value={value ?? ""}
           autoFocus={editing}
           className="field-input"
+          onClick={openPicker}
           onChange={(e) => onChange(e.target.value)}
           onBlur={() => value && setEditing(false)}
         />

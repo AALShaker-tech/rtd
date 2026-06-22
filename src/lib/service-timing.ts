@@ -60,13 +60,15 @@ export function estimateServiceTime(
     case "DEPARTURE_ASSIST_RIYADH":
       return shift(depDate, depTime, -B.riyadhDepartureAssistBefore);
     case "ARRIVAL_ASSIST_DESTINATION":
+      // Arrival time is only meaningful from a resolved flight. Without one we
+      // leave the time empty (the customer enters it) instead of faking it.
       return depFlight
         ? { date: depFlight.estimatedArrivalDate, time: depFlight.estimatedArrivalTimeLocal }
-        : { date: depDate, time: depTime };
+        : { date: depDate };
     case "AIRPORT_TO_HOTEL":
       return depFlight
         ? shift(depFlight.estimatedArrivalDate, depFlight.estimatedArrivalTimeLocal, B.arrivalClearanceAfterArrival)
-        : { date: depDate, time: depTime };
+        : { date: depDate };
     case "CHAUFFEUR_DURING_STAY":
       // Starts on the chauffeur start date (handled per-step); no clock estimate.
       return { date: depFlight?.estimatedArrivalDate ?? depDate };
@@ -77,11 +79,11 @@ export function estimateServiceTime(
     case "ARRIVAL_ASSIST_RIYADH":
       return retFlight
         ? { date: retFlight.estimatedArrivalDate, time: retFlight.estimatedArrivalTimeLocal }
-        : { date: retDate, time: retTime };
+        : { date: retDate };
     case "RIYADH_AIRPORT_TO_HOME":
       return retFlight
         ? shift(retFlight.estimatedArrivalDate, retFlight.estimatedArrivalTimeLocal, B.arrivalClearanceAfterArrival)
-        : { date: retDate, time: retTime };
+        : { date: retDate };
     default:
       return {};
   }

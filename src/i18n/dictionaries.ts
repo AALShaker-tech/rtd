@@ -227,6 +227,10 @@ export const dict = {
       en: "These details were auto-filled from your trip information.",
       ar: "تم تعبئة هذه البيانات تلقائيًا من معلومات الرحلة.",
     },
+    autoFilledTooltip: {
+      en: "These details were automatically filled from your trip information. You can update them from Edit Trip Information.",
+      ar: "تم تعبئة هذه البيانات تلقائيًا من معلومات الرحلة. يمكنك تعديلها من زر تعديل معلومات الرحلة.",
+    },
     editTitle: { en: "Edit trip information", ar: "تعديل معلومات الرحلة" },
     arrivalDateNote: {
       en: "Using your departure date — adjust the time if your arrival differs.",

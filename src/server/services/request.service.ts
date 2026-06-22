@@ -151,8 +151,9 @@ export async function createRequest(input: CreateRequestInput) {
       // Chauffeur end date is auto-calculated as start + days; otherwise unused.
       let endAt: Date | null = null;
       if (getStep(s.stepType).features.chauffeur && scheduledAt && s.days) {
+        // Business rule: end date = start date + number of days.
         endAt = new Date(scheduledAt);
-        endAt.setDate(endAt.getDate() + Math.max(1, s.days) - 1);
+        endAt.setDate(endAt.getDate() + Math.max(1, s.days));
       }
       const breakdown = stepBreakdowns.get(s.stepType);
 

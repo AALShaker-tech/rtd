@@ -1,53 +1,108 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useJourneyStore } from "@/store/journeyStore";
+import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { formatDateOnly } from "@/lib/utils";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Small "i" with an accessible popover explaining the auto-filled values. */
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  return (
+    <span
+      ref={ref}
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        aria-label="info"
+        className="grid h-4 w-4 place-items-center rounded-full border border-charcoal/30 text-[10px] font-bold text-charcoal/50 transition hover:border-gold hover:text-gold-dark"
+      >
+        i
+      </button>
+      {open && (
+        <span className="absolute top-6 z-20 w-60 rounded-xl border border-charcoal/10 bg-white p-3 text-[11px] leading-relaxed text-charcoal/70 shadow-luxe ltr:left-0 rtl:right-0">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /**
- * Compact, elegant trip summary shown at the top of every service step. Values
- * are pre-filled from the Trip Information step (the source of truth). "Edit"
- * opens a modal that updates Trip Info and re-applies it across all steps.
+ * Single, compact "trip summary" card shown at the top of every service step.
+ * Merges the route bar + auto-filled trip info + info tooltip + actions
+ * (Edit Trip Information, Change destination, Start New). Values come from the
+ * Trip Information step (the source of truth); Edit updates them everywhere.
  */
-export function TripSummaryBar() {
+export function TripSummaryBar({
+  onChangeDestination,
+  onStartNew,
+}: {
+  onChangeDestination?: () => void;
+  onStartNew?: () => void;
+}) {
   const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const tripInfo = useJourneyStore((s) => s.tripInfo);
+  const destination = useJourneyStore((s) => s.destination);
+  const catalog = useCatalog();
   const [open, setOpen] = useState(false);
 
-  const chips: { label: string; value: string }[] = [
-    { label: pick(t.tripInfo.departureDate), value: tripInfo.departureDate ? formatDateOnly(tripInfo.departureDate, locale) : "—" },
-    { label: pick(t.tripInfo.returnDate), value: tripInfo.returnDate ? formatDateOnly(tripInfo.returnDate, locale) : "—" },
-    { label: pick(t.fields.passengers), value: String(tripInfo.passengers) },
-    { label: pick(t.fields.bags), value: String(tripInfo.bags) },
+  const chips: string[] = [
+    `${pick(t.tripInfo.departureDate)}: ${tripInfo.departureDate ? formatDateOnly(tripInfo.departureDate, locale) : "—"}`,
+    ...(tripInfo.returnDate ? [`${pick(t.tripInfo.returnDate)}: ${formatDateOnly(tripInfo.returnDate, locale)}`] : []),
+    `${tripInfo.passengers} ${pick(t.fields.passengers)}`,
+    `${tripInfo.bags} ${pick(t.fields.bags)}`,
+    ...(tripInfo.specialAssistance ? [pick(t.tripInfo.specialAssistanceLabel)] : []),
   ];
 
   return (
     <>
-      <div className="mb-5 rounded-2xl border border-gold/30 bg-gold-50/60 px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {chips.map((c) => (
-              <div key={c.label} className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wide text-charcoal/45">{c.label}</p>
-                <p className="text-sm font-semibold text-charcoal">{c.value}</p>
-              </div>
-            ))}
-            {tripInfo.specialAssistance && (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-charcoal/45">{pick(t.tripInfo.specialAssistanceLabel)}</p>
-                <p className="text-sm font-semibold text-gold-dark">{pick(t.common.yes)}</p>
-              </div>
+      <div className="mb-5 rounded-2xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
+        {/* Row 1 — route + actions */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <span className="flex items-center gap-2 text-sm font-medium text-charcoal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
+            {ar ? "الرياض" : "Riyadh"} ✈ {catalog.cityName(destination, locale)} ✈ {ar ? "الرياض" : "Riyadh"}
+          </span>
+          <div className="flex items-center gap-3">
+            {onChangeDestination && (
+              <button onClick={onChangeDestination} className="text-sm font-medium text-gold-dark hover:underline">{pick(t.builder.change)}</button>
+            )}
+            <button onClick={() => setOpen(true)} className="btn-outline px-3 py-1.5 text-xs">{pick(t.tripInfo.editTripInfo)}</button>
+            {onStartNew && (
+              <button onClick={onStartNew} className="text-sm font-medium text-charcoal/45 hover:text-charcoal">{pick(t.builder.startNew)}</button>
             )}
           </div>
-          <button onClick={() => setOpen(true)} className="btn-outline shrink-0 px-3 py-1.5 text-xs">
-            {pick(t.common.edit)}
-          </button>
         </div>
-        <p className="mt-2 text-[11px] text-charcoal/45">{pick(t.tripInfo.autoFilledNote)}</p>
+
+        {/* Row 2 — auto-filled chips + info tooltip */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-charcoal/5 pt-2 text-xs text-charcoal/60">
+          <InfoTooltip text={pick(t.tripInfo.autoFilledTooltip)} />
+          {chips.map((c, i) => (
+            <span key={i} className="whitespace-nowrap">
+              {i > 0 && <span className="me-3 text-charcoal/25">·</span>}
+              {c}
+            </span>
+          ))}
+        </div>
       </div>
 
       {open && <EditModal onClose={() => setOpen(false)} />}
