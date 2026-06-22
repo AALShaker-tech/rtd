@@ -8,13 +8,22 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
-import { COUNTRY_CODES, isValidEmail, parsePhone } from "@/lib/phone";
+import { COUNTRY_CODES } from "@/lib/phone";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
-import { formatDateOnly } from "@/lib/utils";
+import { cn, formatDateOnly } from "@/lib/utils";
 import type { ResolvedFlight } from "@/lib/flight";
 import { StepCard } from "@/components/journey/StepCard";
 import { JourneySummary } from "@/components/journey/JourneySummary";
 import { TripSummaryBar } from "@/components/journey/TripSummaryBar";
+
+/** Open the native date/time picker when the user clicks anywhere in the input. */
+function openPicker(e: React.MouseEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>) {
+  try {
+    (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+  } catch {
+    /* showPicker can throw without a user gesture — safe to ignore */
+  }
+}
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -218,20 +227,37 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const setTripInfo = useJourneyStore((s) => s.setTripInfo);
 
-  const [touched, setTouched] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
-  const phoneCheck = parsePhone(customer.phone || "", customer.phoneCountry || "SA");
-  const emailOk = !customer.email || isValidEmail(customer.email);
-  const customerErrors = validateCustomer({ ...customer, language: locale });
-  const tripErrors = validateTripInfo(tripInfo).filter((e) => e.severity === "error");
-  const canContinue = customerErrors.filter((e) => e.severity === "error").length === 0 && tripErrors.length === 0;
+  // Collect field-level errors from the shared validators (errors only).
+  const issues = [
+    ...validateCustomer({ ...customer, language: locale }),
+    ...validateTripInfo(tripInfo),
+  ].filter((i) => i.severity === "error");
+  const errFor = (field: string) => {
+    const i = issues.find((x) => x.field === field);
+    return i ? (ar ? i.messageAr : i.messageEn) : undefined;
+  };
+  const canContinue = issues.length === 0;
+  // Order in which required fields appear, for focusing the first missing one.
+  const FIELD_ORDER = ["fullName", "phone", "departureDate", "departureTime", "passengers", "bags", "returnDate", "email"];
 
   function cont() {
-    setTouched(true);
-    if (!canContinue) return;
+    setAttempted(true);
+    if (!canContinue) {
+      const first = FIELD_ORDER.find((f) => errFor(f));
+      if (first) {
+        const el = document.getElementById(`ti-${first}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => (el as HTMLElement | null)?.focus?.(), 250);
+      }
+      return;
+    }
     setCustomer({ language: locale });
     onContinue();
   }
+
+  const showErr = (field: string) => (attempted ? errFor(field) : undefined);
 
   return (
     <div className="luxe-container max-w-2xl py-10 md:py-14">
@@ -242,8 +268,8 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
       </div>
 
       <div className="luxe-card space-y-5 p-6 md:p-8">
-        <Field label={pick(t.fields.fullName)} error={touched && !customer.fullName ? pick(t.common.required) : undefined}>
-          <input className="field-input" value={customer.fullName} onChange={(e) => setCustomer({ fullName: e.target.value })} placeholder={ar ? "الاسم الكامل" : "Your full name"} />
+        <Field label={pick(t.fields.fullName)} error={showErr("fullName")}>
+          <input id="ti-fullName" className={cn("field-input", showErr("fullName") && "field-input-error")} value={customer.fullName} onChange={(e) => setCustomer({ fullName: e.target.value })} placeholder={ar ? "الاسم الكامل" : "Your full name"} />
         </Field>
 
         <div>
@@ -252,30 +278,27 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
             <select className="field-input w-32 shrink-0" value={customer.phoneCountry} onChange={(e) => setCustomer({ phoneCountry: e.target.value })}>
               {COUNTRY_CODES.map((c) => (<option key={c.code} value={c.code}>{c.dial} {c.code}</option>))}
             </select>
-            <input className="field-input flex-1" inputMode="tel" value={customer.phone} onChange={(e) => setCustomer({ phone: e.target.value })} placeholder="5XXXXXXXX" />
+            <input id="ti-phone" className={cn("field-input flex-1", showErr("phone") && "field-input-error")} inputMode="tel" value={customer.phone} onChange={(e) => setCustomer({ phone: e.target.value })} placeholder="5XXXXXXXX" />
           </div>
-          {touched && !phoneCheck.valid && <p className="mt-1 text-xs text-red-600">{ar ? "رقم جوال غير صحيح" : "Invalid mobile number"}</p>}
+          {showErr("phone") && <p className="mt-1 text-xs text-red-600">{showErr("phone")}</p>}
         </div>
 
-        <Field label={`${pick(t.fields.email)} — ${pick(t.common.optional)}`} error={touched && !emailOk ? (ar ? "بريد غير صحيح" : "Invalid email") : undefined}>
-          <input className="field-input" inputMode="email" value={customer.email} onChange={(e) => setCustomer({ email: e.target.value })} placeholder="name@example.com" />
+        <Field label={`${pick(t.fields.email)} — ${pick(t.common.optional)}`} error={showErr("email")}>
+          <input id="ti-email" className={cn("field-input", showErr("email") && "field-input-error")} inputMode="email" value={customer.email} onChange={(e) => setCustomer({ email: e.target.value })} placeholder="name@example.com" />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={pick(t.tripInfo.departureDate)} error={touched && !tripInfo.departureDate ? pick(t.common.required) : undefined}>
-            <input type="date" min={today()} className="field-input" value={tripInfo.departureDate} onChange={(e) => setTripInfo({ departureDate: e.target.value })} />
+          <Field label={pick(t.tripInfo.departureDate)} error={showErr("departureDate")}>
+            <input id="ti-departureDate" type="date" min={today()} className={cn("field-input", showErr("departureDate") && "field-input-error")} value={tripInfo.departureDate} onClick={openPicker} onChange={(e) => setTripInfo({ departureDate: e.target.value })} />
           </Field>
-          <Field
-            label={pick(t.tripInfo.returnDate)}
-            error={touched && tripInfo.returnDate && tripInfo.departureDate && tripInfo.returnDate < tripInfo.departureDate ? (ar ? "قبل المغادرة" : "Before departure") : undefined}
-          >
-            <input type="date" min={tripInfo.departureDate || today()} className="field-input" value={tripInfo.returnDate} onChange={(e) => setTripInfo({ returnDate: e.target.value })} />
+          <Field label={`${pick(t.tripInfo.returnDate)} — ${pick(t.common.optional)}`} error={showErr("returnDate")}>
+            <input id="ti-returnDate" type="date" min={tripInfo.departureDate || today()} className={cn("field-input", showErr("returnDate") && "field-input-error")} value={tripInfo.returnDate} onClick={openPicker} onChange={(e) => setTripInfo({ returnDate: e.target.value })} />
           </Field>
         </div>
 
         {/* Flight details (resolved from the static schedule) */}
-        <FlightField leg="DEPARTURE" />
-        {tripInfo.returnDate && <FlightField leg="RETURN" />}
+        <FlightField leg="DEPARTURE" timeError={showErr("departureTime")} />
+        {tripInfo.returnDate && <FlightField leg="RETURN" timeError={showErr("returnTime")} />}
         <p className="rounded-lg bg-ivory-warm px-3 py-2 text-[11px] text-charcoal/50">{pick(t.tripInfo.scheduleDisclaimer)}</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -293,9 +316,14 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
           </Field>
         )}
 
+        {attempted && !canContinue && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+            {ar ? "يرجى تعبئة الحقول المطلوبة المميّزة بالأحمر." : "Please complete the required fields highlighted in red."}
+          </p>
+        )}
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
-          <button onClick={onBack} className="btn-ghost">{ar ? "→" : "←"} {pick(t.common.back)}</button>
-          <button onClick={cont} disabled={touched && !canContinue} className="btn-gold">{pick(t.common.next)} {ar ? "←" : "→"}</button>
+          <button type="button" onClick={onBack} className="btn-ghost">{ar ? "→" : "←"} {pick(t.common.back)}</button>
+          <button type="button" onClick={cont} className="btn-gold">{pick(t.common.next)} {ar ? "←" : "→"}</button>
         </div>
       </div>
     </div>
@@ -313,7 +341,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 /** Flight number entry with static-schedule lookup + manual fallback. */
-function FlightField({ leg }: { leg: "DEPARTURE" | "RETURN" }) {
+function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeError?: string }) {
   const { t, pick, locale } = useI18n();
   const ar = locale === "ar";
   const tripInfo = useJourneyStore((s) => s.tripInfo);
@@ -403,13 +431,24 @@ function FlightField({ leg }: { leg: "DEPARTURE" | "RETURN" }) {
         </div>
       )}
 
-      {/* Not found → manual time */}
-      {status === "not_found" && !resolved && (
+      {/* Manual time — always available when no flight is resolved (so the
+          customer can provide a time even without a schedule match). */}
+      {!resolved && (
         <div className="mt-2 space-y-2">
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
+          {status === "not_found" && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
+          )}
           <label className="block">
-            <span className="field-label">{pick(t.tripInfo.flightTime)}</span>
-            <input type="time" className="field-input" value={manualTime} onChange={(e) => patch(isDep ? { departureTime: e.target.value } : { returnTime: e.target.value })} />
+            <span className="field-label">{pick(t.tripInfo.flightTime)}{!isDep ? ` — ${pick(t.common.optional)}` : ""}</span>
+            <input
+              id={isDep ? "ti-departureTime" : "ti-returnTime"}
+              type="time"
+              className={cn("field-input", timeError && "field-input-error")}
+              value={manualTime}
+              onClick={openPicker}
+              onChange={(e) => patch(isDep ? { departureTime: e.target.value } : { returnTime: e.target.value })}
+            />
+            {timeError && <span className="mt-1 block text-xs text-red-600">{timeError}</span>}
           </label>
         </div>
       )}

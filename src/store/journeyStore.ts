@@ -1,7 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import {
   DEFAULT_CHAUFFEUR_USAGE,
   getPackage,
@@ -14,9 +13,6 @@ import {
 } from "@/lib/domain";
 import { estimateServiceTime } from "@/lib/service-timing";
 import type { CustomerDetailsInput, JourneyStepInput, TripInfoInput } from "@/lib/types";
-
-/** How long an inactive customer draft survives before it's cleared. */
-export const DRAFT_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Build a step's trip-derived fields from Trip Information.
@@ -171,9 +167,9 @@ function sortByOrder(steps: JourneyStepInput[]): JourneyStepInput[] {
 
 const NOW = () => Date.now();
 
-export const useJourneyStore = create<JourneyState>()(
-  persist(
-    (set, get) => ({
+// In-memory only (no persist): the customer booking draft is session-scoped and
+// cleared on a full page reload. Client-side navigation between steps keeps it.
+export const useJourneyStore = create<JourneyState>()((set, get) => ({
       ...freshDraft(),
 
       setDestination: (code) =>
@@ -289,51 +285,9 @@ export const useJourneyStore = create<JourneyState>()(
 
       clearExpiredNotice: () => set({ draftExpired: false }),
 
-      reset: () => {
-        set({ ...freshDraft() });
-        // also wipe the persisted copy so a fresh start is truly clean
-        try {
-          useJourneyStore.persist.clearStorage();
-        } catch {
-          /* noop */
-        }
-      },
+      reset: () => set({ ...freshDraft() }),
     }),
-    {
-      name: "rtd_journey_draft",
-      version: 3,
-      // Persist only user inputs — never computed prices. Derived dates/times are
-      // recomputed from Trip Information whenever it changes.
-      partialize: (s) => ({
-        selectedPackage: s.selectedPackage,
-        destination: s.destination,
-        steps: s.steps,
-        customer: s.customer,
-        tripInfo: s.tripInfo,
-        lastTouched: s.lastTouched,
-      }),
-      // Drop drafts saved by older (incompatible) versions.
-      migrate: (persisted, version) => {
-        if (version < 3 || !persisted) {
-          const f = freshDraft();
-          return { selectedPackage: f.selectedPackage, destination: f.destination, steps: f.steps, customer: f.customer, tripInfo: f.tripInfo, lastTouched: f.lastTouched } as any;
-        }
-        return persisted as any;
-      },
-      // On load, clear a stale draft and flag it so the UI can inform the user.
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
-        const ts = state.lastTouched;
-        if (ts && Date.now() - ts > DRAFT_TTL_MS) {
-          setTimeout(() => {
-            useJourneyStore.setState({ ...freshDraft(), draftExpired: true });
-            useJourneyStore.persist.clearStorage();
-          }, 0);
-        }
-      },
-    },
-  ),
-);
+  );
 
 /** All available steps in canonical order (for the builder catalogue). */
 export const ALL_STEPS = STEPS;
