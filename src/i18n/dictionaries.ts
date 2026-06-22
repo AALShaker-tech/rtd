@@ -36,6 +36,7 @@ export const dict = {
     step: { en: "Step", ar: "خطوة" },
     notSet: { en: "Not set", ar: "غير محدد" },
     none: { en: "None", ar: "لا يوجد" },
+    done: { en: "Done", ar: "تم" },
   },
   home: {
     eyebrow: { en: "RTD — Riyadh to Destination", ar: "حيّاك الله في RTD" },
@@ -121,6 +122,15 @@ export const dict = {
     selectServicePrompt: {
       en: "Please select a service or skip this step.",
       ar: "يرجى اختيار خدمة أو تخطي هذه الخطوة.",
+    },
+    selectReturnTiming: {
+      en: "Please select return date and time to add this service.",
+      ar: "يرجى اختيار تاريخ ووقت العودة لإضافة هذه الخدمة.",
+    },
+    returnTimingTitle: { en: "Return flight date & time", ar: "تاريخ ووقت رحلة العودة" },
+    returnTimingHint: {
+      en: "We'll use this to time all your return services automatically.",
+      ar: "بنستخدمها لضبط توقيت كل خدمات عودتك تلقائيًا.",
     },
   },
   cities: {
@@ -264,6 +274,8 @@ export const dict = {
     estArrival: { en: "Est. arrival", ar: "الوصول المتوقع" },
     usingTripInfo: { en: "Using your trip information", ar: "تم استخدام معلومات رحلتك" },
     editTripInfo: { en: "Edit Trip Information", ar: "تعديل معلومات الرحلة" },
+    editReturnTime: { en: "Edit return time", ar: "تعديل وقت العودة" },
+    returnTime: { en: "Return flight time", ar: "وقت رحلة العودة" },
     suggestedTime: { en: "Suggested time", ar: "الوقت المقترح" },
     flightSource: { en: "Source", ar: "المصدر" },
     sourceStatic: { en: "Static schedule", ar: "جدول محفوظ" },

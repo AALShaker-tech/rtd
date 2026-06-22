@@ -8,7 +8,7 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { stepSide } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
-import { estimateServiceTime } from "@/lib/service-timing";
+import { hasReturnTiming } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES } from "@/lib/phone";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
@@ -125,23 +125,19 @@ export default function JourneyPage() {
   if (!step) return null;
 
   const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
-  // Date/time is the Trip Information's job — it auto-fills every step. The only
-  // place we re-ask is a RETURN-side step whose time couldn't be derived because
-  // the customer didn't enter return date/time up front. Departure-side steps
-  // (home pickup, Riyadh departure assist, destination arrival, airport→hotel)
-  // NEVER show editable date/time; they only display the computed suggestion.
-  const autoEst = estimateServiceTime(
-    def.type,
-    { departureDate: tripInfo.departureDate, returnDate: tripInfo.returnDate, departureTime: tripInfo.departureTime, returnTime: tripInfo.returnTime },
-    tripInfo.departureFlight,
-    tripInfo.returnFlight,
-  );
-  const needsTimeInput = !def.features.chauffeur && stepSide(def.type) === "RETURN" && !autoEst.time;
+  // Date/time is the Trip Information's job — it auto-fills every step. Departure
+  // steps never re-ask. For RETURN steps, if the return date/time wasn't entered
+  // up front we collect it once here (the return source of truth); once set, it
+  // propagates to every later return step and is never asked again.
+  const isReturnStep = stepSide(def.type) === "RETURN";
+  const returnReady = hasReturnTiming(tripInfo);
+  const collectReturnTiming = isReturnStep && !returnReady;
   const stepValidation = validateStep({ ...step, skipped: false });
   // Assistance steps require an explicit option (lounge / airport service) before
   // they can be added. Transfer/chauffeur steps have a visible default vehicle.
   const needsService = def.features.assistance && !step.loungeType;
-  const blockAdd = stepValidation.errors.some((e) => e.field === "passengers") || needsService;
+  const blockAdd =
+    stepValidation.errors.some((e) => e.field === "passengers") || needsService || collectReturnTiming;
 
   return (
     <div className="luxe-container max-w-6xl py-8 md:py-12">
@@ -171,8 +167,10 @@ export default function JourneyPage() {
               </div>
             </div>
 
+            {collectReturnTiming && <ReturnTimingPrompt />}
+
             <div className="mt-6">
-              <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
+              <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={false} />
             </div>
 
             <div className="mt-6 flex items-center justify-between rounded-xl bg-ivory-warm px-4 py-3">
@@ -181,6 +179,9 @@ export default function JourneyPage() {
             </div>
             {needsService && (
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.builder.selectServicePrompt)}</p>
+            )}
+            {collectReturnTiming && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.builder.selectReturnTiming)}</p>
             )}
             <div className="mt-4 flex gap-3">
               <button onClick={() => { if (blockAdd) return; updateStep(def.type, { skipped: false }); advance(); }} disabled={blockAdd} className="btn-gold flex-1">
@@ -206,6 +207,40 @@ export default function JourneyPage() {
               locale,
             )}
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Collects the return journey's date & time once, on the first return-side step
+ * the customer reaches without it. Writing here updates Trip Information (the
+ * source of truth) and re-applies it to every step, so later return services
+ * reuse the same smart timing and never ask again.
+ */
+function ReturnTimingPrompt() {
+  const { t, pick } = useI18n();
+  const tripInfo = useJourneyStore((s) => s.tripInfo);
+  const setTripInfo = useJourneyStore((s) => s.setTripInfo);
+  const applyTripInfoToSteps = useJourneyStore((s) => s.applyTripInfoToSteps);
+  const update = (patch: Parameters<typeof setTripInfo>[0]) => { setTripInfo(patch); applyTripInfoToSteps(); };
+
+  return (
+    <div className="mt-6 rounded-2xl border border-gold/40 bg-gold-50/60 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold text-charcoal">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v4h-4" /></svg>
+        {pick(t.builder.returnTimingTitle)}
+      </p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-charcoal/55">{pick(t.builder.returnTimingHint)}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <span className="field-label">{pick(t.tripInfo.returnDate)}</span>
+          <DateField value={tripInfo.returnDate} min={tripInfo.departureDate || today()} onChange={(v) => update({ returnDate: v })} />
+        </div>
+        <div>
+          <span className="field-label">{pick(t.tripInfo.returnTime)}</span>
+          <TimeField value={tripInfo.returnTime} onChange={(v) => update({ returnTime: v })} />
         </div>
       </div>
     </div>

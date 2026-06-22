@@ -30,6 +30,16 @@ import type {
 
 const MAX_REASONABLE_BAGS_PER_PERSON = 3;
 
+// Arrival-driven services are timed off the actual flight arrival, which ops
+// confirm on the day. A precise clock time is shown when a flight is resolved,
+// but a date alone is acceptable here (we never block on a missing time).
+const TIME_OPTIONAL_STEPS = new Set<StepType>([
+  "ARRIVAL_ASSIST_DESTINATION",
+  "AIRPORT_TO_HOTEL",
+  "ARRIVAL_ASSIST_RIYADH",
+  "RIYADH_AIRPORT_TO_HOME",
+]);
+
 function issue(
   severity: "error" | "warning",
   en: string,
@@ -101,7 +111,7 @@ export function validateStep(step: JourneyStepInput, now: Date = new Date()): St
     if (!step.city) errors.push(req("city", "المدينة", "city"));
   } else {
     if (!step.date) errors.push(req("date", "التاريخ", "date"));
-    if (!step.time) errors.push(req("time", "الوقت", "time"));
+    if (!step.time && !TIME_OPTIONAL_STEPS.has(step.stepType)) errors.push(req("time", "الوقت", "time"));
     if (when && when < now) errors.push(pastDate());
   }
 

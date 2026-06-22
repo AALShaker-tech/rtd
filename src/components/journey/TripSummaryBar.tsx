@@ -6,7 +6,7 @@ import { useJourneyStore } from "@/store/journeyStore";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { formatDateOnly } from "@/lib/utils";
-import { DateField } from "@/components/ui/DateTimeField";
+import { DateField, TimeField } from "@/components/ui/DateTimeField";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -159,6 +159,14 @@ function EditModal({ onClose }: { onClose: () => void }) {
               <DateField value={tripInfo.returnDate} min={tripInfo.departureDate || today()} onChange={(v) => setTripInfo({ returnDate: v })} />
             </div>
           </div>
+
+          {/* Return flight time — editable when set manually (no resolved flight). */}
+          {tripInfo.returnDate && !tripInfo.returnFlight && (
+            <div className="block">
+              <span className="field-label">{pick(t.tripInfo.returnTime)}</span>
+              <TimeField value={tripInfo.returnTime} onChange={(v) => setTripInfo({ returnTime: v })} />
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Stepper label={pick(t.fields.passengers)} value={tripInfo.passengers} min={1} onChange={(v) => setTripInfo({ passengers: v })} />

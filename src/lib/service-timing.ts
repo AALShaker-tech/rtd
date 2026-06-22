@@ -25,6 +25,19 @@ export interface TimingInputs {
   returnTime?: string;
 }
 
+/**
+ * Whether the return journey timing is established (the source of truth for all
+ * return-side steps): a return date plus either a resolved return flight or a
+ * manually entered return time.
+ */
+export function hasReturnTiming(trip: {
+  returnDate?: string;
+  returnFlight?: ResolvedFlight | null;
+  returnTime?: string;
+}): boolean {
+  return !!trip.returnDate && (!!trip.returnFlight || !!trip.returnTime);
+}
+
 export interface EstimatedTime {
   date?: string; // yyyy-mm-dd
   time?: string; // HH:MM
@@ -53,6 +66,11 @@ export function estimateServiceTime(
   const depTime = depFlight?.departureTimeLocal ?? trip.departureTime;
   const retDate = retFlight?.departureDate ?? trip.returnDate;
   const retTime = retFlight?.departureTimeLocal ?? trip.returnTime;
+  // When only a manual return time is known (no resolved return flight), estimate
+  // the Riyadh arrival from the trip's flight duration (symmetric outbound leg),
+  // so later return steps still get a logical suggested time. Falls back to
+  // date-only if no duration is available anywhere.
+  const retDurationMin = retFlight?.durationMinutes ?? depFlight?.durationMinutes;
 
   switch (stepType) {
     case "HOME_TO_RIYADH_AIRPORT":
@@ -77,13 +95,15 @@ export function estimateServiceTime(
     case "DEPARTURE_ASSIST_RETURN":
       return shift(retDate, retTime, -B.returnDepartureAssistBefore);
     case "ARRIVAL_ASSIST_RIYADH":
-      return retFlight
-        ? { date: retFlight.estimatedArrivalDate, time: retFlight.estimatedArrivalTimeLocal }
-        : { date: retDate };
+      if (retFlight) return { date: retFlight.estimatedArrivalDate, time: retFlight.estimatedArrivalTimeLocal };
+      if (retDate && retTime && retDurationMin != null) return shift(retDate, retTime, retDurationMin);
+      return { date: retDate };
     case "RIYADH_AIRPORT_TO_HOME":
-      return retFlight
-        ? shift(retFlight.estimatedArrivalDate, retFlight.estimatedArrivalTimeLocal, B.arrivalClearanceAfterArrival)
-        : { date: retDate };
+      if (retFlight)
+        return shift(retFlight.estimatedArrivalDate, retFlight.estimatedArrivalTimeLocal, B.arrivalClearanceAfterArrival);
+      if (retDate && retTime && retDurationMin != null)
+        return shift(retDate, retTime, retDurationMin + B.arrivalClearanceAfterArrival);
+      return { date: retDate };
     default:
       return {};
   }

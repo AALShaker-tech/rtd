@@ -200,32 +200,39 @@ export function TimeField({
   onChange,
   error,
   placeholder,
+  doneLabel,
 }: {
   id?: string;
   value?: string;
   onChange: (v: string) => void;
   error?: boolean;
   placeholder?: string;
+  doneLabel?: string;
 }) {
   const { locale } = useI18n();
   const ar = locale === "ar";
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
   const uid = useId();
 
-  const [h, m] = value ? value.split(":").map(Number) : [null, null];
+  // Pending selection — committed only when the user clicks Done (or dismisses).
+  // This keeps the picker open while choosing hour + minute.
+  const parse = (v?: string): { h: number; m: number } => {
+    const [hh, mm] = v ? v.split(":").map(Number) : [NaN, NaN];
+    return { h: Number.isFinite(hh) ? hh : 0, m: Number.isFinite(mm) ? mm : 0 };
+  };
+  const [pending, setPending] = useState(() => parse(value));
+  useEffect(() => { setPending(parse(value)); /* sync on external change */ }, [value]);
+
+  const commit = () => onChange(`${pad(pending.h)}:${pad(pending.m)}`);
+  const ref = useDismiss(open, () => { commit(); setOpen(false); });
+
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
-
-  const set = (nh: number | null, nm: number | null) => {
-    const hh = nh ?? h ?? 0;
-    const mm = nm ?? m ?? 0;
-    onChange(`${pad(hh)}:${pad(mm)}`);
-  };
+  const preview = `${pad(pending.h)}:${pad(pending.m)}`;
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" id={id} className={triggerClass(error, open)} onClick={() => setOpen((o) => !o)}>
+      <button type="button" id={id} className={triggerClass(error, open)} onClick={() => { if (open) commit(); setOpen((o) => !o); }}>
         <span className={cn(value ? "font-medium text-charcoal" : "text-charcoal/35")}>
           {value || placeholder || (ar ? "اختر الوقت" : "Select time")}
         </span>
@@ -233,19 +240,20 @@ export function TimeField({
       </button>
 
       {open && (
-        <div className={cn(popoverClass, "w-44")} dir={ar ? "rtl" : "ltr"}>
+        <div className={cn(popoverClass, "w-48")} dir={ar ? "rtl" : "ltr"}>
+          <p className="mb-2 text-center text-sm font-semibold text-charcoal">{preview}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="mb-1 text-center text-[11px] font-medium text-charcoal/40">{ar ? "ساعة" : "Hour"}</p>
-              <div className="max-h-44 overflow-y-auto rounded-lg border border-charcoal/5">
+              <div className="max-h-40 overflow-y-auto rounded-lg border border-charcoal/5">
                 {hours.map((hh) => (
                   <button
                     key={`${uid}-h-${hh}`}
                     type="button"
-                    onClick={() => set(hh, null)}
+                    onClick={() => setPending((p) => ({ ...p, h: hh }))}
                     className={cn(
                       "block w-full py-1.5 text-center text-sm transition",
-                      h === hh ? "bg-gold-gradient font-semibold text-charcoal" : "text-charcoal/70 hover:bg-ivory-warm",
+                      pending.h === hh ? "bg-gold-gradient font-semibold text-charcoal" : "text-charcoal/70 hover:bg-ivory-warm",
                     )}
                   >
                     {pad(hh)}
@@ -255,15 +263,15 @@ export function TimeField({
             </div>
             <div>
               <p className="mb-1 text-center text-[11px] font-medium text-charcoal/40">{ar ? "دقيقة" : "Min"}</p>
-              <div className="max-h-44 overflow-y-auto rounded-lg border border-charcoal/5">
+              <div className="max-h-40 overflow-y-auto rounded-lg border border-charcoal/5">
                 {minutes.map((mm) => (
                   <button
                     key={`${uid}-m-${mm}`}
                     type="button"
-                    onClick={() => set(null, mm)}
+                    onClick={() => setPending((p) => ({ ...p, m: mm }))}
                     className={cn(
                       "block w-full py-1.5 text-center text-sm transition",
-                      m === mm ? "bg-gold-gradient font-semibold text-charcoal" : "text-charcoal/70 hover:bg-ivory-warm",
+                      pending.m === mm ? "bg-gold-gradient font-semibold text-charcoal" : "text-charcoal/70 hover:bg-ivory-warm",
                     )}
                   >
                     {pad(mm)}
@@ -272,6 +280,13 @@ export function TimeField({
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => { commit(); setOpen(false); }}
+            className="btn-gold mt-3 w-full py-2 text-sm"
+          >
+            {doneLabel ?? (ar ? "تم" : "Done")}
+          </button>
         </div>
       )}
     </div>
