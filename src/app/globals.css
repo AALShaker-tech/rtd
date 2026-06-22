@@ -91,6 +91,38 @@ html[dir="rtl"] {
     @apply border-red-400 focus:border-red-500 focus:ring-red-200;
   }
 
+  /* ── Polished native date/time pickers ──
+     Make the whole field clickable, keep the value clearly readable, and tint
+     the calendar/clock indicator to match the gold accent on every platform. */
+  input[type="date"].field-input,
+  input[type="time"].field-input {
+    @apply cursor-pointer appearance-none;
+    min-height: 2.85rem;
+  }
+  /* Selected value reads as a strong, clear state. */
+  input[type="date"].field-input:not([value=""]),
+  input[type="time"].field-input:not([value=""]) {
+    @apply font-medium text-charcoal;
+  }
+  /* The clickable calendar/clock icon, gold-tinted and enlarged for touch. */
+  input[type="date"].field-input::-webkit-calendar-picker-indicator,
+  input[type="time"].field-input::-webkit-calendar-picker-indicator {
+    @apply cursor-pointer rounded-md opacity-70 transition hover:opacity-100;
+    padding: 2px;
+    /* Gold tint (#a8854a) via a color filter on the default glyph. */
+    filter: invert(56%) sepia(36%) saturate(560%) hue-rotate(2deg) brightness(92%) contrast(88%);
+  }
+  /* RTL: keep the indicator on the trailing (left) edge and text right-aligned. */
+  [dir="rtl"] input[type="date"].field-input,
+  [dir="rtl"] input[type="time"].field-input {
+    text-align: right;
+  }
+  /* Hide the redundant inner spin button so the field stays clean. */
+  input[type="date"].field-input::-webkit-inner-spin-button,
+  input[type="time"].field-input::-webkit-inner-spin-button {
+    display: none;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium;
   }

@@ -12,8 +12,8 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
-import { cn, formatDateOnly } from "@/lib/utils";
-import type { JourneyStepInput } from "@/lib/types";
+import { cn, composeHomeAddress, formatDateOnly } from "@/lib/utils";
+import type { HomeAddressInput, JourneyStepInput } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -167,9 +167,12 @@ export function StepCard({
 
       {/* Locations */}
       {f.home && (
-        <Field label={pick(t.fields.homeAddress)}>
-          <input value={step.homeAddress ?? ""} className="field-input" placeholder={ar ? "حي العليا، الرياض" : "Al Olaya, Riyadh"} onChange={(e) => onChange({ homeAddress: e.target.value })} />
-        </Field>
+        <HomeAddressCard
+          home={step.home}
+          fallback={step.homeAddress}
+          onChange={(home) => onChange({ home, homeAddress: composeHomeAddress(home) })}
+          onManual={(homeAddress) => onChange({ homeAddress, home: undefined })}
+        />
       )}
       {f.hotel && (
         <Field label={pick(t.fields.hotelName)}>
@@ -192,6 +195,123 @@ export function StepCard({
               {ar ? iss.messageAr : iss.messageEn}
             </p>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Small inline icon for an address field (decorative). */
+function AddrIcon({ d }: { d: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** A single labelled address input with a leading icon. */
+function AddrField({
+  label,
+  icon,
+  value,
+  onChange,
+  placeholder,
+  optional,
+  hint,
+}: {
+  label: string;
+  icon: string;
+  value?: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  optional?: boolean;
+  hint?: string;
+}) {
+  const { t, pick } = useI18n();
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-charcoal/60">
+        <AddrIcon d={icon} />
+        {label}
+        {optional && <span className="text-charcoal/30">· {pick(t.common.optional)}</span>}
+      </span>
+      <input
+        value={value ?? ""}
+        className="field-input"
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {hint && <span className="mt-1 block text-[11px] text-charcoal/40">{hint}</span>}
+    </label>
+  );
+}
+
+/**
+ * Structured Saudi National Address card. Composes the entered parts into the
+ * one-line `homeAddress` string that is persisted/shown to staff. Customers who
+ * don't know their National Address can switch to a free-text fallback.
+ */
+function HomeAddressCard({
+  home,
+  fallback,
+  onChange,
+  onManual,
+}: {
+  home?: HomeAddressInput;
+  fallback?: string;
+  onChange: (home: HomeAddressInput) => void;
+  onManual: (homeAddress: string) => void;
+}) {
+  const { t, pick } = useI18n();
+  // Start in manual mode if a free-text address exists without structured parts.
+  const [manual, setManual] = useState(!home && !!fallback);
+  const set = (patch: Partial<HomeAddressInput>) => onChange({ ...home, ...patch });
+
+  return (
+    <div className="rounded-2xl border border-charcoal/10 bg-ivory-warm/60 p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-semibold text-charcoal">
+            <AddrIcon d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" />
+            {pick(t.address.title)}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-charcoal/50">{pick(t.address.hint)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setManual((m) => !m)}
+          className="shrink-0 text-[11px] font-medium text-gold-dark hover:underline"
+        >
+          {manual ? pick(t.address.title) : pick(t.address.manualToggle)}
+        </button>
+      </div>
+
+      {manual ? (
+        <label className="block">
+          <span className="field-label">{pick(t.address.manualLabel)}</span>
+          <textarea
+            value={fallback ?? ""}
+            className="field-input min-h-[80px] resize-y"
+            placeholder={pick(t.address.manualHint)}
+            onChange={(e) => onManual(e.target.value)}
+          />
+        </label>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <AddrField label={pick(t.address.shortAddress)} icon="M5 12h14M12 5l7 7-7 7" value={home?.shortAddress} onChange={(v) => set({ shortAddress: v })} placeholder={pick(t.address.shortAddressHint)} hint={pick(t.address.shortAddressHint)} />
+          </div>
+          <AddrField label={pick(t.address.buildingNumber)} icon="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" value={home?.buildingNumber} onChange={(v) => set({ buildingNumber: v })} />
+          <AddrField label={pick(t.address.street)} icon="M4 19l4-14M16 19l4-14M9 5h6M8 12h8M7 19h10" value={home?.street} onChange={(v) => set({ street: v })} />
+          <AddrField label={pick(t.address.district)} icon="M12 21s-7-6.5-7-11a7 7 0 1114 0c0 4.5-7 11-7 11zM12 10a2 2 0 100-4 2 2 0 000 4z" value={home?.district} onChange={(v) => set({ district: v })} />
+          <AddrField label={pick(t.address.city)} icon="M3 21V7l6-3 6 3v14M9 21v-4h2v4M3 21h18M15 21v-9l4 2v7" value={home?.city} onChange={(v) => set({ city: v })} />
+          <AddrField label={pick(t.address.postalCode)} icon="M3 7h18v10H3zM3 7l9 6 9-6" value={home?.postalCode} onChange={(v) => set({ postalCode: v })} />
+          <AddrField label={pick(t.address.additionalNumber)} icon="M12 5v14M5 12h14" value={home?.additionalNumber} onChange={(v) => set({ additionalNumber: v })} />
+          <AddrField label={pick(t.address.unitNumber)} icon="M4 4h16v16H4zM4 12h16M12 4v16" value={home?.unitNumber} onChange={(v) => set({ unitNumber: v })} optional />
+          <div className="sm:col-span-2">
+            <AddrField label={pick(t.address.notes)} icon="M4 6h16M4 12h16M4 18h10" value={home?.notes} onChange={(v) => set({ notes: v })} placeholder={pick(t.address.notesHint)} optional />
+          </div>
         </div>
       )}
     </div>
