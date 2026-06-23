@@ -17,6 +17,7 @@ import {
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Select, TextInput } from "@/components/ui/Field";
 import { formatDateTime } from "@/lib/utils";
+import { formatPrice } from "@/lib/pricing";
 
 interface RequestRow {
   referenceNumber: string;
@@ -25,6 +26,8 @@ interface RequestRow {
   status: RequestStatus;
   carCategory: CarCategory;
   createdAt: Date | string;
+  estimatedTotal: number;
+  finalPrice: number | null;
   employee: string | null;
   driver: string | null;
   cities: string[];
@@ -129,6 +132,7 @@ export function RequestsView({
                 <Th>{pick(t.admin.customer)}</Th>
                 <Th>{pick(t.fields.city)}</Th>
                 <Th>{pick(t.fields.carCategory)}</Th>
+                <Th>{pick(t.pricing.estimatedTotal)}</Th>
                 <Th>{pick(t.admin.employees)}</Th>
                 <Th>{pick(t.admin.changeStatus)}</Th>
                 <Th>{pick(t.fields.date)}</Th>
@@ -148,6 +152,10 @@ export function RequestsView({
                   </Td>
                   <Td>{r.cities.map((c) => getCity(c)?.name[locale] ?? c).join(", ") || "—"}</Td>
                   <Td>{getVehicle(r.carCategory).name[locale]}</Td>
+                  <Td>
+                    <span className="font-medium text-charcoal">{formatPrice(r.finalPrice ?? r.estimatedTotal, locale)}</span>
+                    {r.finalPrice != null && <span className="ms-1 text-[0.65rem] text-gold-dark">★</span>}
+                  </Td>
                   <Td>{r.employee ?? <span className="text-charcoal/30">—</span>}</Td>
                   <Td><StatusBadge status={r.status} /></Td>
                   <Td><span className="text-xs text-charcoal/50">{formatDateTime(r.createdAt, locale, { dateStyle: "short" })}</span></Td>
@@ -155,7 +163,7 @@ export function RequestsView({
               ))}
               {requests.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-sm text-charcoal/40">{pick(t.admin.noRequests)}</td>
+                  <td colSpan={8} className="py-10 text-center text-sm text-charcoal/40">{pick(t.admin.noRequests)}</td>
                 </tr>
               )}
             </tbody>

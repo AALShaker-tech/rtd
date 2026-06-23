@@ -18,12 +18,22 @@ const config: Config = {
           950: "#0b0b0d",
         },
         gold: {
-          DEFAULT: "#c8a35b",
-          light: "#e2c789",
-          dark: "#a8842f",
+          DEFAULT: "#c9a86a",
+          light: "#e2cd9e",
+          soft: "#e2cd9e",
+          dark: "#a8854a",
           50: "#fbf7ee",
           100: "#f3e8cf",
         },
+        // SAFAR-style dark luxury palette for the customer experience.
+        ink: {
+          DEFAULT: "#0b1418",
+          900: "#0b1418",
+          800: "#0f1d22",
+          700: "#13262c",
+        },
+        cream: "#f4ecdd",
+        dim: "#8a9499",
         ivory: {
           DEFAULT: "#f7f4ee",
           warm: "#fbf9f4",
@@ -41,9 +51,12 @@ const config: Config = {
         card: "0 8px 30px -12px rgba(16, 16, 18, 0.18)",
       },
       backgroundImage: {
-        "gold-gradient": "linear-gradient(135deg, #e2c789 0%, #c8a35b 45%, #a8842f 100%)",
+        "gold-gradient": "linear-gradient(135deg, #e2cd9e 0%, #c9a86a 45%, #a8854a 100%)",
         "charcoal-gradient": "linear-gradient(160deg, #1c1c1f 0%, #101012 60%, #0b0b0d 100%)",
         "hero-glow": "radial-gradient(70% 60% at 70% 20%, rgba(200,163,91,0.18) 0%, rgba(16,16,18,0) 60%)",
+        "ink-grain":
+          "radial-gradient(900px 500px at 15% -5%, rgba(201,168,106,0.10), transparent 60%), radial-gradient(700px 600px at 110% 100%, rgba(95,174,126,0.06), transparent 60%)",
+        "ink-gradient": "linear-gradient(165deg, #0f1d22 0%, #0b1418 55%, #091015 100%)",
       },
       borderRadius: {
         luxe: "1.25rem",

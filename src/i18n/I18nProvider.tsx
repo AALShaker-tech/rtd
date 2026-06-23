@@ -39,7 +39,8 @@ export function I18nProvider({
     document.documentElement.lang = locale;
     document.documentElement.dir = dir;
     localStorage.setItem(STORAGE_KEY, locale);
-    document.cookie = `${STORAGE_KEY}=${locale}; path=/; max-age=31536000`;
+    // Language preference is fine to keep for ~30 days (booking draft is short-lived).
+    document.cookie = `${STORAGE_KEY}=${locale}; path=/; max-age=2592000; samesite=lax`;
   }, [locale]);
 
   const setLocale = useCallback((l: Locale) => setLocaleState(l), []);

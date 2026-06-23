@@ -95,6 +95,35 @@ enum VerificationPurpose {
   EMAIL
 }
 
+/// Lifecycle of a request's price.
+enum PriceStatus {
+  ESTIMATED // customer-facing estimate from the pricing engine
+  ADJUSTED // admin applied a discount/surcharge
+  FINALIZED // admin confirmed a final price
+}
+
+/// Placeholder payment lifecycle (payment not implemented yet).
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  REFUNDED
+}
+
+enum PriceChangeType {
+  RECALCULATED
+  OVERRIDE
+  DISCOUNT
+  SURCHARGE
+}
+
+/// How a journey step's flight details were obtained.
+enum FlightLookupStatus {
+  MANUAL // entered by hand, not verified
+  VERIFIED // confirmed via the flight lookup provider
+  LOOKUP_FAILED // lookup attempted but the flight wasn't found / API failed
+}
+
 // ─────────────────────────── Models ───────────────────────────
 
 /// Staff accounts (admin / operations employee / driver). Customers are NOT users.
@@ -115,6 +144,7 @@ model User {
   internalNotes      InternalNote[]
   auditLogs          AuditLog[]
   driverTasks        DriverTask[]
+  priceChanges       RequestPriceHistory[]
 
   @@index([role])
 }
@@ -154,9 +184,22 @@ model Request {
   children    Boolean     @default(false)
   childSeat   Boolean     @default(false)
 
+  // Trip-level information (collected once at the start of the journey)
+  departureDate     DateTime?
+  returnDate        DateTime?
+  specialAssistance Boolean   @default(false)
+  assistanceNotes   String?
+
   notes               String?
   contactMeInstead    Boolean @default(false) // "I don't know the details yet, please contact me"
   validationStatus    String  @default("PENDING") // PENDING | VALID | HAS_WARNINGS
+
+  // ── Pricing ──
+  currency       String        @default("SAR")
+  estimatedTotal Int           @default(0) // engine estimate, in whole SAR
+  finalPrice     Int? // admin-controlled final price
+  priceStatus    PriceStatus   @default(ESTIMATED)
+  paymentStatus  PaymentStatus @default(UNPAID)
 
   assignedEmployeeId String?
   assignedEmployee   User?   @relation("EmployeeAssignment", fields: [assignedEmployeeId], references: [id])
@@ -171,6 +214,8 @@ model Request {
   internalNotes InternalNote[]
   driverTasks   DriverTask[]
   auditLogs     AuditLog[]
+  priceHistory  RequestPriceHistory[]
+  flightSnapshots FlightSnapshot[]
 
   @@index([status])
   @@index([assignedEmployeeId])
@@ -207,8 +252,19 @@ model JourneyStep {
   // chauffeur specifics
   days       Int?
   dailyHours Int?
+  dailyUsage String? // SEVEN_HOURS | EIGHT_HOURS | FULL_DAY
 
   skipped Boolean @default(false)
+
+  // ── Pricing (computed server-side; admin may adjust per step) ──
+  basePrice          Int? // base price for this service before multipliers
+  vehicleMultiplier  Float? // applied vehicle multiplier (1.0 when no car)
+  computedPrice      Int? // engine result for this step
+  adminAdjustedPrice Int? // optional per-step admin override
+
+  // ── Flight lookup ──
+  flightLookupStatus FlightLookupStatus @default(MANUAL)
+  flightData         Json? // normalized flight payload (airline, terminals, times, status…)
 
   validationErrors   String[] @default([])
   validationWarnings String[] @default([])
@@ -239,17 +295,60 @@ model DriverTask {
 }
 
 model VehicleCategory {
-  id            String      @id @default(cuid())
-  category      CarCategory @unique
-  nameEn        String
-  nameAr        String
-  maxPassengers Int
-  exampleModels String
-  descriptionEn String
-  descriptionAr String
-  isRecommended Boolean     @default(false)
-  sortOrder     Int         @default(0)
-  active        Boolean     @default(true)
+  id              String      @id @default(cuid())
+  category        CarCategory @unique
+  nameEn          String
+  nameAr          String
+  maxPassengers   Int
+  exampleModels   String
+  descriptionEn   String
+  descriptionAr   String
+  priceMultiplier Float       @default(1.0)
+  isRecommended   Boolean     @default(false)
+  sortOrder       Int         @default(0)
+  active          Boolean     @default(true)
+}
+
+/// Admin-editable base price per service (journey step type), in whole SAR.
+model ServicePricing {
+  id        String   @id @default(cuid())
+  stepType  StepType @unique
+  basePrice Int
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+/// Admin-editable price per lounge / assistance option.
+model LoungePricing {
+  id         String  @id @default(cuid())
+  loungeType String  @unique
+  price      Int
+  active     Boolean @default(true)
+}
+
+/// Destination-specific price adjustment (multiplicative factor + flat surcharge).
+model DestinationPricing {
+  id       String  @id @default(cuid())
+  cityCode String  @unique
+  factor   Float   @default(1.0)
+  surcharge Int    @default(0)
+  active   Boolean @default(true)
+}
+
+/// Audit trail of price changes on a request (override / discount / surcharge).
+model RequestPriceHistory {
+  id          String          @id @default(cuid())
+  requestId   String
+  request     Request         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  changeType  PriceChangeType
+  oldPrice    Int?
+  newPrice    Int
+  reason      String?
+  changedById String?
+  changedBy   User?           @relation(fields: [changedById], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@index([requestId])
 }
 
 model ServicePackage {
@@ -272,7 +371,38 @@ model City {
   nameAr    String
   country   String
   active    Boolean  @default(true)
+  isOrigin  Boolean  @default(false) // Riyadh is the journey origin
+  multiplier Float   @default(1.0) // destination price factor
+  currency  String?
+  approxDurationMinutes Int? // approx flight time from Riyadh
+  notes     String?
   airports  Airport[]
+  servicePricing CityServicePricing[]
+  loungePricing  CityLoungePricing[]
+}
+
+/// Per-city override of a service (journey step) base price + availability.
+model CityServicePricing {
+  id       String   @id @default(cuid())
+  cityCode String
+  city     City     @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  stepType StepType
+  price    Int? // null → use the global base price
+  enabled  Boolean  @default(true) // false → service unavailable in this city
+
+  @@unique([cityCode, stepType])
+}
+
+/// Per-city override of a lounge / airport-service price + availability.
+model CityLoungePricing {
+  id         String  @id @default(cuid())
+  cityCode   String
+  city       City    @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  loungeType String
+  price      Int? // null → use the global lounge price
+  enabled    Boolean @default(true)
+
+  @@unique([cityCode, loungeType])
 }
 
 model Airport {
@@ -283,6 +413,71 @@ model Airport {
   cityId  String
   city    City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
   terminals String[] @default([])
+  country  String?
+  timezone String? // IANA, e.g. Asia/Riyadh
+  utcOffsetMinutes Int @default(0) // offset for the schedule window (June 2026)
+}
+
+/// Airlines referenced by the static weekly flight schedule.
+model Airline {
+  id        String                 @id @default(cuid())
+  code      String                 @unique // SV, EK, XY…
+  name      String
+  schedules WeeklyFlightSchedule[]
+}
+
+/// A direct route between two airports (by IATA code).
+model Route {
+  id                     String                 @id @default(cuid())
+  originAirportCode      String
+  destinationAirportCode String
+  isDirect               Boolean                @default(true)
+  approxDurationMinutes  Int
+  schedules              WeeklyFlightSchedule[]
+
+  @@unique([originAirportCode, destinationAirportCode])
+}
+
+/// One row per active weekday for a scheduled flight (static, not live data).
+model WeeklyFlightSchedule {
+  id                 String  @id @default(cuid())
+  routeId            String
+  route              Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  airlineId          String
+  airline            Airline @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  flightCode         String
+  dayOfWeek          Int // 1=Mon … 7=Sun
+  departureTimeLocal String // "HH:MM" local to the origin airport
+  isActive           Boolean @default(true)
+  sourceWeek         String
+  sourceName         String
+  isStaticSchedule   Boolean @default(true)
+
+  @@index([flightCode])
+  @@index([routeId])
+  @@index([airlineId])
+}
+
+/// A snapshot of the flight as resolved at request time (preserved even if the
+/// static schedule later changes).
+model FlightSnapshot {
+  id                        String   @id @default(cuid())
+  requestId                 String
+  request                   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  leg                       String // DEPARTURE | RETURN
+  flightCode                String?
+  airline                   String?
+  originAirport             String?
+  destinationAirport        String?
+  departureDate             DateTime?
+  departureTimeLocal        String?
+  estimatedArrivalDate      DateTime?
+  estimatedArrivalTimeLocal String?
+  lookupSource              String // static_schedule | manual
+  lookupStatus              String // static_matched | manual | not_found
+  createdAt                 DateTime @default(now())
+
+  @@index([requestId])
 }
 
 model Hotel {

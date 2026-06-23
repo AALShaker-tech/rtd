@@ -25,6 +25,11 @@ export default async function RequestDetailPage({
         orderBy: { createdAt: "desc" },
         include: { author: { select: { fullName: true } } },
       },
+      priceHistory: {
+        orderBy: { createdAt: "desc" },
+        include: { changedBy: { select: { fullName: true } } },
+      },
+      flightSnapshots: true,
     },
   });
   if (!request) notFound();

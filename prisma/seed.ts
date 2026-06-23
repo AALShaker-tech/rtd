@@ -8,7 +8,22 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { CITIES, PACKAGES, VEHICLES } from "../src/lib/domain";
+import {
+  CITIES,
+  DEFAULT_DESTINATION_FACTORS,
+  DEFAULT_LOUNGE_PRICES,
+  DEFAULT_SERVICE_PRICES,
+  PACKAGES,
+  VEHICLES,
+} from "../src/lib/domain";
+import type { StepType } from "../src/lib/domain";
+import {
+  AIRPORT_META,
+  SOURCE_NAME,
+  SOURCE_WEEK,
+  parseFlightSchedule,
+  routeDuration,
+} from "../src/lib/flight-schedule";
 
 const prisma = new PrismaClient();
 
@@ -19,7 +34,7 @@ async function main() {
   for (const v of VEHICLES) {
     await prisma.vehicleCategory.upsert({
       where: { category: v.category },
-      update: {},
+      update: { priceMultiplier: v.multiplier },
       create: {
         category: v.category,
         nameEn: v.name.en,
@@ -28,9 +43,33 @@ async function main() {
         exampleModels: v.exampleModels,
         descriptionEn: v.description.en,
         descriptionAr: v.description.ar,
+        priceMultiplier: v.multiplier,
         isRecommended: v.isRecommended ?? false,
         sortOrder: v.sortOrder,
       },
+    });
+  }
+
+  // ── Pricing: services, lounges, destinations ──
+  for (const [stepType, basePrice] of Object.entries(DEFAULT_SERVICE_PRICES)) {
+    await prisma.servicePricing.upsert({
+      where: { stepType: stepType as StepType },
+      update: {},
+      create: { stepType: stepType as StepType, basePrice },
+    });
+  }
+  for (const [loungeType, price] of Object.entries(DEFAULT_LOUNGE_PRICES)) {
+    await prisma.loungePricing.upsert({
+      where: { loungeType },
+      update: {},
+      create: { loungeType, price },
+    });
+  }
+  for (const [cityCode, factor] of Object.entries(DEFAULT_DESTINATION_FACTORS)) {
+    await prisma.destinationPricing.upsert({
+      where: { cityCode },
+      update: {},
+      create: { cityCode, factor },
     });
   }
 
@@ -54,19 +93,85 @@ async function main() {
 
   // ── Cities + airports ──
   for (const c of CITIES) {
+    const isOrigin = c.code === "RUH";
+    const cityFields = {
+      nameEn: c.name.en,
+      nameAr: c.name.ar,
+      country: c.country,
+      isOrigin,
+      multiplier: DEFAULT_DESTINATION_FACTORS[c.code] ?? 1.0,
+      approxDurationMinutes: isOrigin ? null : routeDuration("RUH", c.airports[0]?.code ?? c.code),
+    };
     const city = await prisma.city.upsert({
       where: { code: c.code },
-      update: {},
-      create: { code: c.code, nameEn: c.name.en, nameAr: c.name.ar, country: c.country },
+      update: cityFields,
+      create: { code: c.code, ...cityFields },
     });
     for (const a of c.airports) {
+      const meta = AIRPORT_META[a.code];
       await prisma.airport.upsert({
         where: { code: a.code },
-        update: {},
-        create: { code: a.code, nameEn: a.name.en, nameAr: a.name.ar, cityId: city.id, terminals: a.terminals },
+        update: { country: meta?.country, timezone: meta?.timezone, utcOffsetMinutes: meta?.offsetMin ?? 0 },
+        create: {
+          code: a.code,
+          nameEn: a.name.en,
+          nameAr: a.name.ar,
+          cityId: city.id,
+          terminals: a.terminals,
+          country: meta?.country ?? c.country,
+          timezone: meta?.timezone,
+          utcOffsetMinutes: meta?.offsetMin ?? 0,
+        },
       });
     }
   }
+
+  // ── Static weekly flight schedule (from CSV) ──
+  const scheduleRows = parseFlightSchedule();
+  // Airlines (unique by code)
+  const airlineByCode = new Map<string, string>();
+  for (const r of scheduleRows) {
+    if (airlineByCode.has(r.airlineCode)) continue;
+    const airline = await prisma.airline.upsert({
+      where: { code: r.airlineCode },
+      update: { name: r.airlineName },
+      create: { code: r.airlineCode, name: r.airlineName },
+    });
+    airlineByCode.set(r.airlineCode, airline.id);
+  }
+  // Routes (unique by origin+destination)
+  const routeByPair = new Map<string, string>();
+  for (const r of scheduleRows) {
+    const key = `${r.origin}-${r.destination}`;
+    if (routeByPair.has(key)) continue;
+    const route = await prisma.route.upsert({
+      where: { originAirportCode_destinationAirportCode: { originAirportCode: r.origin, destinationAirportCode: r.destination } },
+      update: { approxDurationMinutes: routeDuration(r.origin, r.destination) },
+      create: {
+        originAirportCode: r.origin,
+        destinationAirportCode: r.destination,
+        isDirect: true,
+        approxDurationMinutes: routeDuration(r.origin, r.destination),
+      },
+    });
+    routeByPair.set(key, route.id);
+  }
+  // Schedule rows — one per active weekday. Reset first to stay idempotent.
+  await prisma.weeklyFlightSchedule.deleteMany({ where: { sourceWeek: SOURCE_WEEK } });
+  await prisma.weeklyFlightSchedule.createMany({
+    data: scheduleRows.map((r) => ({
+      routeId: routeByPair.get(`${r.origin}-${r.destination}`)!,
+      airlineId: airlineByCode.get(r.airlineCode)!,
+      flightCode: r.flightCode,
+      dayOfWeek: r.dayOfWeek,
+      departureTimeLocal: r.departureTimeLocal,
+      isActive: true,
+      sourceWeek: SOURCE_WEEK,
+      sourceName: SOURCE_NAME,
+      isStaticSchedule: true,
+    })),
+  });
+  console.log(`   Flight schedule: ${airlineByCode.size} airlines, ${routeByPair.size} routes, ${scheduleRows.length} weekly rows.`);
 
   // ── Staff accounts ──
   const password = await bcrypt.hash("Passw0rd!", 12);
@@ -99,6 +204,10 @@ async function main() {
         emailVerified: false,
       },
     });
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+
     const request = await prisma.request.create({
       data: {
         referenceNumber: "RTD-2026-00001",
@@ -112,11 +221,13 @@ async function main() {
         assignedEmployeeId: employee.id,
         assignedDriverId: driver.id,
         validationStatus: "VALID",
+        estimatedTotal: 650, // 250×1.4 (VIP transfer) + 300 (VIP lounge)
+        priceStatus: "ESTIMATED",
+        departureDate: tomorrow,
+        returnDate: tomorrow,
+        specialAssistance: false,
       },
     });
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
 
     const step = await prisma.journeyStep.create({
       data: {
@@ -132,6 +243,10 @@ async function main() {
         carCategory: "VIP",
         passengers: 2,
         bags: 3,
+        basePrice: 250,
+        vehicleMultiplier: 1.4,
+        computedPrice: 350,
+        flightLookupStatus: "VERIFIED",
       },
     });
     await prisma.driverTask.create({
@@ -149,6 +264,9 @@ async function main() {
         scheduledAt: tomorrow,
         flightNumber: "SV021",
         serviceType: "MEET_ASSIST_FASTTRACK_CAR",
+        basePrice: 300,
+        vehicleMultiplier: 1,
+        computedPrice: 300,
       },
     });
     await prisma.statusHistory.create({ data: { requestId: request.id, toStatus: "REQUEST_RECEIVED" } });

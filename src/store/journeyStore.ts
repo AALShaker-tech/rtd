@@ -1,9 +1,68 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { getPackage, getStep, STEPS, type PackageType, type StepType } from "@/lib/domain";
-import type { CustomerDetailsInput, JourneyStepInput } from "@/lib/types";
+import {
+  DEFAULT_CHAUFFEUR_USAGE,
+  getPackage,
+  getStep,
+  loungeOptionsForCity,
+  STEPS,
+  stepSide,
+  type PackageType,
+  type StepType,
+} from "@/lib/domain";
+import { estimateServiceTime } from "@/lib/service-timing";
+import type { CustomerDetailsInput, JourneyStepInput, TripInfoInput } from "@/lib/types";
+
+/**
+ * Build a step's trip-derived fields from Trip Information.
+ *
+ * Trip Information is the SINGLE SOURCE OF TRUTH: date, time, flight number,
+ * passengers and bags are always (re)computed from it so editing trip info
+ * immediately syncs everywhere and never leaves stale values. Only genuinely
+ * service-specific choices (service type, vehicle, lounge, hotel/home address,
+ * notes, chauffeur days/usage, skipped) are preserved from a prior pass.
+ */
+function applyTripToStep(
+  base: JourneyStepInput,
+  tripInfo: TripInfoInput,
+  dest: string | undefined,
+  prior?: JourneyStepInput,
+): JourneyStepInput {
+  const def = getStep(base.stepType);
+  const side = stepSide(base.stepType);
+  const est = estimateServiceTime(base.stepType, tripInfo, tripInfo.departureFlight, tripInfo.returnFlight);
+  const flightCode = side === "DEPARTURE" ? tripInfo.departureFlightCode : tripInfo.returnFlightCode;
+
+  const step: JourneyStepInput = {
+    ...base,
+    city: def.cityScope === "DESTINATION" ? dest : "RUH",
+    // service-specific choices preserved
+    skipped: prior ? prior.skipped : true,
+    serviceType: prior?.serviceType ?? base.serviceType,
+    carCategory: prior?.carCategory ?? base.carCategory,
+    loungeType: prior?.loungeType,
+    hotelName: prior?.hotelName,
+    hotelAddress: prior?.hotelAddress,
+    homeAddress: prior?.homeAddress,
+    notes: prior?.notes,
+    // trip-info-driven — always recomputed (no stale values)
+    date: est.date,
+    time: def.features.flight || def.features.transfer ? est.time : undefined,
+    flightNumber: def.features.flight ? flightCode : undefined,
+    passengers: def.features.transfer ? tripInfo.passengers : undefined,
+    bags: def.features.transfer ? tripInfo.bags : undefined,
+  };
+
+  if (def.features.chauffeur) {
+    // Chauffeur starts at destination arrival (or departure date); days/usage are service-specific.
+    step.date = tripInfo.departureFlight?.estimatedArrivalDate ?? (tripInfo.departureDate || undefined);
+    step.time = undefined;
+    step.days = prior?.days ?? 1;
+    step.dailyUsage = prior?.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE;
+  }
+  return step;
+}
 
 /**
  * Client-side journey draft. Persisted to localStorage purely as a *draft*
@@ -23,6 +82,23 @@ const emptyCustomer: CustomerDetailsInput = {
   notes: "",
 };
 
+const emptyTripInfo: TripInfoInput = {
+  departureDate: "",
+  returnDate: "",
+  passengers: 1,
+  bags: 0,
+  specialAssistance: false,
+  assistanceNotes: "",
+  departureFlightCode: "",
+  returnFlightCode: "",
+  departureTime: "",
+  returnTime: "",
+  departureFlight: null,
+  returnFlight: null,
+  departureLookupStatus: undefined,
+  returnLookupStatus: undefined,
+};
+
 function blankStep(stepType: StepType): JourneyStepInput {
   const def = getStep(stepType);
   return {
@@ -36,13 +112,25 @@ function blankStep(stepType: StepType): JourneyStepInput {
   };
 }
 
-interface JourneyState {
+interface JourneyDraftData {
   selectedPackage?: PackageType;
+  destination?: string; // destination city code
   steps: JourneyStepInput[];
   customer: CustomerDetailsInput;
+  tripInfo: TripInfoInput;
   phoneVerified: boolean;
   emailVerified: boolean;
+  /** Epoch ms of last user activity — drives draft expiry. */
+  lastTouched: number;
+  /** Transient (not persisted): set when a stale draft was just cleared. */
+  draftExpired: boolean;
+}
 
+interface JourneyState extends JourneyDraftData {
+  setDestination: (code: string) => void;
+  setTripInfo: (patch: Partial<TripInfoInput>) => void;
+  applyTripInfoToSteps: () => void;
+  initFlow: (destination?: string) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
@@ -54,28 +142,106 @@ interface JourneyState {
   setCustomer: (patch: Partial<CustomerDetailsInput>) => void;
   setPhoneVerified: (v: boolean) => void;
   setEmailVerified: (v: boolean) => void;
+  clearExpiredNotice: () => void;
   reset: () => void;
+}
+
+/** A fresh, empty draft (data only). */
+function freshDraft(): JourneyDraftData {
+  return {
+    selectedPackage: undefined,
+    destination: undefined,
+    steps: [],
+    customer: emptyCustomer,
+    tripInfo: emptyTripInfo,
+    phoneVerified: false,
+    emailVerified: false,
+    lastTouched: Date.now(),
+    draftExpired: false,
+  };
 }
 
 function sortByOrder(steps: JourneyStepInput[]): JourneyStepInput[] {
   return [...steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
 }
 
-export const useJourneyStore = create<JourneyState>()(
-  persist(
-    (set, get) => ({
-      selectedPackage: undefined,
-      steps: [],
-      customer: emptyCustomer,
-      phoneVerified: false,
-      emailVerified: false,
+const NOW = () => Date.now();
+
+// In-memory only (no persist): the customer booking draft is session-scoped and
+// cleared on a full page reload. Client-side navigation between steps keeps it.
+export const useJourneyStore = create<JourneyState>()((set, get) => ({
+      ...freshDraft(),
+
+      setDestination: (code) =>
+        set((st) => ({
+          destination: code,
+          lastTouched: NOW(),
+          steps: st.steps.map((s) =>
+            getStep(s.stepType).cityScope === "DESTINATION" ? { ...s, city: code } : s,
+          ),
+        })),
+
+      setTripInfo: (patch) => set((st) => ({ tripInfo: { ...st.tripInfo, ...patch }, lastTouched: NOW() })),
+
+      /**
+       * Re-apply Trip Information to every step's auto-filled fields (dates by
+       * side, passengers & bags). Called after the customer edits Trip Info —
+       * Trip Info is the source of truth, so these values propagate everywhere.
+       */
+      applyTripInfoToSteps: () =>
+        set((st) => ({
+          lastTouched: NOW(),
+          steps: st.steps.map((s) => applyTripToStep(blankStep(s.stepType), st.tripInfo, st.destination, s)),
+        })),
+
+      /**
+       * Build the step-by-step flow for the chosen destination, auto-filling
+       * shared Trip Information into each step:
+       *  - departure-side steps default to the departure date
+       *  - return-side steps default to the return date
+       *  - passengers / bags default to the global trip values
+       * User-customized fields from a prior pass are preserved.
+       */
+      initFlow: (destination) => {
+        const { tripInfo } = get();
+        const dest = destination ?? get().destination;
+        const prior = new Map(get().steps.map((s) => [s.stepType, s]));
+        const steps = STEPS.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
+
+        // For the chosen package, pre-select the recommended lounge option on its
+        // assistance steps so the customer sees a default selection (they still
+        // explicitly Add each step — nothing is auto-added).
+        const pkg = get().selectedPackage;
+        const pkgSteps = pkg ? new Set(getPackage(pkg)?.steps ?? []) : null;
+        if (pkgSteps) {
+          for (const s of steps) {
+            const d = getStep(s.stepType);
+            if (d.features.assistance && !s.loungeType && pkgSteps.has(s.stepType)) {
+              s.loungeType = loungeOptionsForCity(s.city)[0]?.value;
+            }
+          }
+        }
+
+        set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
+      },
 
       applyPackage: (pkg) => {
         const def = getPackage(pkg);
         if (!def) return;
+        const dest = get().destination;
         set({
           selectedPackage: pkg,
-          steps: sortByOrder(def.steps.map(blankStep)),
+          lastTouched: NOW(),
+          steps: sortByOrder(
+            def.steps.map((t) => {
+              const step = blankStep(t);
+              // Packages no longer auto-add: the customer explicitly Adds each
+              // service (or Skips). Steps start un-added.
+              step.skipped = true;
+              if (getStep(t).cityScope === "DESTINATION" && dest) step.city = dest;
+              return step;
+            }),
+          ),
         });
       },
 
@@ -83,11 +249,14 @@ export const useJourneyStore = create<JourneyState>()(
 
       addStep: (stepType) => {
         if (get().steps.some((s) => s.stepType === stepType)) return;
-        set((st) => ({ steps: sortByOrder([...st.steps, blankStep(stepType)]) }));
+        const step = blankStep(stepType);
+        const dest = get().destination;
+        if (getStep(stepType).cityScope === "DESTINATION" && dest) step.city = dest;
+        set((st) => ({ steps: sortByOrder([...st.steps, step]), lastTouched: NOW() }));
       },
 
       removeStep: (stepType) =>
-        set((st) => ({ steps: st.steps.filter((s) => s.stepType !== stepType) })),
+        set((st) => ({ steps: st.steps.filter((s) => s.stepType !== stepType), lastTouched: NOW() })),
 
       toggleStep: (stepType) => {
         if (get().steps.some((s) => s.stepType === stepType)) get().removeStep(stepType);
@@ -96,11 +265,13 @@ export const useJourneyStore = create<JourneyState>()(
 
       updateStep: (stepType, patch) =>
         set((st) => ({
+          lastTouched: NOW(),
           steps: st.steps.map((s) => (s.stepType === stepType ? { ...s, ...patch } : s)),
         })),
 
       setSkipped: (stepType, skipped) =>
         set((st) => ({
+          lastTouched: NOW(),
           steps: st.steps.map((s) =>
             s.stepType === stepType ? { ...s, skipped, serviceType: skipped ? "SKIP" : "CAR_ONLY" } : s,
           ),
@@ -108,22 +279,15 @@ export const useJourneyStore = create<JourneyState>()(
 
       hasStep: (stepType) => get().steps.some((s) => s.stepType === stepType),
 
-      setCustomer: (patch) => set((st) => ({ customer: { ...st.customer, ...patch } })),
+      setCustomer: (patch) => set((st) => ({ customer: { ...st.customer, ...patch }, lastTouched: NOW() })),
       setPhoneVerified: (v) => set({ phoneVerified: v }),
       setEmailVerified: (v) => set({ emailVerified: v }),
 
-      reset: () =>
-        set({
-          selectedPackage: undefined,
-          steps: [],
-          customer: emptyCustomer,
-          phoneVerified: false,
-          emailVerified: false,
-        }),
+      clearExpiredNotice: () => set({ draftExpired: false }),
+
+      reset: () => set({ ...freshDraft() }),
     }),
-    { name: "rtd_journey_draft" },
-  ),
-);
+  );
 
 /** All available steps in canonical order (for the builder catalogue). */
 export const ALL_STEPS = STEPS;

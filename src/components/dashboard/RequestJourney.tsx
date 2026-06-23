@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/i18n/I18nProvider";
-import { SERVICE_TYPES, getCity, getStep, getVehicle } from "@/lib/domain";
+import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, getStep, getVehicle } from "@/lib/domain";
 import { formatDateTime } from "@/lib/utils";
 
 export interface DisplayStep {
@@ -25,8 +25,11 @@ export interface DisplayStep {
   bags: number | null;
   days: number | null;
   dailyHours: number | null;
+  dailyUsage: string | null;
   skipped: boolean;
   notes: string | null;
+  flightLookupStatus?: string | null;
+  computedPrice?: number | null;
 }
 
 export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
@@ -45,7 +48,10 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
               {s.stepOrder}
             </span>
             <div className="luxe-card p-4">
-              <p className="font-medium text-charcoal">{pick(def.name)}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-charcoal">{pick(def.name)}</p>
+                {s.flightNumber && s.flightLookupStatus && <FlightBadge status={s.flightLookupStatus} />}
+              </div>
               <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {s.city && <Row k={pick(t.fields.city)} v={getCity(s.city)?.name[locale] ?? s.city} />}
                 {s.airport && <Row k={pick(t.fields.airport)} v={s.airport} />}
@@ -60,7 +66,7 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
                 {s.passengers != null && <Row k={pick(t.fields.passengers)} v={String(s.passengers)} />}
                 {s.bags != null && <Row k={pick(t.fields.bags)} v={String(s.bags)} />}
                 {s.days != null && <Row k={pick(t.fields.days)} v={String(s.days)} />}
-                {s.dailyHours != null && <Row k={pick(t.fields.dailyHours)} v={String(s.dailyHours)} />}
+                {s.dailyUsage && <Row k={pick(t.fields.dailyUsage)} v={CHAUFFEUR_USAGE.find((u) => u.value === s.dailyUsage)?.name[locale] ?? s.dailyUsage} />}
                 {service && <Row k={pick(t.builder.serviceType)} v={service} />}
                 {s.notes && <Row k={pick(t.fields.notes)} v={s.notes} />}
               </dl>
@@ -80,4 +86,15 @@ function Row({ k, v }: { k: string; v: string }) {
       <dd className="text-end font-medium text-charcoal">{v}</dd>
     </div>
   );
+}
+
+function FlightBadge({ status }: { status: string }) {
+  const { locale } = useI18n();
+  const map: Record<string, { en: string; ar: string; cls: string }> = {
+    VERIFIED: { en: "Flight verified", ar: "تم التحقق من الرحلة", cls: "bg-emerald-50 text-emerald-700" },
+    MANUAL: { en: "Manual entry", ar: "إدخال يدوي", cls: "bg-charcoal/5 text-charcoal/50" },
+    LOOKUP_FAILED: { en: "Lookup failed", ar: "تعذّر الجلب", cls: "bg-amber-50 text-amber-700" },
+  };
+  const m = map[status] ?? map.MANUAL;
+  return <span className={`badge ${m.cls}`}>{locale === "ar" ? m.ar : m.en}</span>;
 }
