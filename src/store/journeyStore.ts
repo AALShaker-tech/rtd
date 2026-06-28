@@ -75,7 +75,7 @@ const emptyCustomer: CustomerDetailsInput = {
   phone: "",
   phoneCountry: "SA",
   email: "",
-  language: "en",
+  language: "ar",
   children: false,
   childSeat: false,
   contactMeInstead: false,

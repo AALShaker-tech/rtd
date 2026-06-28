@@ -19,7 +19,7 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 const STORAGE_KEY = "rtd_locale";
 
 export function I18nProvider({
-  initialLocale = "en",
+  initialLocale = "ar",
   children,
 }: {
   initialLocale?: Locale;

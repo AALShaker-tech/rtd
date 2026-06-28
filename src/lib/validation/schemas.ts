@@ -66,7 +66,7 @@ export const customerDetailsSchema = z.object({
   phoneCountry: z.string().min(2).max(2).default("SA"),
   // Email is optional now; accept a valid email or an empty string.
   email: z.string().email().or(z.literal("")).optional().default(""),
-  language: localeEnum.default("en"),
+  language: localeEnum.default("ar"),
   children: z.boolean().default(false),
   childSeat: z.boolean().default(false),
   contactMeInstead: z.boolean().default(false),
