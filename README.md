@@ -179,6 +179,16 @@ pull request. ESLint (`eslint-config-next`) and Prettier configs are committed;
 (`src/lib/rate-limit.ts`) to blunt brute-force and SMS-cost abuse. State is
 in-memory (per instance); swap the store for Redis in a multi-instance deploy.
 
+## 🔭 Observability
+
+Structured logging via `src/lib/logger.ts` — JSON lines in production, readable
+in dev, level-filtered by `LOG_LEVEL`. Unhandled server errors are captured by
+`src/instrumentation.ts` (`onRequestError`) and client render errors by the root
+`app/global-error.tsx` boundary. Both route through `logger.error`, which
+forwards to a pluggable reporter (`setErrorReporter`) — the single seam to wire
+an error-tracking SDK (e.g. Sentry: `setErrorReporter((err, ctx) =>
+Sentry.captureException(err, { extra: ctx }))` in `register()`).
+
 ---
 
 ## ✅ Acceptance criteria coverage
