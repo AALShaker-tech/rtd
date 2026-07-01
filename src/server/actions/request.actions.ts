@@ -4,21 +4,24 @@ import { prisma } from "@/lib/prisma";
 import { createRequestSchema } from "@/lib/validation/schemas";
 import { validateJourney } from "@/lib/validation/journey";
 import { createRequest } from "@/server/services/request.service";
+import { logger } from "@/lib/logger";
 import type { JourneyDraft } from "@/lib/types";
 
 export async function submitJourney(raw: unknown) {
   const parsed = createRequestSchema.safeParse(raw);
   if (!parsed.success) {
-    console.warn("[submitJourney] schema parse failed", parsed.error.issues?.slice(0, 5));
+    logger.warn("submitJourney: schema parse failed", { issues: parsed.error.issues?.slice(0, 5) });
     return { ok: false as const, error: "Please review your journey — some details are invalid." };
   }
 
   // Server-side authoritative re-validation (never trust the client).
   const draft = parsed.data as unknown as JourneyDraft;
   const validation = validateJourney(draft);
-  console.info("[submitJourney] validation result", {
+  logger.info("submitJourney: validated", {
     hasErrors: validation.hasErrors,
-    errorCount: validation.steps.reduce((n, s) => n + s.errors.length, 0) + validation.timeline.filter((i) => i.severity === "error").length,
+    errorCount:
+      validation.steps.reduce((n, s) => n + s.errors.length, 0) +
+      validation.timeline.filter((i) => i.severity === "error").length,
   });
   if (validation.hasErrors) {
     // Request is NOT created when validation truly fails.
@@ -31,10 +34,10 @@ export async function submitJourney(raw: unknown) {
 
   try {
     const request = await createRequest(parsed.data);
-    console.info("[submitJourney] request created", request.referenceNumber);
+    logger.info("submitJourney: request created", { reference: request.referenceNumber });
     return { ok: true as const, referenceNumber: request.referenceNumber };
   } catch (e) {
-    console.error("[submitJourney] createRequest failed", e);
+    logger.error("submitJourney: createRequest failed", { err: e });
     return {
       ok: false as const,
       error: e instanceof Error ? e.message : "Something went wrong. Please try again.",

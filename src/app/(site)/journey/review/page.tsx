@@ -10,6 +10,7 @@ import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
+import { logger } from "@/lib/logger";
 import { formatDateOnly, formatDateTime } from "@/lib/utils";
 
 export default function ReviewPage() {
@@ -58,7 +59,7 @@ export default function ReviewPage() {
     setServerError(undefined);
 
     const payload = { ...draft, destination: store.destination };
-    console.info("[confirm] click — submitting journey", {
+    logger.info("confirm: submitting journey", {
       destination: payload.destination,
       steps: payload.steps.length,
       customer: payload.customer.fullName ? "present" : "missing",
@@ -66,7 +67,7 @@ export default function ReviewPage() {
 
     try {
       const res = await submitJourney(payload);
-      console.info("[confirm] server response", {
+      logger.info("confirm: server response", {
         ok: res.ok,
         referenceNumber: res.ok ? res.referenceNumber : undefined,
         error: res.ok ? undefined : res.error,
@@ -86,10 +87,10 @@ export default function ReviewPage() {
       // the success page — never here, so this page can't re-validate empty data.
       const ref = res.referenceNumber!;
       setDone(true);
-      console.info("[confirm] redirecting to success page", ref);
+      logger.info("confirm: redirecting to success", { reference: ref });
       router.replace(`/success/${encodeURIComponent(ref)}`);
     } catch (e) {
-      console.error("[confirm] unexpected client error", e);
+      logger.error("confirm: unexpected client error", { err: e });
       submitLock.current = false;
       setSubmitting(false);
       setServerError(ar ? "حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى." : "Something went wrong. Please try again.");

@@ -1,4 +1,5 @@
 import "server-only";
+import { logger } from "@/lib/logger";
 
 /**
  * Provider abstraction for SMS / WhatsApp / Email.
@@ -30,14 +31,12 @@ interface EmailProvider {
 // ── Console (development) ──
 const consoleSms: SmsProvider = {
   async send(msg, channel) {
-    // eslint-disable-next-line no-console
-    console.info(`\n[RTD ${channel}] → ${msg.to}\n${msg.body}\n`);
+    logger.info("dev notify: sms", { channel, to: msg.to, body: msg.body });
   },
 };
 const consoleEmail: EmailProvider = {
   async send(msg) {
-    // eslint-disable-next-line no-console
-    console.info(`\n[RTD EMAIL] → ${msg.to}\nSubject: ${msg.subject}\n${msg.body}\n`);
+    logger.info("dev notify: email", { to: msg.to, subject: msg.subject, body: msg.body });
   },
 };
 
