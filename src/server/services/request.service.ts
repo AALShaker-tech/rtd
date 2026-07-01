@@ -6,6 +6,7 @@ import { computeStepPrice } from "@/lib/pricing";
 import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
 import { getPricingConfig } from "./pricing.service";
+import { isTargetVerified } from "./verification.service";
 import type { CreateRequestInput } from "@/lib/validation/schemas";
 import type {
   CarCategory,
@@ -91,6 +92,14 @@ export async function createRequest(input: CreateRequestInput) {
   const departureDate = combineDateTime(input.tripInfo.departureDate, null);
   const returnDate = combineDateTime(input.tripInfo.returnDate, null);
 
+  // Authoritative server-side verification — never trust the client's
+  // `phoneVerified` / `emailVerified` flags. A contact is only "verified" if a
+  // matching code was actually consumed recently.
+  const phoneVerified = await isTargetVerified(e164, "PHONE");
+  const emailVerified = input.customer.email
+    ? await isTargetVerified(input.customer.email, "EMAIL")
+    : false;
+
   // Authoritative server-side pricing — never trust the client estimate.
   const pricingConfig = await getPricingConfig();
   const stepBreakdowns = new Map(
@@ -110,8 +119,8 @@ export async function createRequest(input: CreateRequestInput) {
         phone: e164,
         email: input.customer.email ?? "",
         language,
-        phoneVerified: input.phoneVerified ?? false,
-        emailVerified: input.emailVerified ?? false,
+        phoneVerified,
+        emailVerified,
       },
     });
 

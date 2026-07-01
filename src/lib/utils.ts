@@ -32,6 +32,24 @@ export function buildReferenceNumber(sequence: number): string {
   return `RTD-${year}-${String(sequence).padStart(5, "0")}`;
 }
 
+/**
+ * Serialize a server-fetched object (typically a Prisma record) for passing
+ * across the Server Component → Client Component boundary. Deep-clones via JSON,
+ * which turns non-serializable values into their JSON form (Date → ISO string).
+ * Centralizes what used to be scattered `JSON.parse(JSON.stringify(x))` calls.
+ *
+ * The return type is intentionally loose: JSON round-tripping changes the shape
+ * (Date fields become strings), and the client components are typed against that
+ * post-serialization shape. Callers assign the result to their own prop type.
+ *
+ * NOTE: this clones the whole object — it does not trim fields. Narrowing each
+ * view to an explicit DTO / Prisma `select` is a worthwhile follow-up so that
+ * internal-only fields aren't shipped to the client.
+ */
+export function serialize(value: unknown): any {
+  return JSON.parse(JSON.stringify(value));
+}
+
 /** Combine a `yyyy-mm-dd` date and `HH:mm` time into a Date, or null. */
 export function combineDateTime(date?: string | null, time?: string | null): Date | null {
   if (!date) return null;

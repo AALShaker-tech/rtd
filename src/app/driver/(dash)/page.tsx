@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { DriverTasksView } from "./DriverTasksView";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +20,5 @@ export default async function DriverHome() {
     },
   });
 
-  return <DriverTasksView tasks={JSON.parse(JSON.stringify(tasks))} />;
+  return <DriverTasksView tasks={serialize(tasks)} />;
 }

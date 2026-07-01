@@ -37,7 +37,11 @@ export default function ReviewPage() {
   };
 
   // validateJourney already folds in trip-info + customer validation.
-  const validation = useMemo(() => validateJourney(draft), [JSON.stringify(draft)]);
+  // `draftKey` is a deep-compare proxy: re-validate only when the draft contents
+  // change, not on every render.
+  const draftKey = JSON.stringify(draft);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const validation = useMemo(() => validateJourney(draft), [draftKey]);
   const blocked = validation.hasErrors;
 
   const ordered = [...store.steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
