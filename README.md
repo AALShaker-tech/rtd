@@ -156,10 +156,26 @@ npm run dev            # dev server
 npm run build          # prisma generate + next build
 npm run start          # production server
 npm run typecheck      # tsc --noEmit
+npm test               # vitest — unit tests for the pricing & validation engines
+npm run test:watch     # vitest in watch mode
 npm run db:seed        # seed
 npm run db:reset       # reset + re-migrate (destructive)
 npm run prisma:studio  # browse the DB
 ```
+
+## 🧪 Tests & CI
+
+Unit tests (Vitest) cover the two pure engines that must never silently
+regress — the **pricing engine** (`src/lib/pricing.test.ts`) and the bilingual
+**journey validation engine** (`src/lib/validation/journey.test.ts`) — plus the
+**rate limiter** (`src/lib/rate-limit.test.ts`). Run them with `npm test`.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `prisma generate`, `typecheck`
+and the test suite on every push and pull request.
+
+**Rate limiting:** staff login and verification-code issuance are throttled
+(`src/lib/rate-limit.ts`) to blunt brute-force and SMS-cost abuse. State is
+in-memory (per instance); swap the store for Redis in a multi-instance deploy.
 
 ---
 
