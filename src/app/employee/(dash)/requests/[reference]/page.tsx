@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { serialize } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmployeeRequestView } from "./EmployeeRequestView";
@@ -29,5 +30,5 @@ export default async function EmployeeRequestPage({
     redirect("/employee");
   }
 
-  return <EmployeeRequestView request={JSON.parse(JSON.stringify(request))} />;
+  return <EmployeeRequestView request={serialize(request)} />;
 }

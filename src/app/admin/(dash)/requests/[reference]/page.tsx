@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { RequestDetailView } from "./RequestDetailView";
 
 export const dynamic = "force-dynamic";
@@ -39,5 +40,5 @@ export default async function RequestDetailPage({
     prisma.user.findMany({ where: { role: "DRIVER", isActive: true }, select: { id: true, fullName: true } }),
   ]);
 
-  return <RequestDetailView request={JSON.parse(JSON.stringify(request))} employees={employees} drivers={drivers} />;
+  return <RequestDetailView request={serialize(request)} employees={employees} drivers={drivers} />;
 }

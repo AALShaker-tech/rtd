@@ -170,8 +170,10 @@ regress — the **pricing engine** (`src/lib/pricing.test.ts`) and the bilingual
 **journey validation engine** (`src/lib/validation/journey.test.ts`) — plus the
 **rate limiter** (`src/lib/rate-limit.test.ts`). Run them with `npm test`.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs `prisma generate`, `typecheck`
-and the test suite on every push and pull request.
+GitHub Actions (`.github/workflows/ci.yml`) runs `prisma generate`, **lint**
+(`next lint --max-warnings=0`), `typecheck` and the test suite on every push and
+pull request. ESLint (`eslint-config-next`) and Prettier configs are committed;
+`npm run format` applies Prettier locally (not yet a CI gate).
 
 **Rate limiting:** staff login and verification-code issuance are throttled
 (`src/lib/rate-limit.ts`) to blunt brute-force and SMS-cost abuse. State is

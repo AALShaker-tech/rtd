@@ -1,27 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import { SESSION_COOKIE, verifySessionToken, type SessionPayload } from "@/lib/session";
 
-const COOKIE_NAME = "rtd_session";
+type Role = SessionPayload["role"];
 
-interface Session {
-  userId: string;
-  role: "ADMIN" | "EMPLOYEE" | "DRIVER";
-}
-
-async function readSession(req: NextRequest): Promise<Session | null> {
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-  if (!token || !process.env.AUTH_SECRET) return null;
-  try {
-    const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
-    const { payload } = await jwtVerify(token, secret);
-    return { userId: String(payload.userId), role: payload.role as Session["role"] };
-  } catch {
-    return null;
-  }
+async function readSession(req: NextRequest): Promise<SessionPayload | null> {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return verifySessionToken(token);
 }
 
 /** Route → allowed roles. */
-const GUARDS: { prefix: string; roles: Session["role"][] }[] = [
+const GUARDS: { prefix: string; roles: Role[] }[] = [
   { prefix: "/admin", roles: ["ADMIN"] },
   { prefix: "/employee", roles: ["EMPLOYEE", "ADMIN"] },
   { prefix: "/driver", roles: ["DRIVER", "ADMIN"] },
