@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import { serialize } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { EmployeeRequestView } from "./EmployeeRequestView";
+import { displayStepSelect, toDisplayStep } from "@/server/dto/journey-step";
+import { EmployeeRequestView, type Data } from "./EmployeeRequestView";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +15,38 @@ export default async function EmployeeRequestPage({
   if (!session) redirect("/employee/login");
 
   const { reference } = await params;
+  // Select only what the employee view renders; `assignedEmployeeId` is used for
+  // the ownership check below but is not shipped to the client.
   const request = await prisma.request.findUnique({
     where: { referenceNumber: decodeURIComponent(reference).toUpperCase() },
-    include: {
-      customer: true,
-      journeySteps: { orderBy: { stepOrder: "asc" } },
-      internalNotes: { orderBy: { createdAt: "desc" }, include: { author: { select: { fullName: true } } } },
+    select: {
+      id: true,
+      referenceNumber: true,
+      status: true,
+      selectedPackage: true,
+      carCategory: true,
+      passengers: true,
+      bags: true,
+      estimatedTotal: true,
+      finalPrice: true,
+      notes: true,
+      contactMeInstead: true,
+      assignedEmployeeId: true,
+      customer: {
+        select: {
+          fullName: true,
+          phone: true,
+          email: true,
+          phoneVerified: true,
+          emailVerified: true,
+          language: true,
+        },
+      },
+      journeySteps: { orderBy: { stepOrder: "asc" }, select: displayStepSelect },
+      internalNotes: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, body: true, createdAt: true, author: { select: { fullName: true } } },
+      },
     },
   });
   if (!request) notFound();
@@ -30,5 +56,34 @@ export default async function EmployeeRequestPage({
     redirect("/employee");
   }
 
-  return <EmployeeRequestView request={serialize(request)} />;
+  const dto: Data = {
+    id: request.id,
+    referenceNumber: request.referenceNumber,
+    status: request.status,
+    selectedPackage: request.selectedPackage,
+    carCategory: request.carCategory,
+    passengers: request.passengers,
+    bags: request.bags,
+    estimatedTotal: request.estimatedTotal,
+    finalPrice: request.finalPrice,
+    notes: request.notes,
+    contactMeInstead: request.contactMeInstead,
+    customer: {
+      fullName: request.customer.fullName,
+      phone: request.customer.phone,
+      email: request.customer.email,
+      phoneVerified: request.customer.phoneVerified,
+      emailVerified: request.customer.emailVerified,
+      language: request.customer.language,
+    },
+    journeySteps: request.journeySteps.map(toDisplayStep),
+    internalNotes: request.internalNotes.map((n) => ({
+      id: n.id,
+      body: n.body,
+      createdAt: n.createdAt.toISOString(),
+      author: n.author ? { fullName: n.author.fullName } : null,
+    })),
+  };
+
+  return <EmployeeRequestView request={dto} />;
 }
