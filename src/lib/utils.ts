@@ -50,6 +50,15 @@ export function serialize(value: unknown): any {
   return JSON.parse(JSON.stringify(value));
 }
 
+/**
+ * ISO string for a Date (or null) — used when mapping a Prisma row to a DTO for
+ * a Client Component, whose date fields are typed as strings (the JSON shape).
+ * Matches what `JSON.stringify` produced, so downstream parsing is unchanged.
+ */
+export function isoOrNull(d: Date | null | undefined): string | null {
+  return d ? d.toISOString() : null;
+}
+
 /** Combine a `yyyy-mm-dd` date and `HH:mm` time into a Date, or null. */
 export function combineDateTime(date?: string | null, time?: string | null): Date | null {
   if (!date) return null;

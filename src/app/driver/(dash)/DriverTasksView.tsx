@@ -15,7 +15,7 @@ import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { DriverTaskStatus } from "@prisma/client";
 
-interface Task {
+export interface Task {
   id: string;
   status: DriverTaskStatus;
   driverNotes: string | null;

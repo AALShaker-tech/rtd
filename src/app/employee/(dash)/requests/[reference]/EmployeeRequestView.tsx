@@ -11,7 +11,7 @@ import { adminAddNote, employeeEscalate, employeeMarkContacted } from "@/server/
 import type { RequestStatus } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
 
-interface Data {
+export interface Data {
   id: string;
   referenceNumber: string;
   status: RequestStatus;
