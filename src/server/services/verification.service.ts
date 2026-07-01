@@ -1,4 +1,5 @@
 import "server-only";
+import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, sendSms } from "./notify.service";
@@ -12,7 +13,8 @@ const VERIFIED_WINDOW_MS =
   Number(process.env.VERIFICATION_VALID_HOURS ?? 24) * 60 * 60 * 1000 || DEFAULT_VERIFIED_WINDOW_MS;
 
 function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically strong 6-digit code (100000–999999).
+  return String(randomInt(100000, 1000000));
 }
 
 export async function issueVerificationCode(params: {

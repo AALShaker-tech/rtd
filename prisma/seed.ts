@@ -174,7 +174,15 @@ async function main() {
   console.log(`   Flight schedule: ${airlineByCode.size} airlines, ${routeByPair.size} routes, ${scheduleRows.length} weekly rows.`);
 
   // ── Staff accounts ──
-  const password = await bcrypt.hash("Passw0rd!", 12);
+  // Password is env-overridable so production seeds don't use a known default.
+  const DEFAULT_STAFF_PASSWORD = "Passw0rd!";
+  const staffPassword = process.env.SEED_STAFF_PASSWORD ?? DEFAULT_STAFF_PASSWORD;
+  if (staffPassword === DEFAULT_STAFF_PASSWORD) {
+    console.warn(
+      "   ⚠  Seeding staff with the default demo password. Set SEED_STAFF_PASSWORD before seeding any non-development environment.",
+    );
+  }
+  const password = await bcrypt.hash(staffPassword, 12);
   const admin = await prisma.user.upsert({
     where: { email: "admin@rtd.sa" },
     update: {},
@@ -274,9 +282,9 @@ async function main() {
   }
 
   console.log("✅ Seed complete.");
-  console.log("   Admin:    admin@rtd.sa  / Passw0rd!");
-  console.log("   Employee: ops@rtd.sa    / Passw0rd!");
-  console.log("   Driver:   driver@rtd.sa / Passw0rd!");
+  console.log(`   Admin:    admin@rtd.sa  / ${staffPassword}`);
+  console.log(`   Employee: ops@rtd.sa    / ${staffPassword}`);
+  console.log(`   Driver:   driver@rtd.sa / ${staffPassword}`);
 }
 
 main()

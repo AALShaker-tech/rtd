@@ -149,6 +149,31 @@ Verification is optional at submission — unverified contacts are clearly marke
 
 ---
 
+## 🐳 Deployment
+
+The app builds to a self-contained Next.js **standalone** server and ships as a
+slim, multi-stage Docker image (non-root, Prisma engine included).
+
+```bash
+# Build
+docker build -t rtd:latest .
+
+# Run (point at your database; migrations are a separate release step)
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://…" \
+  -e AUTH_SECRET="$(openssl rand -base64 48)" \
+  rtd:latest
+```
+
+- **Migrations** are intentionally *not* run by the container. Apply them as a
+  release/deploy step: `npx prisma migrate deploy` (and seed once with a strong
+  `SEED_STAFF_PASSWORD`).
+- **Health probe**: `GET /api/health` returns `200 {"status":"ok"}` when the app
+  and database are reachable, `503` otherwise — wire it to your orchestrator's
+  liveness/readiness checks.
+- CI builds the image, runs the container against a Postgres service, and asserts
+  the health endpoint responds — so a broken Dockerfile fails the build.
+
 ## 🗄️ Useful scripts
 
 ```bash
