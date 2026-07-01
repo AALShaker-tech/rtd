@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useJourneyStore } from "@/store/journeyStore";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { buildWhatsAppLink, type WhatsAppFlightLine } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/pricing";
@@ -27,6 +29,14 @@ export function SuccessView(props: {
   steps: JourneyStepInput[];
 }) {
   const { t, pick, locale } = useI18n();
+
+  // The request is now saved server-side (this page reads it from the DB), so
+  // the client draft is no longer needed. Clear it here — after a confirmed
+  // success — so the review page never re-validates emptied data.
+  useEffect(() => {
+    useJourneyStore.getState().reset();
+  }, []);
+
   const waLink = buildWhatsAppLink({
     referenceNumber: props.referenceNumber,
     customerName: props.customerName,

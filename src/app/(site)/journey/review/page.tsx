@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { VEHICLES, getStep, getVehicle } from "@/lib/domain";
@@ -20,7 +20,12 @@ export default function ReviewPage() {
   const { config } = usePricing();
   const catalog = useCatalog();
   const [submitting, setSubmitting] = useState(false);
+  // True once the request is saved — keeps the success/redirect state and
+  // suppresses any re-validation while we navigate away.
+  const [done, setDone] = useState(false);
   const [serverError, setServerError] = useState<string | undefined>();
+  // Hard lock against double submission (survives re-renders, unlike state).
+  const submitLock = useRef(false);
 
   const draft = {
     selectedPackage: store.selectedPackage,
@@ -39,13 +44,52 @@ export default function ReviewPage() {
   const estimatedTotal = ordered.filter((s) => !s.skipped && s.serviceType !== "SKIP").reduce((sum, s) => sum + computeStepPrice(s, config).computedPrice, 0);
 
   async function confirm() {
-    setSubmitting(true); setServerError(undefined);
-    const res = await submitJourney({ ...draft, destination: store.destination });
-    setSubmitting(false);
-    if (!res.ok) return setServerError(res.error);
-    const ref = res.referenceNumber!;
-    store.reset();
-    router.push(`/success/${ref}`);
+    // Prevent double-click / double-submit — never create duplicate requests.
+    if (submitLock.current || submitting || done) return;
+    // Never submit when the journey truly has errors (button is also disabled).
+    if (validation.hasErrors) return;
+
+    submitLock.current = true;
+    setSubmitting(true);
+    setServerError(undefined);
+
+    const payload = { ...draft, destination: store.destination };
+    console.info("[confirm] click — submitting journey", {
+      destination: payload.destination,
+      steps: payload.steps.length,
+      customer: payload.customer.fullName ? "present" : "missing",
+    });
+
+    try {
+      const res = await submitJourney(payload);
+      console.info("[confirm] server response", {
+        ok: res.ok,
+        referenceNumber: res.ok ? res.referenceNumber : undefined,
+        error: res.ok ? undefined : res.error,
+      });
+
+      if (!res.ok) {
+        // Real server/validation error — request was NOT created. Release the
+        // lock so the customer can correct and retry; show the real error only.
+        submitLock.current = false;
+        setSubmitting(false);
+        setServerError(res.error);
+        return;
+      }
+
+      // Saved successfully. Stay in the loading/success state (button disabled),
+      // suppress all client re-validation, and redirect. The draft is cleared on
+      // the success page — never here, so this page can't re-validate empty data.
+      const ref = res.referenceNumber!;
+      setDone(true);
+      console.info("[confirm] redirecting to success page", ref);
+      router.replace(`/success/${encodeURIComponent(ref)}`);
+    } catch (e) {
+      console.error("[confirm] unexpected client error", e);
+      submitLock.current = false;
+      setSubmitting(false);
+      setServerError(ar ? "حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى." : "Something went wrong. Please try again.");
+    }
   }
 
   const allIssues = validation.timeline;
@@ -146,7 +190,7 @@ export default function ReviewPage() {
             );
           })}
 
-          {allIssues.length > 0 && (
+          {allIssues.length > 0 && !submitting && !done && (
             <div className="grid gap-1.5">
               {allIssues.map((iss, i) => (
                 <p key={i} className={`rounded-xl px-3 py-2 text-xs ${iss.severity === "error" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{ar ? iss.messageAr : iss.messageEn}</p>
@@ -166,11 +210,11 @@ export default function ReviewPage() {
             </div>
             <p className="mt-3 text-xs leading-relaxed text-charcoal/50">{pick(t.pricing.finalNote)}</p>
 
-            {blocked && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">{pick(t.review.blockingError)}</p>}
-            {serverError && <p className="mt-3 text-xs text-red-600">{serverError}</p>}
+            {blocked && !submitting && !done && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">{pick(t.review.blockingError)}</p>}
+            {serverError && !submitting && !done && <p className="mt-3 text-xs text-red-600">{serverError}</p>}
 
-            <button onClick={confirm} disabled={blocked || submitting} className="btn-gold mt-5 w-full">
-              {submitting ? pick(t.common.loading) : pick(t.review.confirmRequest)}
+            <button onClick={confirm} disabled={blocked || submitting || done} className="btn-gold mt-5 w-full">
+              {submitting || done ? pick(t.common.loading) : pick(t.review.confirmRequest)}
             </button>
             <button onClick={() => router.push("/journey/details")} className="btn-ghost mt-2 w-full">{ar ? "→" : "←"} {pick(t.common.back)}</button>
           </div>

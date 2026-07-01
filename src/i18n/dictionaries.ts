@@ -354,6 +354,10 @@ export const dict = {
     email: { en: "Email", ar: "البريد الإلكتروني" },
     password: { en: "Password", ar: "كلمة المرور" },
     invalid: { en: "Invalid email or password.", ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة." },
+    tooManyAttempts: {
+      en: "Too many attempts. Please wait a few minutes and try again.",
+      ar: "عدد محاولات كبير جدًا. الرجاء الانتظار بضع دقائق والمحاولة مرة أخرى.",
+    },
     adminTitle: { en: "Admin Console", ar: "لوحة الإدارة" },
     employeeTitle: { en: "Operations Console", ar: "لوحة العمليات" },
     driverTitle: { en: "Driver App", ar: "تطبيق السائق" },

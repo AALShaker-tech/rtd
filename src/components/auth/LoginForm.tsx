@@ -31,7 +31,11 @@ export function LoginForm({ title, hint }: { title: string; hint?: string }) {
               <TextInput name="password" type="password" required autoComplete="current-password" placeholder="••••••••" />
             </FieldWrap>
 
-            {state?.error && <p className="text-sm text-red-600">{pick(t.auth.invalid)}</p>}
+            {state?.error && (
+              <p className="text-sm text-red-600">
+                {pick(state.error === "RATE_LIMITED" ? t.auth.tooManyAttempts : t.auth.invalid)}
+              </p>
+            )}
 
             <button type="submit" disabled={pending} className="btn-gold w-full">
               {pending ? pick(t.common.loading) : pick(t.auth.signIn)}
