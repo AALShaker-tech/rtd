@@ -26,7 +26,7 @@ test("admin login page shows the sign-in form", async ({ page }) => {
   expect(res?.ok(), "admin login should return a 2xx").toBeTruthy();
   await expect(page.locator('input[name="email"]')).toBeVisible();
   await expect(page.locator('input[name="password"]')).toBeVisible();
-  await expect(page.getByRole("button")).toBeVisible();
+  await expect(page.locator('button[type="submit"]')).toBeVisible();
 });
 
 test("public status tracking page renders", async ({ page }) => {
