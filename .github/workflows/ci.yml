@@ -84,3 +84,58 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  docker:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rtd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rtd?schema=public
+      AUTH_SECRET: ci-docker-secret-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Apply migrations from the host (12-factor: migrations are a release step,
+      # not baked into the image).
+      - name: Migrate database
+        run: |
+          npm ci
+          npx prisma migrate deploy
+
+      - name: Build image
+        run: docker build -t rtd:ci .
+
+      - name: Run container and health-check
+        run: |
+          docker run -d --name rtd --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e AUTH_SECRET="$AUTH_SECRET" \
+            rtd:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then
+              echo "health OK"; exit 0
+            fi
+            sleep 2
+          done
+          echo "health check failed"; exit 1
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs rtd || true
