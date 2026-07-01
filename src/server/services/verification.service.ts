@@ -2,10 +2,14 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, sendSms } from "./notify.service";
-import type { VerificationChannel, VerificationPurpose } from "@prisma/client";
+import { isVerifiedWithinWindow, DEFAULT_VERIFIED_WINDOW_MS } from "@/lib/verification-policy";
+import type { VerificationPurpose, VerificationChannel } from "@prisma/client";
 
 const TTL_MIN = Number(process.env.VERIFICATION_CODE_TTL_MINUTES ?? 10);
 const MAX_ATTEMPTS = 5;
+// How long a successful verification stays valid for a later request submission.
+const VERIFIED_WINDOW_MS =
+  Number(process.env.VERIFICATION_VALID_HOURS ?? 24) * 60 * 60 * 1000 || DEFAULT_VERIFIED_WINDOW_MS;
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -21,10 +25,11 @@ export async function issueVerificationCode(params: {
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(Date.now() + TTL_MIN * 60_000);
 
-  // Invalidate prior unconsumed codes for this target/purpose.
-  await prisma.verificationCode.updateMany({
+  // Invalidate prior unconsumed codes by deleting them. We deliberately do NOT
+  // mark them `consumed`, because `consumed: true` must mean "successfully
+  // verified" and nothing else — that is what isTargetVerified() relies on.
+  await prisma.verificationCode.deleteMany({
     where: { target, purpose, consumed: false },
-    data: { consumed: true },
   });
 
   await prisma.verificationCode.create({
@@ -80,4 +85,23 @@ export async function verifyCode(params: {
     data: { consumed: true },
   });
   return { ok: true };
+}
+
+/**
+ * Authoritative, server-side check of whether a target (E.164 phone / email)
+ * has been verified recently. Never trust a client-supplied "verified" flag —
+ * derive it from a consumed verification code instead.
+ */
+export async function isTargetVerified(
+  target: string,
+  purpose: VerificationPurpose,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const records = await prisma.verificationCode.findMany({
+    where: { target, purpose, consumed: true },
+    select: { consumed: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  return isVerifiedWithinWindow(records, now, VERIFIED_WINDOW_MS);
 }
