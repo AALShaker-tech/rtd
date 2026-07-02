@@ -11,7 +11,7 @@ const createUserSchema = z.object({
   fullName: z.string().min(3),
   email: z.string().email(),
   phone: z.string().optional(),
-  password: z.string().min(6),
+  password: z.string().min(10, "Password must be at least 10 characters"),
   role: z.enum(["EMPLOYEE", "DRIVER", "ADMIN"]),
 });
 
@@ -20,7 +20,9 @@ export async function createStaffUser(raw: unknown) {
   if (!session || session.role !== "ADMIN") return { ok: false as const, error: "Unauthorized" };
 
   const parsed = createUserSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false as const, error: "Invalid input" };
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
 
   const exists = await prisma.user.findUnique({
     where: { email: parsed.data.email.toLowerCase() },
