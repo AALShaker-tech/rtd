@@ -45,7 +45,8 @@ const twilioSms: SmsProvider = {
   async send(msg, channel) {
     const sid = process.env.TWILIO_ACCOUNT_SID;
     const token = process.env.TWILIO_AUTH_TOKEN;
-    const from = channel === "WHATSAPP" ? process.env.TWILIO_WHATSAPP_FROM : process.env.TWILIO_FROM_NUMBER;
+    const from =
+      channel === "WHATSAPP" ? process.env.TWILIO_WHATSAPP_FROM : process.env.TWILIO_FROM_NUMBER;
     if (!sid || !token || !from) {
       throw new Error("Twilio is not fully configured (set TWILIO_* env vars).");
     }
@@ -63,12 +64,29 @@ const twilioSms: SmsProvider = {
   },
 };
 
-// ── SMTP (production stub) ──
+// ── SMTP (production) ──
+// Generic SMTP via nodemailer — works with any provider that speaks SMTP
+// (Google Workspace/Gmail, Brevo, Resend, SendGrid, SES…). Configure entirely
+// through SMTP_* env vars; no provider-specific code.
 const smtpEmail: EmailProvider = {
-  async send() {
-    // Intentionally a thin stub: wire up nodemailer (or a transactional API)
-    // using SMTP_* env vars in production. Kept dependency-free here.
-    throw new Error("SMTP provider not configured in this build. Set EMAIL_PROVIDER=console for dev.");
+  async send(msg) {
+    const host = process.env.SMTP_HOST;
+    const port = Number(process.env.SMTP_PORT ?? 587);
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASSWORD;
+    const from = process.env.EMAIL_FROM || user;
+    if (!host || !user || !pass) {
+      throw new Error("SMTP is not configured (set SMTP_HOST, SMTP_USER and SMTP_PASSWORD).");
+    }
+    // Loaded lazily so the console provider never needs nodemailer at runtime.
+    const nodemailer = (await import("nodemailer")).default;
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
+      auth: { user, pass },
+    });
+    await transporter.sendMail({ from, to: msg.to, subject: msg.subject, text: msg.body });
   },
 };
 

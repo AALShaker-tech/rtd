@@ -163,6 +163,9 @@ the absolute link.
   and in dev the code is also returned to the verify UI for easy testing.
 - **`twilio`** / **`smtp`** (production): wired entirely through environment
   variables (`TWILIO_*`, `SMTP_*`). Swap the provider without touching app code.
+  The `smtp` sender is generic (nodemailer) and works with any SMTP provider —
+  e.g. **Google Workspace** (`smtp.gmail.com:587` with an App Password from a
+  `@ratbli.sa` mailbox), Brevo, Resend, SendGrid or SES. See `.env.example`.
 
 Verification is optional at submission — unverified contacts are clearly marked
 **“pending verification”** rather than blocking the request.
