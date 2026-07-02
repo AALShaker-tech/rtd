@@ -553,3 +553,12 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([requestId])
 }
+
+// Key/value store for superadmin-editable app configuration (WhatsApp number,
+// ops-alert email, email provider + credentials). Secret values are stored
+// encrypted; a missing key falls back to the corresponding env var.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

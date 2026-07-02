@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SuccessView } from "./SuccessView";
+import { getPublicConfig } from "@/server/services/settings.service";
 import type { JourneyStepInput } from "@/lib/types";
 
 export default async function SuccessPage({ params }: { params: Promise<{ reference: string }> }) {
@@ -26,7 +27,9 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
           destinationAirport: s.destinationAirport,
           departureDate: s.departureDate ? s.departureDate.toISOString().slice(0, 10) : null,
           departureTimeLocal: s.departureTimeLocal,
-          estimatedArrivalDate: s.estimatedArrivalDate ? s.estimatedArrivalDate.toISOString().slice(0, 10) : null,
+          estimatedArrivalDate: s.estimatedArrivalDate
+            ? s.estimatedArrivalDate.toISOString().slice(0, 10)
+            : null,
           estimatedArrivalTimeLocal: s.estimatedArrivalTimeLocal,
         }
       : null;
@@ -56,8 +59,11 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
     notes: s.notes ?? undefined,
   }));
 
+  const { whatsappNumber } = await getPublicConfig();
+
   return (
     <SuccessView
+      whatsappNumber={whatsappNumber}
       referenceNumber={request.referenceNumber}
       status={request.status}
       customerName={request.customer.fullName}

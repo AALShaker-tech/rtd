@@ -1,13 +1,18 @@
 import "server-only";
 import { logger } from "@/lib/logger";
+import {
+  resolveEmailConfig,
+  getOpsTargets,
+  type EmailConfig,
+} from "@/server/services/settings.service";
 
 /**
  * Provider abstraction for SMS / WhatsApp / Email.
  *
- * In development the "console" provider logs the message to the server console,
- * so verification codes can be tested without external credentials.
- * In production, set SMS_PROVIDER / EMAIL_PROVIDER to a real provider and supply
- * credentials via environment variables. No secrets are hardcoded.
+ * SMS uses SMS_PROVIDER + env credentials. Email config (provider + sender +
+ * credentials) is resolved from the Setting store with env fallback, so the
+ * superadmin can change it from the dashboard. The "console" provider just logs
+ * the message, for development.
  */
 
 export interface SmsMessage {
@@ -25,7 +30,7 @@ interface SmsProvider {
   send(msg: SmsMessage, channel: "SMS" | "WHATSAPP"): Promise<void>;
 }
 interface EmailProvider {
-  send(msg: EmailMessage): Promise<void>;
+  send(msg: EmailMessage, cfg: EmailConfig): Promise<void>;
 }
 
 // ── Console (development) ──
@@ -66,17 +71,14 @@ const twilioSms: SmsProvider = {
 
 // ── SMTP (production) ──
 // Generic SMTP via nodemailer — works with any provider that speaks SMTP
-// (Google Workspace/Gmail, Brevo, Resend, SendGrid, SES…). Configure entirely
-// through SMTP_* env vars; no provider-specific code.
+// (Google Workspace/Gmail, Brevo, Resend, SendGrid, SES…). No provider-specific
+// code; driven by the resolved email config.
 const smtpEmail: EmailProvider = {
-  async send(msg) {
-    const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT ?? 587);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASSWORD;
-    const from = process.env.EMAIL_FROM || user;
-    if (!host) throw new Error("SMTP is not configured (set SMTP_HOST).");
-    if (!from) throw new Error("SMTP needs EMAIL_FROM (or SMTP_USER) for the sender address.");
+  async send(msg, cfg) {
+    const { host, port, user, pass } = cfg.smtp;
+    const from = cfg.from || user;
+    if (!host) throw new Error("SMTP is not configured (set SMTP host).");
+    if (!from) throw new Error("SMTP needs a sender address (Email 'from' or SMTP user).");
     // Loaded lazily so the console provider never needs nodemailer at runtime.
     const nodemailer = (await import("nodemailer")).default;
     const transporter = nodemailer.createTransport({
@@ -93,14 +95,14 @@ const smtpEmail: EmailProvider = {
 
 // ── Brevo HTTP API (production) ──
 // Sends over HTTPS (port 443), so it works even where outbound SMTP ports are
-// blocked (e.g. some Railway projects). Needs BREVO_API_KEY (a v3 API key, not
-// the SMTP key) and a sender address from EMAIL_FROM.
+// blocked (e.g. some Railway projects). Needs a Brevo v3 API key (not the SMTP
+// key) and a sender address.
 const brevoApiEmail: EmailProvider = {
-  async send(msg) {
-    const apiKey = process.env.BREVO_API_KEY;
-    if (!apiKey) throw new Error("Brevo API is not configured (set BREVO_API_KEY).");
-    const sender = parseSender(process.env.EMAIL_FROM || "");
-    if (!sender.email) throw new Error("Set EMAIL_FROM to a sender address for Brevo.");
+  async send(msg, cfg) {
+    const apiKey = cfg.brevoApiKey;
+    if (!apiKey) throw new Error("Brevo API is not configured (set the Brevo API key).");
+    const sender = parseSender(cfg.from);
+    if (!sender.email) throw new Error("Set the email 'from' address for Brevo.");
 
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -133,8 +135,7 @@ function parseSender(from: string): { name?: string; email: string } {
 function smsProvider(): SmsProvider {
   return process.env.SMS_PROVIDER === "twilio" ? twilioSms : consoleSms;
 }
-function emailProvider(): EmailProvider {
-  const provider = process.env.EMAIL_PROVIDER;
+function emailProviderFor(provider: string): EmailProvider {
   if (provider === "brevo") return brevoApiEmail;
   if (provider === "smtp") return smtpEmail;
   return consoleEmail;
@@ -144,18 +145,18 @@ export async function sendSms(msg: SmsMessage, channel: "SMS" | "WHATSAPP" = "SM
   await smsProvider().send(msg, channel);
 }
 export async function sendEmail(msg: EmailMessage) {
-  await emailProvider().send(msg);
+  const cfg = await resolveEmailConfig();
+  await emailProviderFor(cfg.provider).send(msg, cfg);
 }
 
 /**
  * Alert the operations team. Routes to whichever ops channels are configured
- * (`OPS_ALERT_EMAIL` and/or `OPS_ALERT_PHONE`); if none are set, the alert is
- * logged so it's still visible in the server logs. Uses the same provider
- * abstraction, so it's console in dev and Twilio/SMTP in production.
+ * (ops-alert email and/or `OPS_ALERT_PHONE`); if none are set, the alert is
+ * logged so it's still visible in the server logs. The email target is
+ * superadmin-editable (Setting store); the phone stays env-only for now.
  */
 export async function sendOpsAlert(msg: { subject: string; body: string }): Promise<void> {
-  const email = process.env.OPS_ALERT_EMAIL;
-  const phone = process.env.OPS_ALERT_PHONE;
+  const { email, phone } = await getOpsTargets();
   const channel: "SMS" | "WHATSAPP" =
     process.env.OPS_ALERT_SMS_CHANNEL === "WHATSAPP" ? "WHATSAPP" : "SMS";
 

@@ -3,21 +3,22 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { PACKAGES, STEPS, VEHICLES } from "@/lib/domain";
-import { sendTestEmail } from "@/server/actions/email.actions";
-import { FieldWrap, TextInput } from "@/components/ui/Field";
+import { SettingsIntegrations } from "./SettingsIntegrations";
+import type { AdminSettings } from "@/server/services/settings.service";
 
 export function SettingsView(props: {
-  whatsappNumber: string;
-  whatsappDisplay: string;
+  settings: AdminSettings;
   smsProvider: string;
-  emailProvider: string;
   adminEmail: string;
+  canEdit: boolean;
 }) {
   const { t, pick, locale } = useI18n();
-  const [tab, setTab] = useState<"whatsapp" | "services" | "vehicles" | "packages">("whatsapp");
+  const [tab, setTab] = useState<"integrations" | "services" | "vehicles" | "packages">(
+    "integrations",
+  );
 
   const tabs = [
-    { key: "whatsapp", label: pick(t.admin.whatsappSettings) },
+    { key: "integrations", label: pick(t.admin.whatsappSettings) },
     { key: "services", label: pick(t.admin.services) },
     { key: "vehicles", label: pick(t.admin.vehicles) },
     { key: "packages", label: pick(t.packages.title) },
@@ -43,19 +44,13 @@ export function SettingsView(props: {
         ))}
       </div>
 
-      {tab === "whatsapp" && (
-        <div className="luxe-card max-w-lg space-y-3 p-6">
-          <Note>
-            {locale === "ar"
-              ? "تُضبط هذه القيم عبر متغيرات البيئة (NEXT_PUBLIC_WHATSAPP_*) ولا تُخزَّن أي أسرار في الكود."
-              : "These values are configured via environment variables (NEXT_PUBLIC_WHATSAPP_*). No secrets are stored in code."}
-          </Note>
-          <Field k={locale === "ar" ? "رقم واتساب" : "WhatsApp number"} v={props.whatsappDisplay} />
-          <Field k="wa.me" v={`https://wa.me/${props.whatsappNumber}`} />
-          <Field k={locale === "ar" ? "مزود الرسائل" : "SMS provider"} v={props.smsProvider} />
-          <Field k={locale === "ar" ? "مزود البريد" : "Email provider"} v={props.emailProvider} />
-          <TestEmail defaultEmail={props.adminEmail} />
-        </div>
+      {tab === "integrations" && (
+        <SettingsIntegrations
+          settings={props.settings}
+          smsProvider={props.smsProvider}
+          adminEmail={props.adminEmail}
+          canEdit={props.canEdit}
+        />
       )}
 
       {tab === "services" && (
@@ -102,59 +97,6 @@ export function SettingsView(props: {
             </div>
           ))}
         </div>
-      )}
-    </div>
-  );
-}
-
-function Field({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg bg-ivory-warm px-4 py-3">
-      <span className="text-sm text-charcoal/60">{k}</span>
-      <span className="font-mono text-sm text-charcoal">{v}</span>
-    </div>
-  );
-}
-
-function Note({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-lg bg-gold-50 px-4 py-3 text-xs text-gold-dark">{children}</p>;
-}
-
-function TestEmail({ defaultEmail }: { defaultEmail: string }) {
-  const { t, pick } = useI18n();
-  const [email, setEmail] = useState(defaultEmail);
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
-
-  async function run() {
-    setBusy(true);
-    setResult(null);
-    const res = await sendTestEmail(email);
-    setBusy(false);
-    setResult(
-      res.ok
-        ? { ok: true, msg: `${pick(t.admin.testEmailSent)} ${res.to}` }
-        : { ok: false, msg: res.error },
-    );
-  }
-
-  return (
-    <div className="space-y-2 rounded-lg bg-ivory-warm px-4 py-3">
-      <p className="text-sm font-medium text-charcoal">{pick(t.admin.testEmail)}</p>
-      <p className="text-xs text-charcoal/50">{pick(t.admin.testEmailHint)}</p>
-      <FieldWrap label={pick(t.auth.email)}>
-        <TextInput
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@ratbli.sa"
-        />
-      </FieldWrap>
-      <button onClick={run} disabled={busy} className="btn-gold w-full">
-        {busy ? pick(t.common.loading) : pick(t.admin.sendTestEmail)}
-      </button>
-      {result && (
-        <p className={`text-xs ${result.ok ? "text-emerald-700" : "text-red-600"}`}>{result.msg}</p>
       )}
     </div>
   );

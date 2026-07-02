@@ -81,8 +81,10 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
   if (input.departureFlight || input.returnFlight) {
     lines.push("");
     lines.push(L ? "— الرحلات —" : "— Flights —");
-    if (input.departureFlight) lines.push((L ? "الذهاب: " : "Departure: ") + flightLine(input.departureFlight, L));
-    if (input.returnFlight) lines.push((L ? "العودة: " : "Return: ") + flightLine(input.returnFlight, L));
+    if (input.departureFlight)
+      lines.push((L ? "الذهاب: " : "Departure: ") + flightLine(input.departureFlight, L));
+    if (input.returnFlight)
+      lines.push((L ? "العودة: " : "Return: ") + flightLine(input.returnFlight, L));
   }
 
   lines.push("");
@@ -133,13 +135,19 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
   return lines.join("\n");
 }
 
-/** Build a wa.me deep link with the pre-filled message. */
-export function buildWhatsAppLink(input: WhatsAppSummaryInput): string {
+/**
+ * Build a wa.me deep link with the pre-filled message. `number` defaults to the
+ * build-time env value; pass the runtime value (from settings) when available.
+ */
+export function buildWhatsAppLink(
+  input: WhatsAppSummaryInput,
+  number: string = WHATSAPP_NUMBER,
+): string {
   const text = encodeURIComponent(buildWhatsAppMessage(input));
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
+  return `https://wa.me/${number}?text=${text}`;
 }
 
 /** Plain contact link with no message. */
-export function whatsappContactLink(): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}`;
+export function whatsappContactLink(number: string = WHATSAPP_NUMBER): string {
+  return `https://wa.me/${number}`;
 }

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { displayStepSelect, toDisplayStep } from "@/server/dto/journey-step";
+import { getPublicConfig } from "@/server/services/settings.service";
 import { EmployeeRequestView, type Data } from "./EmployeeRequestView";
 
 export const dynamic = "force-dynamic";
@@ -85,5 +86,6 @@ export default async function EmployeeRequestPage({
     })),
   };
 
-  return <EmployeeRequestView request={dto} />;
+  const { whatsappNumber } = await getPublicConfig();
+  return <EmployeeRequestView request={dto} whatsappNumber={whatsappNumber} />;
 }
