@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { PACKAGES, STEPS, VEHICLES } from "@/lib/domain";
+import { sendTestEmail } from "@/server/actions/email.actions";
+import { FieldWrap, TextInput } from "@/components/ui/Field";
 
 export function SettingsView(props: {
   whatsappNumber: string;
   whatsappDisplay: string;
   smsProvider: string;
   emailProvider: string;
+  adminEmail: string;
 }) {
   const { t, pick, locale } = useI18n();
   const [tab, setTab] = useState<"whatsapp" | "services" | "vehicles" | "packages">("whatsapp");
@@ -30,7 +33,9 @@ export function SettingsView(props: {
             key={tb.key}
             onClick={() => setTab(tb.key)}
             className={`px-4 py-2 text-sm font-medium transition ${
-              tab === tb.key ? "border-b-2 border-gold text-charcoal" : "text-charcoal/50 hover:text-charcoal"
+              tab === tb.key
+                ? "border-b-2 border-gold text-charcoal"
+                : "text-charcoal/50 hover:text-charcoal"
             }`}
           >
             {tb.label}
@@ -49,6 +54,7 @@ export function SettingsView(props: {
           <Field k="wa.me" v={`https://wa.me/${props.whatsappNumber}`} />
           <Field k={locale === "ar" ? "مزود الرسائل" : "SMS provider"} v={props.smsProvider} />
           <Field k={locale === "ar" ? "مزود البريد" : "Email provider"} v={props.emailProvider} />
+          <TestEmail defaultEmail={props.adminEmail} />
         </div>
       )}
 
@@ -56,7 +62,9 @@ export function SettingsView(props: {
         <div className="grid gap-3 md:grid-cols-2">
           {STEPS.map((s) => (
             <div key={s.type} className="luxe-card p-4">
-              <p className="font-medium text-charcoal">{s.order}. {pick(s.name)}</p>
+              <p className="font-medium text-charcoal">
+                {s.order}. {pick(s.name)}
+              </p>
               <p className="mt-1 text-sm text-charcoal/50">{pick(s.description)}</p>
             </div>
           ))}
@@ -66,11 +74,16 @@ export function SettingsView(props: {
       {tab === "vehicles" && (
         <div className="grid gap-4 md:grid-cols-3">
           {VEHICLES.map((v) => (
-            <div key={v.category} className={`luxe-card p-5 ${v.isRecommended ? "ring-2 ring-gold" : ""}`}>
+            <div
+              key={v.category}
+              className={`luxe-card p-5 ${v.isRecommended ? "ring-2 ring-gold" : ""}`}
+            >
               <h3 className="gold-text text-xl font-semibold">{pick(v.name)}</h3>
               <p className="text-sm text-charcoal/60">{v.exampleModels}</p>
               <p className="mt-2 text-sm text-charcoal/50">
-                {locale === "ar" ? `حتى ${v.maxPassengers} ركاب` : `Up to ${v.maxPassengers} passengers`}
+                {locale === "ar"
+                  ? `حتى ${v.maxPassengers} ركاب`
+                  : `Up to ${v.maxPassengers} passengers`}
               </p>
             </div>
           ))}
@@ -83,7 +96,9 @@ export function SettingsView(props: {
             <div key={p.type} className="luxe-card p-4">
               <p className="font-medium text-charcoal">{pick(p.name)}</p>
               <p className="mt-1 text-sm text-charcoal/50">{pick(p.description)}</p>
-              <p className="mt-2 text-xs text-charcoal/40">{p.steps.length} {pick(t.admin.services)}</p>
+              <p className="mt-2 text-xs text-charcoal/40">
+                {p.steps.length} {pick(t.admin.services)}
+              </p>
             </div>
           ))}
         </div>
@@ -103,4 +118,44 @@ function Field({ k, v }: { k: string; v: string }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return <p className="rounded-lg bg-gold-50 px-4 py-3 text-xs text-gold-dark">{children}</p>;
+}
+
+function TestEmail({ defaultEmail }: { defaultEmail: string }) {
+  const { t, pick } = useI18n();
+  const [email, setEmail] = useState(defaultEmail);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setResult(null);
+    const res = await sendTestEmail(email);
+    setBusy(false);
+    setResult(
+      res.ok
+        ? { ok: true, msg: `${pick(t.admin.testEmailSent)} ${res.to}` }
+        : { ok: false, msg: res.error },
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg bg-ivory-warm px-4 py-3">
+      <p className="text-sm font-medium text-charcoal">{pick(t.admin.testEmail)}</p>
+      <p className="text-xs text-charcoal/50">{pick(t.admin.testEmailHint)}</p>
+      <FieldWrap label={pick(t.auth.email)}>
+        <TextInput
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@ratbli.sa"
+        />
+      </FieldWrap>
+      <button onClick={run} disabled={busy} className="btn-gold w-full">
+        {busy ? pick(t.common.loading) : pick(t.admin.sendTestEmail)}
+      </button>
+      {result && (
+        <p className={`text-xs ${result.ok ? "text-emerald-700" : "text-red-600"}`}>{result.msg}</p>
+      )}
+    </div>
+  );
 }

@@ -75,16 +75,17 @@ const smtpEmail: EmailProvider = {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASSWORD;
     const from = process.env.EMAIL_FROM || user;
-    if (!host || !user || !pass) {
-      throw new Error("SMTP is not configured (set SMTP_HOST, SMTP_USER and SMTP_PASSWORD).");
-    }
+    if (!host) throw new Error("SMTP is not configured (set SMTP_HOST).");
+    if (!from) throw new Error("SMTP needs EMAIL_FROM (or SMTP_USER) for the sender address.");
     // Loaded lazily so the console provider never needs nodemailer at runtime.
     const nodemailer = (await import("nodemailer")).default;
     const transporter = nodemailer.createTransport({
       host,
       port,
       secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
-      auth: { user, pass },
+      // Auth is optional: an IP-allowlisted Google Workspace SMTP relay
+      // (smtp-relay.gmail.com) accepts mail without credentials.
+      ...(user && pass ? { auth: { user, pass } } : {}),
     });
     await transporter.sendMail({ from, to: msg.to, subject: msg.subject, text: msg.body });
   },

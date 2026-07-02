@@ -443,6 +443,13 @@ export const dict = {
     actions: { en: "Actions", ar: "الإجراءات" },
     settings: { en: "Settings", ar: "الإعدادات" },
     whatsappSettings: { en: "WhatsApp", ar: "واتساب" },
+    testEmail: { en: "Test email", ar: "بريد تجريبي" },
+    testEmailHint: {
+      en: "Send a test message to verify the email provider is working.",
+      ar: "أرسل رسالة تجريبية للتأكد من عمل مزود البريد.",
+    },
+    sendTestEmail: { en: "Send test email", ar: "إرسال بريد تجريبي" },
+    testEmailSent: { en: "Sent to", ar: "أُرسل إلى" },
     services: { en: "Services", ar: "الخدمات" },
     vehicles: { en: "Car Categories", ar: "فئات السيارات" },
     totalRequests: { en: "Total requests", ar: "إجمالي الطلبات" },
