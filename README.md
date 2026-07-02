@@ -149,30 +149,26 @@ Verification is optional at submission — unverified contacts are clearly marke
 
 ---
 
-## 🐳 Deployment
+## 🚀 Deployment (Railway)
 
-The app builds to a self-contained Next.js **standalone** server and ships as a
-slim, multi-stage Docker image (non-root, Prisma engine included).
+Deployed on **Railway** using its native **Railpack** builder (`npm run build`
+→ `next start`) with a managed **PostgreSQL** service. Config is codified in
+`railway.json`:
 
-```bash
-# Build
-docker build -t rtd:latest .
+- **`preDeployCommand`: `npx prisma migrate deploy`** — migrations run as a
+  release step before each deploy (`prisma` is a runtime dependency so the CLI
+  is present). Seed once with a strong `SEED_STAFF_PASSWORD`.
+- **`healthcheckPath`: `/api/health`** — returns `200 {"status":"ok"}` when the
+  app and database are reachable, `503` otherwise. Railway won't promote a
+  deployment until this passes, so a bad build can't replace a healthy one.
+- **`startCommand`: `npm run start`**, `restartPolicyType: ON_FAILURE`.
 
-# Run (point at your database; migrations are a separate release step)
-docker run -p 3000:3000 \
-  -e DATABASE_URL="postgresql://…" \
-  -e AUTH_SECRET="$(openssl rand -base64 48)" \
-  rtd:latest
-```
+Required env in the deploy target: `DATABASE_URL`, `AUTH_SECRET` (a long random
+value), `NEXT_PUBLIC_APP_URL`. See `.env.example` for the full list.
 
-- **Migrations** are intentionally *not* run by the container. Apply them as a
-  release/deploy step: `npx prisma migrate deploy` (and seed once with a strong
-  `SEED_STAFF_PASSWORD`).
-- **Health probe**: `GET /api/health` returns `200 {"status":"ok"}` when the app
-  and database are reachable, `503` otherwise — wire it to your orchestrator's
-  liveness/readiness checks.
-- CI builds the image, runs the container against a Postgres service, and asserts
-  the health endpoint responds — so a broken Dockerfile fails the build.
+> Note: no Dockerfile is used — Railway auto-detects a Dockerfile and would
+> override Railpack, so the app is deployed via Railpack to match the working
+> setup. A container image can be reintroduced if moving to a container platform.
 
 ## 🗄️ Useful scripts
 
