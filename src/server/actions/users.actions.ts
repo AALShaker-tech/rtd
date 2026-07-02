@@ -22,7 +22,9 @@ export async function createStaffUser(raw: unknown) {
   const parsed = createUserSchema.safeParse(raw);
   if (!parsed.success) return { ok: false as const, error: "Invalid input" };
 
-  const exists = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
+  const exists = await prisma.user.findUnique({
+    where: { email: parsed.data.email.toLowerCase() },
+  });
   if (exists) return { ok: false as const, error: "Email already in use" };
 
   const user = await prisma.user.create({
@@ -35,17 +37,27 @@ export async function createStaffUser(raw: unknown) {
     },
   });
 
-  await logAudit({ action: "USER_CREATED", entity: "User", entityId: user.id, actorId: session.userId });
+  await logAudit({
+    action: "USER_CREATED",
+    entity: "User",
+    entityId: user.id,
+    actorId: session.userId,
+  });
   revalidatePath("/admin/employees");
   revalidatePath("/admin/drivers");
+  revalidatePath("/admin/admins");
   return { ok: true as const };
 }
 
 export async function toggleStaffActive(userId: string, isActive: boolean) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return { ok: false as const, error: "Unauthorized" };
+  if (userId === session.userId && !isActive) {
+    return { ok: false as const, error: "You cannot deactivate your own account" };
+  }
   await prisma.user.update({ where: { id: userId }, data: { isActive } });
   revalidatePath("/admin/employees");
   revalidatePath("/admin/drivers");
+  revalidatePath("/admin/admins");
   return { ok: true as const };
 }

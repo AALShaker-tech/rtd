@@ -1,0 +1,16 @@
+"use client";
+
+import { useI18n } from "@/i18n/I18nProvider";
+import { StaffManager } from "@/components/dashboard/StaffManager";
+
+export function AdminsTitle({ staff }: { staff: Parameters<typeof StaffManager>[0]["staff"] }) {
+  const { t, pick } = useI18n();
+  return (
+    <StaffManager
+      title={pick(t.admin.admins)}
+      role="ADMIN"
+      staff={staff}
+      countLabel={pick(t.admin.actions)}
+    />
+  );
+}

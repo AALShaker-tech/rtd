@@ -24,7 +24,7 @@ export function StaffManager({
   countLabel,
 }: {
   title: string;
-  role: "EMPLOYEE" | "DRIVER";
+  role: "EMPLOYEE" | "DRIVER" | "ADMIN";
   staff: StaffRow[];
   countLabel: string;
 }) {
@@ -70,16 +70,31 @@ export function StaffManager({
                   <td className="px-4 py-3 font-medium text-charcoal">{s.count}</td>
                   <td className="px-4 py-3 text-end">
                     <button
-                      onClick={async () => { await toggleStaffActive(s.id, !s.isActive); router.refresh(); }}
+                      onClick={async () => {
+                        const res = await toggleStaffActive(s.id, !s.isActive);
+                        if (!res.ok) return setError(res.error);
+                        setError(undefined);
+                        router.refresh();
+                      }}
                       className={`badge ${s.isActive ? "bg-emerald-50 text-emerald-700" : "bg-charcoal/5 text-charcoal/40"}`}
                     >
-                      {s.isActive ? (locale === "ar" ? "نشط" : "Active") : (locale === "ar" ? "موقوف" : "Inactive")}
+                      {s.isActive
+                        ? locale === "ar"
+                          ? "نشط"
+                          : "Active"
+                        : locale === "ar"
+                          ? "موقوف"
+                          : "Inactive"}
                     </button>
                   </td>
                 </tr>
               ))}
               {staff.length === 0 && (
-                <tr><td colSpan={4} className="py-8 text-center text-sm text-charcoal/40">—</td></tr>
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-sm text-charcoal/40">
+                    —
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -91,19 +106,35 @@ export function StaffManager({
           </h3>
           <div className="space-y-3">
             <FieldWrap label={pick(t.fields.fullName)}>
-              <TextInput value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+              <TextInput
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              />
             </FieldWrap>
             <FieldWrap label={pick(t.auth.email)}>
-              <TextInput type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <TextInput
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
             </FieldWrap>
             <FieldWrap label={pick(t.fields.phone)}>
-              <TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <TextInput
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
             </FieldWrap>
             <FieldWrap label={pick(t.auth.password)}>
-              <TextInput type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <TextInput
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
             </FieldWrap>
             {error && <p className="text-xs text-red-600">{error}</p>}
-            <button onClick={add} disabled={busy} className="btn-gold w-full">{pick(t.common.save)}</button>
+            <button onClick={add} disabled={busy} className="btn-gold w-full">
+              {pick(t.common.save)}
+            </button>
           </div>
         </div>
       </div>

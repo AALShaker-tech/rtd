@@ -54,7 +54,10 @@ export const dict = {
       en: "RTD is a premium travel transportation and airport concierge company built for clients who value comfort, privacy, reliability, and seamless travel. From your doorstep to your final destination, RTD manages the details so every movement feels effortless.",
       ar: "RTD هي خدمة نقل فاخر وكونسيرج مطارات لعملاء يقدّرون الراحة والخصوصية والموثوقية. من باب بيتك إلى وجهتك النهائية، نتولّى عنك كل التفاصيل عشان رحلتك تكون بكل سلاسة ورفاهية.",
     },
-    servicesTitle: { en: "A complete door-to-door experience", ar: "تجربة متكاملة من باب البيت إلى الوجهة" },
+    servicesTitle: {
+      en: "A complete door-to-door experience",
+      ar: "تجربة متكاملة من باب البيت إلى الوجهة",
+    },
     servicesSubtitle: {
       en: "Nine seamless services, one effortless journey.",
       ar: "تسع خدمات متكاملة.. ورحلة وحدة بلا أي عناء.",
@@ -67,9 +70,18 @@ export const dict = {
     },
     whyTitle: { en: "Why RTD", ar: "لماذا RTD" },
     why: [
-      { t: { en: "Discretion", ar: "خصوصية" }, d: { en: "Privacy and trust at every step.", ar: "خصوصية وثقة في كل خطوة." } },
-      { t: { en: "Reliability", ar: "موثوقية" }, d: { en: "On time, every time.", ar: "في الموعد، دائمًا." } },
-      { t: { en: "Effortless", ar: "بلا عناء" }, d: { en: "We manage every detail.", ar: "نتولى كل التفاصيل." } },
+      {
+        t: { en: "Discretion", ar: "خصوصية" },
+        d: { en: "Privacy and trust at every step.", ar: "خصوصية وثقة في كل خطوة." },
+      },
+      {
+        t: { en: "Reliability", ar: "موثوقية" },
+        d: { en: "On time, every time.", ar: "في الموعد، دائمًا." },
+      },
+      {
+        t: { en: "Effortless", ar: "بلا عناء" },
+        d: { en: "We manage every detail.", ar: "نتولى كل التفاصيل." },
+      },
     ],
   },
   packages: {
@@ -103,7 +115,10 @@ export const dict = {
       ar: "يمكنك تخطّي أي خطوة — وسنهتم بالباقي.",
     },
     chooseDestination: { en: "Choose your destination", ar: "وش وجهتك؟" },
-    chooseDestinationSub: { en: "From Riyadh to one of our destinations", ar: "من الرياض إلى أي وجهة تختارها" },
+    chooseDestinationSub: {
+      en: "From Riyadh to one of our destinations",
+      ar: "من الرياض إلى أي وجهة تختارها",
+    },
     flightTime: { en: "Flight time", ar: "زمن الرحلة" },
     change: { en: "Change", ar: "تغيير" },
     addService: { en: "Add service", ar: "أضِف الخدمة" },
@@ -111,7 +126,10 @@ export const dict = {
     chooseCar: { en: "Choose your car", ar: "اختر سيارتك" },
     perDay: { en: "/ day", ar: "/ يوم" },
     daysUnit: { en: "days", ar: "أيام" },
-    loungeHint: { en: "Tap an option to add it, or continue without selecting", ar: "اختر الخدمة اللي تناسبك، أو تابع بدون اختيار" },
+    loungeHint: {
+      en: "Tap an option to add it, or continue without selecting",
+      ar: "اختر الخدمة اللي تناسبك، أو تابع بدون اختيار",
+    },
     estimatedPrice: { en: "Estimated price", ar: "السعر التقديري" },
     editHint: { en: "Tap any service to add or remove it", ar: "اضغط أي خدمة لإضافتها أو إزالتها" },
     startNew: { en: "Start New Booking", ar: "ابدأ حجز جديد" },
@@ -135,7 +153,10 @@ export const dict = {
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
-    subtitle: { en: "Manage destinations, airports and per-city pricing. Journey steps stay the same for every city.", ar: "إدارة الوجهات والمطارات والأسعار لكل مدينة. تبقى خطوات الرحلة ثابتة لكل المدن." },
+    subtitle: {
+      en: "Manage destinations, airports and per-city pricing. Journey steps stay the same for every city.",
+      ar: "إدارة الوجهات والمطارات والأسعار لكل مدينة. تبقى خطوات الرحلة ثابتة لكل المدن.",
+    },
     addCity: { en: "Add city", ar: "إضافة مدينة" },
     cityCode: { en: "City code", ar: "رمز المدينة" },
     nameEn: { en: "Name (English)", ar: "الاسم (إنجليزي)" },
@@ -143,7 +164,10 @@ export const dict = {
     country: { en: "Country code", ar: "رمز الدولة" },
     multiplier: { en: "City price multiplier", ar: "معامل سعر المدينة" },
     currency: { en: "Currency", ar: "العملة" },
-    duration: { en: "Approx. flight time from Riyadh (min)", ar: "زمن الرحلة التقريبي من الرياض (دقيقة)" },
+    duration: {
+      en: "Approx. flight time from Riyadh (min)",
+      ar: "زمن الرحلة التقريبي من الرياض (دقيقة)",
+    },
     notes: { en: "Notes", ar: "ملاحظات" },
     isOrigin: { en: "Origin city", ar: "مدينة الانطلاق" },
     active: { en: "Active", ar: "مفعّلة" },
@@ -156,9 +180,15 @@ export const dict = {
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
     overridePlaceholder: { en: "global", ar: "افتراضي" },
     enabled: { en: "Enabled", ar: "مفعّل" },
-    selectCity: { en: "Select a city to edit, or add a new one.", ar: "اختر مدينة للتعديل، أو أضف مدينة جديدة." },
+    selectCity: {
+      en: "Select a city to edit, or add a new one.",
+      ar: "اختر مدينة للتعديل، أو أضف مدينة جديدة.",
+    },
     cityDetails: { en: "City details", ar: "بيانات المدينة" },
-    overrideHint: { en: "Leave a price empty to use the global default. The city multiplier still applies.", ar: "اترك السعر فارغًا لاستخدام الافتراضي. يبقى معامل المدينة ساريًا." },
+    overrideHint: {
+      en: "Leave a price empty to use the global default. The city multiplier still applies.",
+      ar: "اترك السعر فارغًا لاستخدام الافتراضي. يبقى معامل المدينة ساريًا.",
+    },
   },
   pricing: {
     estimatedTotal: { en: "Estimated Total", ar: "الإجمالي التقديري" },
@@ -207,7 +237,10 @@ export const dict = {
     dailyHours: { en: "Daily hours", ar: "الساعات اليومية" },
     dailyUsage: { en: "Daily usage", ar: "الاستخدام اليومي" },
     notes: { en: "Special notes", ar: "ملاحظات خاصة" },
-    flightLabel: { en: "Enter your flight number to fetch details", ar: "أدخل رقم رحلتك لجلب التفاصيل" },
+    flightLabel: {
+      en: "Enter your flight number to fetch details",
+      ar: "أدخل رقم رحلتك لجلب التفاصيل",
+    },
     fullName: { en: "Full name", ar: "الاسم الكامل" },
     phone: { en: "Mobile number", ar: "رقم الجوال" },
     email: { en: "Email address", ar: "البريد الإلكتروني" },
@@ -238,7 +271,10 @@ export const dict = {
       en: "Does the passenger require special assistance?",
       ar: "هل يحتاج المسافر إلى مساعدة خاصة؟",
     },
-    assistanceNotes: { en: "Please describe the assistance needed", ar: "يرجى توضيح نوع المساعدة المطلوبة" },
+    assistanceNotes: {
+      en: "Please describe the assistance needed",
+      ar: "يرجى توضيح نوع المساعدة المطلوبة",
+    },
     assistanceHint: {
       en: "e.g. wheelchair assistance if needed",
       ar: "مثال: كرسي متحرك عند الحاجة",
@@ -345,7 +381,10 @@ export const dict = {
   status: {
     title: { en: "Track Your Request", ar: "تتبّع طلبك" },
     placeholder: { en: "Enter your reference (RTD-2026-…)", ar: "أدخل رقم طلبك (RTD-2026-…)" },
-    notFound: { en: "We couldn't find a request with that reference.", ar: "لم نعثر على طلب بهذا الرقم." },
+    notFound: {
+      en: "We couldn't find a request with that reference.",
+      ar: "لم نعثر على طلب بهذا الرقم.",
+    },
     lookup: { en: "Look up", ar: "بحث" },
   },
   auth: {
@@ -353,7 +392,10 @@ export const dict = {
     signOut: { en: "Sign out", ar: "تسجيل الخروج" },
     email: { en: "Email", ar: "البريد الإلكتروني" },
     password: { en: "Password", ar: "كلمة المرور" },
-    invalid: { en: "Invalid email or password.", ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة." },
+    invalid: {
+      en: "Invalid email or password.",
+      ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    },
     tooManyAttempts: {
       en: "Too many attempts. Please wait a few minutes and try again.",
       ar: "عدد محاولات كبير جدًا. الرجاء الانتظار بضع دقائق والمحاولة مرة أخرى.",
@@ -367,6 +409,8 @@ export const dict = {
     requests: { en: "Requests", ar: "الطلبات" },
     employees: { en: "Employees", ar: "الموظفون" },
     drivers: { en: "Drivers", ar: "السائقون" },
+    admins: { en: "Admins", ar: "المسؤولون" },
+    actions: { en: "Actions", ar: "الإجراءات" },
     settings: { en: "Settings", ar: "الإعدادات" },
     whatsappSettings: { en: "WhatsApp", ar: "واتساب" },
     services: { en: "Services", ar: "الخدمات" },
