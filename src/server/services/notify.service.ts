@@ -91,11 +91,53 @@ const smtpEmail: EmailProvider = {
   },
 };
 
+// ── Brevo HTTP API (production) ──
+// Sends over HTTPS (port 443), so it works even where outbound SMTP ports are
+// blocked (e.g. some Railway projects). Needs BREVO_API_KEY (a v3 API key, not
+// the SMTP key) and a sender address from EMAIL_FROM.
+const brevoApiEmail: EmailProvider = {
+  async send(msg) {
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) throw new Error("Brevo API is not configured (set BREVO_API_KEY).");
+    const sender = parseSender(process.env.EMAIL_FROM || "");
+    if (!sender.email) throw new Error("Set EMAIL_FROM to a sender address for Brevo.");
+
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: msg.to }],
+        subject: msg.subject,
+        textContent: msg.body,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Brevo API send failed: ${res.status} ${detail}`.trim());
+    }
+  },
+};
+
+/** Parse an RFC-style "Name <email@host>" (or a bare address) into parts. */
+function parseSender(from: string): { name?: string; email: string } {
+  const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1] || undefined, email: m[2].trim() };
+  return { email: from.trim() };
+}
+
 function smsProvider(): SmsProvider {
   return process.env.SMS_PROVIDER === "twilio" ? twilioSms : consoleSms;
 }
 function emailProvider(): EmailProvider {
-  return process.env.EMAIL_PROVIDER === "smtp" ? smtpEmail : consoleEmail;
+  const provider = process.env.EMAIL_PROVIDER;
+  if (provider === "brevo") return brevoApiEmail;
+  if (provider === "smtp") return smtpEmail;
+  return consoleEmail;
 }
 
 export async function sendSms(msg: SmsMessage, channel: "SMS" | "WHATSAPP" = "SMS") {
