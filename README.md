@@ -147,6 +147,12 @@ Sample request reference for tracking: **`RTD-2026-00001`** (`/status`).
 Verification is optional at submission — unverified contacts are clearly marked
 **“pending verification”** rather than blocking the request.
 
+**Ops alerts:** when a customer submits a request, the operations team is alerted
+via `sendOpsAlert` (same provider abstraction). Set `OPS_ALERT_EMAIL` and/or
+`OPS_ALERT_PHONE` (with `OPS_ALERT_SMS_CHANNEL=SMS|WHATSAPP`); if neither is set,
+the alert is logged to the server console. The alert is fire-and-forget — a
+delivery failure never blocks the submission.
+
 ---
 
 ## 🚀 Deployment (Railway)

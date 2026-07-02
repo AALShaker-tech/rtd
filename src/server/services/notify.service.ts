@@ -85,3 +85,32 @@ export async function sendSms(msg: SmsMessage, channel: "SMS" | "WHATSAPP" = "SM
 export async function sendEmail(msg: EmailMessage) {
   await emailProvider().send(msg);
 }
+
+/**
+ * Alert the operations team. Routes to whichever ops channels are configured
+ * (`OPS_ALERT_EMAIL` and/or `OPS_ALERT_PHONE`); if none are set, the alert is
+ * logged so it's still visible in the server logs. Uses the same provider
+ * abstraction, so it's console in dev and Twilio/SMTP in production.
+ */
+export async function sendOpsAlert(msg: { subject: string; body: string }): Promise<void> {
+  const email = process.env.OPS_ALERT_EMAIL;
+  const phone = process.env.OPS_ALERT_PHONE;
+  const channel: "SMS" | "WHATSAPP" =
+    process.env.OPS_ALERT_SMS_CHANNEL === "WHATSAPP" ? "WHATSAPP" : "SMS";
+
+  let delivered = false;
+  if (email) {
+    await sendEmail({ to: email, subject: msg.subject, body: msg.body });
+    delivered = true;
+  }
+  if (phone) {
+    await sendSms({ to: phone, body: `${msg.subject}\n${msg.body}` }, channel);
+    delivered = true;
+  }
+  if (!delivered) {
+    logger.info("ops alert (no OPS_ALERT_* configured — logging only)", {
+      subject: msg.subject,
+      body: msg.body,
+    });
+  }
+}
