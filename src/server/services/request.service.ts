@@ -7,6 +7,9 @@ import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
 import { getPricingConfig } from "./pricing.service";
 import { isTargetVerified } from "./verification.service";
+import { sendOpsAlert } from "./notify.service";
+import { buildNewRequestAlert } from "@/lib/ops-alert";
+import { logger } from "@/lib/logger";
 import type { CreateRequestInput } from "@/lib/validation/schemas";
 import type {
   CarCategory,
@@ -234,6 +237,25 @@ export async function createRequest(input: CreateRequestInput) {
     requestId: result.id,
     metadata: { referenceNumber: result.referenceNumber },
   });
+
+  // Alert operations about the new request. Fire-and-forget: a notification
+  // failure must never break a successful submission.
+  try {
+    await sendOpsAlert(
+      buildNewRequestAlert({
+        referenceNumber: result.referenceNumber,
+        customerName: input.customer.fullName,
+        phone: e164,
+        destination: input.destination ?? null,
+        estimatedTotal,
+        currency: "SAR",
+        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+        contactMeInstead: input.customer.contactMeInstead,
+      }),
+    );
+  } catch (e) {
+    logger.error("ops alert failed", { err: e, reference: result.referenceNumber });
+  }
 
   return result;
 }
