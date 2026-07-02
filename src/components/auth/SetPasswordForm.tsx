@@ -7,7 +7,7 @@ import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { FieldWrap, TextInput } from "@/components/ui/Field";
 
-export function SetPasswordForm({ email }: { email: string }) {
+export function SetPasswordForm({ token, email }: { token: string; email: string }) {
   const { t, pick } = useI18n();
   const [state, formAction, pending] = useActionState(setInitialPassword, null);
 
@@ -19,7 +19,7 @@ export function SetPasswordForm({ email }: { email: string }) {
         : state?.error === "WEAK"
           ? pick(t.auth.passwordTooShort)
           : state?.error === "INVALID"
-            ? pick(t.auth.invalid)
+            ? pick(t.auth.setupLinkExpired)
             : null;
 
   return (
@@ -37,7 +37,7 @@ export function SetPasswordForm({ email }: { email: string }) {
           <p className="mt-1 text-sm text-charcoal/50">{pick(t.auth.setPasswordHint)}</p>
 
           <form action={formAction} className="mt-6 space-y-4">
-            <input type="hidden" name="email" value={email} />
+            <input type="hidden" name="token" value={token} />
             <FieldWrap label={pick(t.auth.email)}>
               <TextInput type="email" value={email} disabled readOnly autoComplete="email" />
             </FieldWrap>

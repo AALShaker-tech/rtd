@@ -144,10 +144,14 @@ Sample request reference for tracking: **`RTD-2026-00001`** (`/status`).
 **Superadmin & admins.** The superadmin (`cto@ratbli.sa`) uses the same
 `/admin` dashboard as admins, plus an **Admins** page for creating and
 (de)activating admin accounts — a surface regular admins can't see. It ships
-with no password: at `/admin/login` enter the email (any password) to be sent
-to `/admin/set-password`, where you choose one on first login. In production
-the account is created automatically by the `seed_superadmin` migration; you
-can also (re)create it with `npm run superadmin:create`.
+with no password. To set one, go to `/admin/set-password`, enter the account
+email, and a **one-time setup link** (SHA-256 hashed at rest, ~1h expiry) is
+emailed to that address; the link opens the choose-a-password screen and signs
+you in. In production the account row is created automatically by the
+`seed_superadmin` migration. Running `npm run superadmin:create` also mints a
+setup link and prints it directly — handy for bootstrapping before the email
+provider (`EMAIL_PROVIDER`) is configured. Requires `NEXT_PUBLIC_APP_URL` for
+the absolute link.
 
 ---
 

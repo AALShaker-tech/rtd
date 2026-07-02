@@ -419,6 +419,20 @@ export const dict = {
       ar: "كلمتا المرور غير متطابقتين.",
     },
     setPasswordCta: { en: "Set password & continue", ar: "حفظ ومتابعة" },
+    setupLinkTitle: { en: "Account setup", ar: "تفعيل الحساب" },
+    setupLinkHint: {
+      en: "Enter your account email and we'll send you a one-time setup link.",
+      ar: "أدخل بريد حسابك وسنرسل لك رابط تفعيل لمرة واحدة.",
+    },
+    setupLinkCta: { en: "Email me a setup link", ar: "أرسل لي رابط التفعيل" },
+    setupLinkSent: {
+      en: "If that account is awaiting setup, a one-time link is on its way. Check your email — the link expires shortly.",
+      ar: "إذا كان الحساب بانتظار التفعيل، فسيصلك رابط لمرة واحدة قريبًا. تحقّق من بريدك — الرابط تنتهي صلاحيته قريبًا.",
+    },
+    setupLinkExpired: {
+      en: "This setup link is invalid or has expired. Request a new one below.",
+      ar: "رابط التفعيل غير صالح أو منتهي الصلاحية. اطلب رابطًا جديدًا أدناه.",
+    },
   },
   admin: {
     overview: { en: "Overview", ar: "نظرة عامة" },

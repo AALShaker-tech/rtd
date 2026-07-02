@@ -139,6 +139,10 @@ model User {
   // When true, the account has no usable password yet and must set one on first
   // login (used to bootstrap the superadmin without shipping a known secret).
   mustSetPassword Boolean @default(false)
+  // One-time password-setup token (SHA-256 hash + expiry). The raw token is
+  // emailed to the account owner; cleared once the password is set.
+  setupTokenHash      String?
+  setupTokenExpiresAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
