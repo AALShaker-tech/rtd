@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { logout } from "@/server/actions/auth.actions";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +90,10 @@ export function DashboardShell({
             </svg>
           </button>
           <span className="font-serif text-lg font-semibold text-charcoal">{title}</span>
-          <LanguageSwitcher />
+          <div className="flex items-center gap-1">
+            <NotificationBell role={user.role} />
+            <LanguageSwitcher />
+          </div>
         </header>
         <main className="p-5 md:p-8">{children}</main>
       </div>
