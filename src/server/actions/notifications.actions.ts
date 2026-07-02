@@ -1,6 +1,7 @@
 "use server";
 
 import { getSession } from "@/lib/auth";
+import { isAdmin } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import type { NotificationItem } from "@/lib/notifications";
 
@@ -11,12 +12,15 @@ import type { NotificationItem } from "@/lib/notifications";
  *  - DRIVER   → their pending/accepted tasks
  * Read-only; safe to poll.
  */
-export async function getOpsNotifications(): Promise<{ items: NotificationItem[]; serverTime: string }> {
+export async function getOpsNotifications(): Promise<{
+  items: NotificationItem[];
+  serverTime: string;
+}> {
   const serverTime = new Date().toISOString();
   const session = await getSession();
   if (!session) return { items: [], serverTime };
 
-  if (session.role === "ADMIN") {
+  if (isAdmin(session.role)) {
     const reqs = await prisma.request.findMany({
       where: { status: { in: ["REQUEST_RECEIVED", "UNDER_REVIEW"] } },
       orderBy: { createdAt: "desc" },

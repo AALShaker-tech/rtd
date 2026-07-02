@@ -111,7 +111,11 @@ async function main() {
       const meta = AIRPORT_META[a.code];
       await prisma.airport.upsert({
         where: { code: a.code },
-        update: { country: meta?.country, timezone: meta?.timezone, utcOffsetMinutes: meta?.offsetMin ?? 0 },
+        update: {
+          country: meta?.country,
+          timezone: meta?.timezone,
+          utcOffsetMinutes: meta?.offsetMin ?? 0,
+        },
         create: {
           code: a.code,
           nameEn: a.name.en,
@@ -145,7 +149,12 @@ async function main() {
     const key = `${r.origin}-${r.destination}`;
     if (routeByPair.has(key)) continue;
     const route = await prisma.route.upsert({
-      where: { originAirportCode_destinationAirportCode: { originAirportCode: r.origin, destinationAirportCode: r.destination } },
+      where: {
+        originAirportCode_destinationAirportCode: {
+          originAirportCode: r.origin,
+          destinationAirportCode: r.destination,
+        },
+      },
       update: { approxDurationMinutes: routeDuration(r.origin, r.destination) },
       create: {
         originAirportCode: r.origin,
@@ -171,7 +180,9 @@ async function main() {
       isStaticSchedule: true,
     })),
   });
-  console.log(`   Flight schedule: ${airlineByCode.size} airlines, ${routeByPair.size} routes, ${scheduleRows.length} weekly rows.`);
+  console.log(
+    `   Flight schedule: ${airlineByCode.size} airlines, ${routeByPair.size} routes, ${scheduleRows.length} weekly rows.`,
+  );
 
   // ── Staff accounts ──
   // Password is env-overridable so production seeds don't use a known default.
@@ -183,6 +194,18 @@ async function main() {
     );
   }
   const password = await bcrypt.hash(staffPassword, 12);
+  // Superadmin: no password shipped — it's set on first login (mustSetPassword).
+  await prisma.user.upsert({
+    where: { email: "cto@ratbli.sa" },
+    update: {},
+    create: {
+      email: "cto@ratbli.sa",
+      passwordHash: "",
+      mustSetPassword: true,
+      fullName: "CTO",
+      role: "SUPERADMIN",
+    },
+  });
   const admin = await prisma.user.upsert({
     where: { email: "admin@rtd.sa" },
     update: {},
@@ -191,16 +214,30 @@ async function main() {
   const employee = await prisma.user.upsert({
     where: { email: "ops@rtd.sa" },
     update: {},
-    create: { email: "ops@rtd.sa", passwordHash: password, fullName: "Operations Officer", role: "EMPLOYEE", phone: "+966500000001" },
+    create: {
+      email: "ops@rtd.sa",
+      passwordHash: password,
+      fullName: "Operations Officer",
+      role: "EMPLOYEE",
+      phone: "+966500000001",
+    },
   });
   const driver = await prisma.user.upsert({
     where: { email: "driver@rtd.sa" },
     update: {},
-    create: { email: "driver@rtd.sa", passwordHash: password, fullName: "Khalid (Driver)", role: "DRIVER", phone: "+966500000002" },
+    create: {
+      email: "driver@rtd.sa",
+      passwordHash: password,
+      fullName: "Khalid (Driver)",
+      role: "DRIVER",
+      phone: "+966500000002",
+    },
   });
 
   // ── Sample request ──
-  const existing = await prisma.request.findUnique({ where: { referenceNumber: "RTD-2026-00001" } });
+  const existing = await prisma.request.findUnique({
+    where: { referenceNumber: "RTD-2026-00001" },
+  });
   if (!existing) {
     const customer = await prisma.customer.create({
       data: {
@@ -258,7 +295,12 @@ async function main() {
       },
     });
     await prisma.driverTask.create({
-      data: { requestId: request.id, journeyStepId: step.id, driverId: driver.id, status: "ACCEPTED" },
+      data: {
+        requestId: request.id,
+        journeyStepId: step.id,
+        driverId: driver.id,
+        status: "ACCEPTED",
+      },
     });
     await prisma.journeyStep.create({
       data: {
@@ -277,11 +319,16 @@ async function main() {
         computedPrice: 300,
       },
     });
-    await prisma.statusHistory.create({ data: { requestId: request.id, toStatus: "REQUEST_RECEIVED" } });
-    await prisma.statusHistory.create({ data: { requestId: request.id, toStatus: "EMPLOYEE_ASSIGNED", changedById: admin.id } });
+    await prisma.statusHistory.create({
+      data: { requestId: request.id, toStatus: "REQUEST_RECEIVED" },
+    });
+    await prisma.statusHistory.create({
+      data: { requestId: request.id, toStatus: "EMPLOYEE_ASSIGNED", changedById: admin.id },
+    });
   }
 
   console.log("✅ Seed complete.");
+  console.log(`   Superadmin: cto@ratbli.sa / (set on first login)`);
   console.log(`   Admin:    admin@rtd.sa  / ${staffPassword}`);
   console.log(`   Employee: ops@rtd.sa    / ${staffPassword}`);
   console.log(`   Driver:   driver@rtd.sa / ${staffPassword}`);

@@ -403,6 +403,22 @@ export const dict = {
     adminTitle: { en: "Admin Console", ar: "لوحة الإدارة" },
     employeeTitle: { en: "Operations Console", ar: "لوحة العمليات" },
     driverTitle: { en: "Driver App", ar: "تطبيق السائق" },
+    setPasswordTitle: { en: "Set your password", ar: "عيّن كلمة المرور" },
+    setPasswordHint: {
+      en: "Create a password for your account to continue.",
+      ar: "أنشئ كلمة مرور لحسابك للمتابعة.",
+    },
+    newPassword: { en: "New password", ar: "كلمة المرور الجديدة" },
+    confirmPassword: { en: "Confirm password", ar: "تأكيد كلمة المرور" },
+    passwordTooShort: {
+      en: "Password must be at least 10 characters.",
+      ar: "يجب أن تتكوّن كلمة المرور من 10 أحرف على الأقل.",
+    },
+    passwordMismatch: {
+      en: "Passwords do not match.",
+      ar: "كلمتا المرور غير متطابقتين.",
+    },
+    setPasswordCta: { en: "Set password & continue", ar: "حفظ ومتابعة" },
   },
   admin: {
     overview: { en: "Overview", ar: "نظرة عامة" },

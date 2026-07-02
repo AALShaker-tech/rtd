@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession, hashPassword } from "@/lib/auth";
+import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { logAudit } from "@/server/services/audit.service";
 import type { UserRole } from "@prisma/client";
 
@@ -17,11 +18,16 @@ const createUserSchema = z.object({
 
 export async function createStaffUser(raw: unknown) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return { ok: false as const, error: "Unauthorized" };
+  if (!session || !isAdmin(session.role)) return { ok: false as const, error: "Unauthorized" };
 
   const parsed = createUserSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Only a superadmin may create admin-level accounts.
+  if (parsed.data.role === "ADMIN" && !isSuperAdmin(session.role)) {
+    return { ok: false as const, error: "Unauthorized" };
   }
 
   const exists = await prisma.user.findUnique({
@@ -53,9 +59,15 @@ export async function createStaffUser(raw: unknown) {
 
 export async function toggleStaffActive(userId: string, isActive: boolean) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return { ok: false as const, error: "Unauthorized" };
+  if (!session || !isAdmin(session.role)) return { ok: false as const, error: "Unauthorized" };
   if (userId === session.userId && !isActive) {
     return { ok: false as const, error: "You cannot deactivate your own account" };
+  }
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  if (!target) return { ok: false as const, error: "User not found" };
+  // Only a superadmin may (de)activate admin-level accounts.
+  if (isAdmin(target.role) && !isSuperAdmin(session.role)) {
+    return { ok: false as const, error: "Unauthorized" };
   }
   await prisma.user.update({ where: { id: userId }, data: { isActive } });
   revalidatePath("/admin/employees");

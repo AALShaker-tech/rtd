@@ -20,7 +20,8 @@
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "admin:set-password": "node scripts/set-admin-password.mjs"
+    "admin:set-password": "node scripts/set-admin-password.mjs",
+    "superadmin:create": "node scripts/create-superadmin.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

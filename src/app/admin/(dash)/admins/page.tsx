@@ -1,9 +1,15 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/roles";
 import { AdminsTitle } from "./AdminsTitle";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminsPage() {
+  const session = await getSession();
+  if (!session || !isSuperAdmin(session.role)) redirect("/admin");
+
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
     orderBy: { createdAt: "desc" },

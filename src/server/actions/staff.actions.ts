@@ -14,7 +14,9 @@ import type { DriverTaskStatus, RequestStatus, UserRole } from "@prisma/client";
 
 async function requireRole(roles: UserRole[]) {
   const session = await getSession();
-  if (!session || !roles.includes(session.role)) {
+  // SUPERADMIN is a superset of ADMIN, so it satisfies any ADMIN-gated action.
+  const allowed = roles.includes("ADMIN") ? [...roles, "SUPERADMIN" as UserRole] : roles;
+  if (!session || !allowed.includes(session.role)) {
     throw new Error("Unauthorized");
   }
   return session;
@@ -75,7 +77,13 @@ export async function employeeMarkContacted(requestId: string) {
 export async function employeeEscalate(requestId: string, note: string) {
   const s = await requireRole(["EMPLOYEE", "ADMIN"]);
   await addInternalNote(requestId, `[ESCALATION] ${note}`, s.userId);
-  await logAudit({ action: "ESCALATED", entity: "Request", entityId: requestId, actorId: s.userId, requestId });
+  await logAudit({
+    action: "ESCALATED",
+    entity: "Request",
+    entityId: requestId,
+    actorId: s.userId,
+    requestId,
+  });
   revalidatePath(`/employee/requests/${requestId}`);
   return { ok: true as const };
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { isAdmin } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AssignedListHeader } from "./AssignedListHeader";
@@ -11,7 +12,7 @@ export default async function EmployeeHome() {
   if (!session) return null;
 
   // Employees see ONLY their assigned requests. Admins viewing this area see all.
-  const where = session.role === "ADMIN" ? {} : { assignedEmployeeId: session.userId };
+  const where = isAdmin(session.role) ? {} : { assignedEmployeeId: session.userId };
 
   const requests = await prisma.request.findMany({
     where,
@@ -31,7 +32,9 @@ export default async function EmployeeHome() {
           >
             <div>
               <p className="font-mono text-sm font-semibold text-charcoal">{r.referenceNumber}</p>
-              <p className="text-sm text-charcoal/60">{r.customer.fullName} · {r.customer.phone}</p>
+              <p className="text-sm text-charcoal/60">
+                {r.customer.fullName} · {r.customer.phone}
+              </p>
             </div>
             <StatusBadge status={r.status} />
           </Link>

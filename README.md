@@ -39,18 +39,18 @@ that flows through admin, operations and driver dashboards.
 
 ## 🧱 Tech stack
 
-| Layer        | Choice                                            |
-|--------------|---------------------------------------------------|
-| Framework    | Next.js 15 (App Router) + React 19                |
-| Language     | TypeScript (strict)                               |
-| Styling      | Tailwind CSS v3 (custom luxury theme)             |
-| Database     | PostgreSQL                                         |
-| ORM          | Prisma 6                                           |
-| Validation   | Zod (server) + a custom bilingual journey engine  |
-| Forms        | React Hook Form                                    |
-| Auth         | `jose` (JWT cookie sessions) + `bcryptjs`         |
-| Client state | Zustand (journey draft, persisted as draft only)  |
-| i18n         | Custom dictionary + context (cookie-persisted)    |
+| Layer        | Choice                                           |
+| ------------ | ------------------------------------------------ |
+| Framework    | Next.js 15 (App Router) + React 19               |
+| Language     | TypeScript (strict)                              |
+| Styling      | Tailwind CSS v3 (custom luxury theme)            |
+| Database     | PostgreSQL                                       |
+| ORM          | Prisma 6                                         |
+| Validation   | Zod (server) + a custom bilingual journey engine |
+| Forms        | React Hook Form                                  |
+| Auth         | `jose` (JWT cookie sessions) + `bcryptjs`        |
+| Client state | Zustand (journey draft, persisted as draft only) |
+| i18n         | Custom dictionary + context (cookie-persisted)   |
 
 ---
 
@@ -99,39 +99,55 @@ Domain config and validation are pure, shared between client and server.
 ## 🚀 Getting started
 
 ### 1. Prerequisites
+
 - Node.js 20+ and a running **PostgreSQL** instance.
 
 ### 2. Install
+
 ```bash
 npm install
 ```
 
 ### 3. Configure environment
+
 ```bash
 cp .env.example .env
 ```
+
 Edit `.env` and set at least `DATABASE_URL` and `AUTH_SECRET`
 (generate one with `openssl rand -base64 48`). No secrets are hardcoded.
 
 ### 4. Database — migrate & seed
+
 ```bash
 npx prisma migrate dev      # create the schema
 npm run db:seed             # reference data + demo accounts + sample request
 ```
 
 ### 5. Run
+
 ```bash
 npm run dev                 # http://localhost:3000
 ```
 
 ### Demo staff accounts (from the seed)
-| Role     | Email           | Password    | Console          |
-|----------|-----------------|-------------|------------------|
-| Admin    | admin@rtd.sa    | `Passw0rd!` | `/admin/login`   |
-| Employee | ops@rtd.sa      | `Passw0rd!` | `/employee/login`|
-| Driver   | driver@rtd.sa   | `Passw0rd!` | `/driver/login`  |
+
+| Role       | Email         | Password             | Console           |
+| ---------- | ------------- | -------------------- | ----------------- |
+| Superadmin | cto@ratbli.sa | _set on first login_ | `/admin/login`    |
+| Admin      | admin@rtd.sa  | `Passw0rd!`          | `/admin/login`    |
+| Employee   | ops@rtd.sa    | `Passw0rd!`          | `/employee/login` |
+| Driver     | driver@rtd.sa | `Passw0rd!`          | `/driver/login`   |
 
 Sample request reference for tracking: **`RTD-2026-00001`** (`/status`).
+
+**Superadmin & admins.** The superadmin (`cto@ratbli.sa`) uses the same
+`/admin` dashboard as admins, plus an **Admins** page for creating and
+(de)activating admin accounts — a surface regular admins can't see. It ships
+with no password: at `/admin/login` enter the email (any password) to be sent
+to `/admin/set-password`, where you choose one on first login. In production
+the account is created automatically by the `seed_superadmin` migration; you
+can also (re)create it with `npm run superadmin:create`.
 
 ---
 
@@ -252,4 +268,7 @@ Sentry.captureException(err, { extra: ctx }))` in `register()`).
   (authoritative re-check) — the client is never trusted.
 - Hotel selection supports search-or-type free entry; a `Hotel` table exists for
   optional curated suggestions.
+
+```
+
 ```

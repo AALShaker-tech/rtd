@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { isAdmin } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/server/services/audit.service";
 import { changeRequestPrice, setPaymentStatus } from "@/server/services/request.service";
@@ -17,7 +18,7 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
 
 async function requireAdmin() {
   const s = await getSession();
-  if (!s || s.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!s || !isAdmin(s.role)) throw new Error("Unauthorized");
   return s;
 }
 
@@ -30,7 +31,13 @@ export async function updateServicePrice(stepType: StepType, basePrice: number, 
     update: { basePrice, active },
     create: { stepType, basePrice, active },
   });
-  await logAudit({ action: "SERVICE_PRICE_UPDATED", entity: "ServicePricing", entityId: stepType, actorId: s.userId, metadata: { basePrice, active } });
+  await logAudit({
+    action: "SERVICE_PRICE_UPDATED",
+    entity: "ServicePricing",
+    entityId: stepType,
+    actorId: s.userId,
+    metadata: { basePrice, active },
+  });
   revalidatePath("/admin/pricing");
   return { ok: true as const };
 }
@@ -40,7 +47,13 @@ export async function updateVehicleMultiplier(category: CarCategory, priceMultip
   const s = await requireAdmin();
   if (priceMultiplier < 0) return { ok: false as const, error: "Multiplier cannot be negative" };
   await prisma.vehicleCategory.update({ where: { category }, data: { priceMultiplier } });
-  await logAudit({ action: "VEHICLE_MULTIPLIER_UPDATED", entity: "VehicleCategory", entityId: category, actorId: s.userId, metadata: { priceMultiplier } });
+  await logAudit({
+    action: "VEHICLE_MULTIPLIER_UPDATED",
+    entity: "VehicleCategory",
+    entityId: category,
+    actorId: s.userId,
+    metadata: { priceMultiplier },
+  });
   revalidatePath("/admin/pricing");
   return { ok: true as const };
 }
@@ -54,21 +67,38 @@ export async function updateLoungePrice(loungeType: string, price: number, activ
     update: { price, active },
     create: { loungeType, price, active },
   });
-  await logAudit({ action: "LOUNGE_PRICE_UPDATED", entity: "LoungePricing", entityId: loungeType, actorId: s.userId, metadata: { price, active } });
+  await logAudit({
+    action: "LOUNGE_PRICE_UPDATED",
+    entity: "LoungePricing",
+    entityId: loungeType,
+    actorId: s.userId,
+    metadata: { price, active },
+  });
   revalidatePath("/admin/pricing");
   return { ok: true as const };
 }
 
 // ── Destination pricing ──
-export async function updateDestinationPricing(cityCode: string, factor: number, surcharge: number) {
+export async function updateDestinationPricing(
+  cityCode: string,
+  factor: number,
+  surcharge: number,
+) {
   const s = await requireAdmin();
-  if (factor < 0 || surcharge < 0) return { ok: false as const, error: "Values cannot be negative" };
+  if (factor < 0 || surcharge < 0)
+    return { ok: false as const, error: "Values cannot be negative" };
   await prisma.destinationPricing.upsert({
     where: { cityCode },
     update: { factor, surcharge },
     create: { cityCode, factor, surcharge },
   });
-  await logAudit({ action: "DESTINATION_PRICE_UPDATED", entity: "DestinationPricing", entityId: cityCode, actorId: s.userId, metadata: { factor, surcharge } });
+  await logAudit({
+    action: "DESTINATION_PRICE_UPDATED",
+    entity: "DestinationPricing",
+    entityId: cityCode,
+    actorId: s.userId,
+    metadata: { factor, surcharge },
+  });
   revalidatePath("/admin/pricing");
   return { ok: true as const };
 }
@@ -84,7 +114,8 @@ const priceChangeSchema = z.object({
 export async function adminChangeRequestPrice(raw: unknown) {
   const s = await requireAdmin();
   const parsed = priceChangeSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false as const, error: "A valid price and reason are required." };
+  if (!parsed.success)
+    return { ok: false as const, error: "A valid price and reason are required." };
   try {
     await changeRequestPrice({ ...parsed.data, actorId: s.userId });
   } catch (e) {

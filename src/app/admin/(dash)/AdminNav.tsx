@@ -18,7 +18,8 @@ export function AdminNav({
     { href: "/admin/cities", label: pick(t.cities.title) },
     { href: "/admin/employees", label: pick(t.admin.employees) },
     { href: "/admin/drivers", label: pick(t.admin.drivers) },
-    { href: "/admin/admins", label: pick(t.admin.admins) },
+    // Managing admin accounts is reserved for the superadmin.
+    ...(user.role === "SUPERADMIN" ? [{ href: "/admin/admins", label: pick(t.admin.admins) }] : []),
     { href: "/admin/settings", label: pick(t.admin.settings) },
   ];
   return (

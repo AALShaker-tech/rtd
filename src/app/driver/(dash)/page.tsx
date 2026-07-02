@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { isAdmin } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { isoOrNull } from "@/lib/utils";
 import { DriverTasksView, type Task } from "./DriverTasksView";
@@ -9,7 +10,7 @@ export default async function DriverHome() {
   const session = await getSession();
   if (!session) return null;
 
-  const where = session.role === "ADMIN" ? {} : { driverId: session.userId };
+  const where = isAdmin(session.role) ? {} : { driverId: session.userId };
 
   // Fetch ONLY the fields the driver view needs — a driver must not receive the
   // full request (pricing, internal fields, etc.). The explicit DTO mapping
