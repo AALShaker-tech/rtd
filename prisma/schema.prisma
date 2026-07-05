@@ -69,12 +69,6 @@ enum ServiceType {
   SKIP
 }
 
-enum CarCategory {
-  VVIP
-  VIP
-  ECONOMY
-}
-
 enum PackageType {
   ARRIVAL
   DEPARTURE
@@ -186,7 +180,7 @@ model Request {
   preferredLanguage Language     @default(EN)
 
   // Trip-level summary defaults (each step can override)
-  carCategory CarCategory @default(VIP)
+  carCategory String      @default("VIP") // vehicle class code (see VehicleCategory.category)
   passengers  Int         @default(1)
   bags        Int         @default(0)
   children    Boolean     @default(false)
@@ -253,7 +247,7 @@ model JourneyStep {
   homeAddress    String?
 
   serviceType ServiceType @default(CAR_ONLY)
-  carCategory CarCategory?
+  carCategory String? // vehicle class code (see VehicleCategory.category)
   passengers  Int?
   bags        Int?
 
@@ -304,7 +298,7 @@ model DriverTask {
 
 model VehicleCategory {
   id              String      @id @default(cuid())
-  category        CarCategory @unique
+  category        String      @unique // vehicle class code, e.g. VIP or a custom class
   nameEn          String
   nameAr          String
   maxPassengers   Int
@@ -419,7 +413,7 @@ model CityVehiclePricing {
   id         String      @id @default(cuid())
   cityCode   String
   city       City        @relation(fields: [cityCode], references: [code], onDelete: Cascade)
-  category   CarCategory
+  category   String // vehicle class code (see VehicleCategory.category)
   multiplier Float? // null → use the global VehicleCategory.priceMultiplier
   enabled    Boolean     @default(true) // false → category not offered in this city
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { STEPS, LOUNGE_TYPES, VEHICLES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep } from "@/lib/domain";
+import { STEPS, LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
@@ -26,7 +26,9 @@ interface CityRow {
 
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [] };
 
-export function CitiesManager({ cities }: { cities: CityRow[] }) {
+interface VehicleOption { category: string; nameEn: string; multiplier: number }
+
+export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicles: VehicleOption[] }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(cities[0]?.code ?? null);
@@ -66,7 +68,7 @@ export function CitiesManager({ cities }: { cities: CityRow[] }) {
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -76,7 +78,7 @@ export function CitiesManager({ cities }: { cities: CityRow[] }) {
   );
 }
 
-function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; onSaved: () => void }) {
+function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; isNew: boolean; onSaved: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -156,7 +158,7 @@ function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; o
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} />
           <ServicePrices cityCode={city.code} rows={city.servicePricing} />
-          <VehiclePrices cityCode={city.code} rows={city.vehiclePricing} />
+          <VehiclePrices cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
           <LoungePrices cityCode={city.code} rows={city.loungePricing} />
         </>
       )}
@@ -283,8 +285,8 @@ function PriceRow({ label, fallback, price, enabled, onSave }: { label: string; 
   );
 }
 
-function VehiclePrices({ cityCode, rows }: { cityCode: string; rows: VehicleRow[] }) {
-  const { pick, locale } = useI18n();
+function VehiclePrices({ cityCode, rows, vehicles }: { cityCode: string; rows: VehicleRow[]; vehicles: VehicleOption[] }) {
+  const { locale } = useI18n();
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">
@@ -296,12 +298,12 @@ function VehiclePrices({ cityCode, rows }: { cityCode: string; rows: VehicleRow[
           : "Leave blank to use the global multiplier. Uncheck to hide the class in this city."}
       </p>
       <div className="grid gap-2">
-        {VEHICLES.map((v) => {
+        {vehicles.map((v) => {
           const row = rows.find((r) => r.category === v.category);
           return (
             <VehiclePriceRow
               key={v.category}
-              label={v.category}
+              label={`${v.nameEn} (${v.category})`}
               fallback={v.multiplier}
               multiplier={row?.multiplier ?? null}
               enabled={row?.enabled ?? true}

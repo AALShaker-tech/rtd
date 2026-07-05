@@ -73,6 +73,20 @@ describe("computeStepPrice — car transfers", () => {
     expect(b.computedPrice).toBe(889);
   });
 
+  it("prices a brand-new (custom) vehicle class from its configured multiplier", () => {
+    const config: PricingConfig = {
+      ...DEFAULT_PRICING_CONFIG,
+      multipliers: { ...DEFAULT_PRICING_CONFIG.multipliers, LUXURY_SUV: 2.5 },
+    };
+    const b = computeStepPrice(
+      step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "LUXURY_SUV" }),
+      config,
+    );
+    // 380 × 2.5 × 1 = 950 — the data-driven class is priced like any other
+    expect(b.vehicleMultiplier).toBe(2.5);
+    expect(b.computedPrice).toBe(950);
+  });
+
   it("falls back to the global multiplier for a city with no override", () => {
     const config: PricingConfig = {
       ...DEFAULT_PRICING_CONFIG,

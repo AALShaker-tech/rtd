@@ -7,7 +7,7 @@ import {
   DRIVER_TASK_STATUSES,
   getCity,
   getStep,
-  getVehicle,
+  vehicleLabel,
 } from "@/lib/domain";
 import { TextArea } from "@/components/ui/Field";
 import { driverUpdateTask } from "@/server/actions/staff.actions";
@@ -94,7 +94,7 @@ function TaskCard({ task }: { task: Task }) {
           {(step.pickupLocation || step.homeAddress) && <Row k={pick(t.fields.pickup)} v={step.pickupLocation || step.homeAddress!} />}
           {(step.dropoffLocation || step.hotelName) && <Row k={pick(t.fields.dropoff)} v={step.dropoffLocation || step.hotelName!} />}
           {step.flightNumber && <Row k={pick(t.fields.flightNumber)} v={step.flightNumber} />}
-          {step.carCategory && <Row k={pick(t.fields.carCategory)} v={getVehicle(step.carCategory as any).name[locale]} />}
+          {step.carCategory && <Row k={pick(t.fields.carCategory)} v={vehicleLabel(step.carCategory, locale)} />}
           {step.passengers != null && <Row k={pick(t.fields.passengers)} v={String(step.passengers)} />}
           {step.notes && <Row k={pick(t.fields.notes)} v={step.notes} />}
         </dl>

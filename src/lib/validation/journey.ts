@@ -59,9 +59,10 @@ export function validateVehicleCapacity(
   maxOverride?: number,
 ): ValidationIssue | null {
   if (!category || passengers == null) return null;
-  const staticMax = getVehicle(category).maxPassengers;
+  const staticMax = getVehicle(category)?.maxPassengers;
   const max = maxOverride ?? staticMax;
-  if (passengers <= max) return null;
+  // No known capacity (custom class with no configured capacity) → can't judge.
+  if (max == null || passengers <= max) return null;
 
   // If the admin customised the capacity, use a generic message with the real
   // number rather than the hard-coded per-class copy below.

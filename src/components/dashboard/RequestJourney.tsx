@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/i18n/I18nProvider";
-import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, getStep, getVehicle } from "@/lib/domain";
+import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, getStep, vehicleLabel } from "@/lib/domain";
 import { formatDateTime } from "@/lib/utils";
 
 export interface DisplayStep {
@@ -62,7 +62,7 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
                 {(s.pickupLocation || s.homeAddress) && <Row k={pick(t.fields.pickup)} v={s.pickupLocation || s.homeAddress!} />}
                 {(s.dropoffLocation || s.hotelName) && <Row k={pick(t.fields.dropoff)} v={s.dropoffLocation || s.hotelName!} />}
                 {s.hotelAddress && <Row k={pick(t.fields.hotelAddress)} v={s.hotelAddress} />}
-                {s.carCategory && <Row k={pick(t.fields.carCategory)} v={getVehicle(s.carCategory as any).name[locale]} />}
+                {s.carCategory && <Row k={pick(t.fields.carCategory)} v={vehicleLabel(s.carCategory, locale)} />}
                 {s.passengers != null && <Row k={pick(t.fields.passengers)} v={String(s.passengers)} />}
                 {s.bags != null && <Row k={pick(t.fields.bags)} v={String(s.bags)} />}
                 {s.days != null && <Row k={pick(t.fields.days)} v={String(s.days)} />}

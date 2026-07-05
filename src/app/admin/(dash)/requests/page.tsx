@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma, RequestStatus, CarCategory } from "@prisma/client";
+import type { Prisma, RequestStatus } from "@prisma/client";
 import { RequestsView } from "./RequestsView";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function RequestsListPage({
 
   const where: Prisma.RequestWhereInput = {};
   if (sp.status) where.status = sp.status as RequestStatus;
-  if (sp.category) where.carCategory = sp.category as CarCategory;
+  if (sp.category) where.carCategory = sp.category;
   if (sp.employee) where.assignedEmployeeId = sp.employee;
   if (sp.driver) where.assignedDriverId = sp.driver;
   if (sp.q) {

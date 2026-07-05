@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
-import { getCity, getVehicle, type CarCategory, type RequestStatus } from "@/lib/domain";
+import { getCity, vehicleLabel, type CarCategory, type RequestStatus } from "@/lib/domain";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/utils";
 
@@ -55,7 +55,7 @@ export function OverviewView({ metrics, byCity, byCategory, recent }: Props) {
         </div>
         <div className="luxe-card p-5">
           <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">{pick(t.admin.byCategory)}</h3>
-          <DistList items={byCategory.map((c) => ({ label: getVehicle(c.category).name[locale], count: c.count }))} />
+          <DistList items={byCategory.map((c) => ({ label: vehicleLabel(c.category, locale), count: c.count }))} />
         </div>
         <div className="luxe-card p-5 lg:col-span-1">
           <div className="mb-4 flex items-center justify-between">

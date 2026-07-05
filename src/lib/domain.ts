@@ -82,7 +82,10 @@ export function getCity(code: string): CityDef | undefined {
 
 // ─────────────────────────── Vehicle categories ───────────────────────────
 
-export type CarCategory = "VVIP" | "VIP" | "ECONOMY";
+// Vehicle classes are data-driven (admin-managed in VehicleCategory), so a
+// category is any string code. The built-in VVIP/VIP/ECONOMY are the seed
+// defaults, not an exhaustive set.
+export type CarCategory = string;
 
 export interface VehicleDef {
   category: CarCategory;
@@ -136,8 +139,16 @@ export const VEHICLES: VehicleDef[] = [
   },
 ];
 
-export function getVehicle(category: CarCategory): VehicleDef {
-  return VEHICLES.find((v) => v.category === category)!;
+/** Built-in vehicle definition for a category, or undefined for a custom class
+ * (custom classes live only in the DB — resolve their name via the catalog). */
+export function getVehicle(category: CarCategory): VehicleDef | undefined {
+  return VEHICLES.find((v) => v.category === category);
+}
+
+/** Display label for a vehicle class: the built-in name, else the raw code. */
+export function vehicleLabel(category: string | null | undefined, locale: Locale): string {
+  if (!category) return "";
+  return getVehicle(category)?.name[locale] ?? category;
 }
 
 // ─────────────────────────── Journey steps ───────────────────────────

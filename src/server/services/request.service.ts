@@ -12,7 +12,6 @@ import { buildNewRequestAlert } from "@/lib/ops-alert";
 import { logger } from "@/lib/logger";
 import type { CreateRequestInput } from "@/lib/validation/schemas";
 import type {
-  CarCategory,
   Language,
   Prisma,
   RequestStatus,
@@ -89,7 +88,7 @@ export async function createRequest(input: CreateRequestInput) {
   // Trip-level passenger/bag counts come from the Trip Information step.
   // Vehicle category is derived from the first transfer that has a car.
   const carStep = input.steps.find((s) => !s.skipped && serviceHasCar(s.serviceType) && s.carCategory);
-  const carCategory = (carStep?.carCategory ?? "VIP") as CarCategory;
+  const carCategory = carStep?.carCategory ?? "VIP";
   const passengers = input.tripInfo.passengers ?? carStep?.passengers ?? 1;
   const bags = input.tripInfo.bags ?? carStep?.bags ?? 0;
   const departureDate = combineDateTime(input.tripInfo.departureDate, null);
@@ -187,7 +186,7 @@ export async function createRequest(input: CreateRequestInput) {
           hotelAddress: s.hotelAddress ?? null,
           homeAddress: s.homeAddress ?? null,
           serviceType: s.serviceType,
-          carCategory: (s.carCategory ?? null) as CarCategory | null,
+          carCategory: s.carCategory ?? null,
           passengers: s.passengers ?? null,
           bags: s.bags ?? null,
           days: s.days ?? null,
