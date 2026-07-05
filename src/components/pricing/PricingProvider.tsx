@@ -19,11 +19,21 @@ interface PricingCtx {
 
 const Ctx = createContext<PricingCtx | null>(null);
 
-export function PricingProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
-  const [loaded, setLoaded] = useState(false);
+export function PricingProvider({
+  children,
+  initialConfig,
+}: {
+  children: React.ReactNode;
+  /** Live config resolved on the server (preferred). When present the client
+   * skips the fetch, so a failed request can never mask admin changes with the
+   * built-in defaults. */
+  initialConfig?: PricingConfig;
+}) {
+  const [config, setConfig] = useState<PricingConfig>(initialConfig ?? DEFAULT_PRICING_CONFIG);
+  const [loaded, setLoaded] = useState(!!initialConfig);
 
   useEffect(() => {
+    if (initialConfig) return; // already hydrated with live server data
     let active = true;
     fetchPricingConfig()
       .then((c) => active && (setConfig(c), setLoaded(true)))
@@ -31,7 +41,7 @@ export function PricingProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialConfig]);
 
   const value: PricingCtx = {
     config,
