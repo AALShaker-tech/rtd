@@ -8,7 +8,6 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/server/services/audit.service";
 import { getCityCatalog } from "@/server/services/city.service";
 import type { Catalog } from "@/lib/catalog";
-import type { StepType } from "@prisma/client";
 
 /** Public: the active city catalog used by the customer flow. */
 export async function fetchCityCatalog(): Promise<Catalog> {
@@ -157,9 +156,9 @@ export async function setCityServicePrice(
   const s = await requireAdmin();
   if (price != null && price < 0) return { ok: false as const, error: "Price cannot be negative" };
   await prisma.cityServicePricing.upsert({
-    where: { cityCode_stepType: { cityCode, stepType: stepType as StepType } },
+    where: { cityCode_stepType: { cityCode, stepType: stepType } },
     update: { price, enabled },
-    create: { cityCode, stepType: stepType as StepType, price, enabled },
+    create: { cityCode, stepType: stepType, price, enabled },
   });
   await logAudit({
     action: "CITY_SERVICE_PRICE_SET",
@@ -183,13 +182,13 @@ export async function setCityServiceClassPrice(
   if (price == null) {
     // Blank clears the per-city override → falls back to the global price.
     await prisma.cityServiceClassPrice.deleteMany({
-      where: { cityCode, stepType: stepType as StepType, category },
+      where: { cityCode, stepType: stepType, category },
     });
   } else {
     await prisma.cityServiceClassPrice.upsert({
-      where: { cityCode_stepType_category: { cityCode, stepType: stepType as StepType, category } },
+      where: { cityCode_stepType_category: { cityCode, stepType: stepType, category } },
       update: { price },
-      create: { cityCode, stepType: stepType as StepType, category, price },
+      create: { cityCode, stepType: stepType, category, price },
     });
   }
   await logAudit({

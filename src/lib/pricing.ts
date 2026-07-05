@@ -78,16 +78,18 @@ function carClassPrice(
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days" | "dailyUsage"
+    "stepType" | "def" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days" | "dailyUsage"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
   if (step.skipped || step.serviceType === "SKIP") return { basePrice: 0, computedPrice: 0 };
 
-  const def = getStep(step.stepType);
+  // Behavior comes from the step's resolved def (data-driven), falling back to
+  // the built-in def for known codes.
+  const f = (step.def ?? getStep(step.stepType))?.features;
 
   // Chauffeur — per-day per-class price × days × daily-usage tier.
-  if (def.features.chauffeur) {
+  if (f?.chauffeur) {
     const unit = carClassPrice(config, step.city, step.stepType, step.carCategory);
     const days = Math.max(1, step.days ?? 1);
     const usage = chauffeurUsageMultiplier(step.dailyUsage);
@@ -95,7 +97,7 @@ export function computeStepPrice(
   }
 
   // Car transfer — the direct per-class price.
-  if (def.features.transfer && serviceHasCar(step.serviceType)) {
+  if (f?.transfer && serviceHasCar(step.serviceType)) {
     const price = carClassPrice(config, step.city, step.stepType, step.carCategory);
     return { basePrice: price, computedPrice: Math.round(price) };
   }

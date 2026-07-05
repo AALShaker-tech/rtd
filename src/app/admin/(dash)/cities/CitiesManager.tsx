@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { STEPS, LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep, isCarStep } from "@/lib/domain";
+import { LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
@@ -30,8 +30,9 @@ interface CityRow {
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
 interface VehicleOption { category: string; nameEn: string }
+interface StepOption { code: string; nameEn: string; nameAr: string; isCar: boolean }
 
-export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicles: VehicleOption[] }) {
+export function CitiesManager({ cities, vehicles, steps }: { cities: CityRow[]; vehicles: VehicleOption[]; steps: StepOption[] }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(cities[0]?.code ?? null);
@@ -70,7 +71,7 @@ export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicle
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -80,7 +81,7 @@ export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicle
   );
 }
 
-function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; isNew: boolean; onSaved: () => void }) {
+function CityEditor({ city, vehicles, steps, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; isNew: boolean; onSaved: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -156,7 +157,7 @@ function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicle
       ) : (
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} />
-          <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} />
+          <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} steps={steps} />
           <VehicleAvailability cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
           <LoungePrices cityCode={city.code} rows={city.loungePricing} />
         </>
@@ -204,35 +205,36 @@ function AirportEditor({ cityCode, airports }: { cityCode: string; airports: Air
   );
 }
 
-function ServicePrices({ cityCode, rows, classRows, vehicles }: { cityCode: string; rows: ServiceRow[]; classRows: ClassPriceRow[]; vehicles: VehicleOption[] }) {
-  const { t, pick } = useI18n();
+function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCode: string; rows: ServiceRow[]; classRows: ClassPriceRow[]; vehicles: VehicleOption[]; steps: StepOption[] }) {
+  const { t, pick, locale } = useI18n();
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.cities.servicePrices)}</h3>
       <p className="mb-3 text-xs text-charcoal/45">{pick(t.cities.overrideHint)}</p>
       <div className="grid gap-2">
-        {STEPS.map((s) => {
-          if (isCarStep(s.type)) {
+        {steps.map((s) => {
+          const label = locale === "ar" ? s.nameAr : s.nameEn;
+          if (s.isCar) {
             return (
               <CityClassPrices
-                key={s.type}
-                label={pick(getStep(s.type).name)}
+                key={s.code}
+                label={label}
                 cityCode={cityCode}
-                stepType={s.type}
+                stepType={s.code}
                 vehicles={vehicles}
-                rows={classRows.filter((r) => r.stepType === s.type)}
+                rows={classRows.filter((r) => r.stepType === s.code)}
               />
             );
           }
-          const row = rows.find((r) => r.stepType === s.type);
+          const row = rows.find((r) => r.stepType === s.code);
           return (
             <PriceRow
-              key={s.type}
-              label={pick(getStep(s.type).name)}
-              fallback={DEFAULT_SERVICE_PRICES[s.type]}
+              key={s.code}
+              label={label}
+              fallback={DEFAULT_SERVICE_PRICES[s.code] ?? 0}
               price={row?.price ?? null}
               enabled={row?.enabled ?? true}
-              onSave={(price, enabled) => setCityServicePrice(cityCode, s.type, price, enabled)}
+              onSave={(price, enabled) => setCityServicePrice(cityCode, s.code, price, enabled)}
             />
           );
         })}

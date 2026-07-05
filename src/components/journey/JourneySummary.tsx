@@ -21,7 +21,7 @@ export function JourneySummary({ sticky = true }: { sticky?: boolean }) {
 
   const active = steps
     .filter((s) => !s.skipped && s.serviceType !== "SKIP")
-    .sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
+    .sort((a, b) => (a.def?.order ?? getStep(a.stepType)?.order ?? 0) - (b.def?.order ?? getStep(b.stepType)?.order ?? 0));
   const total = active.reduce((sum, s) => sum + computeStepPrice(s, config).computedPrice, 0);
 
   return (
@@ -36,12 +36,12 @@ export function JourneySummary({ sticky = true }: { sticky?: boolean }) {
       ) : (
         <ol className="space-y-3">
           {active.map((s) => {
-            const def = getStep(s.stepType);
+            const def = s.def ?? getStep(s.stepType);
             const price = computeStepPrice(s, config).computedPrice;
             return (
               <li key={s.stepType} className="flex items-start justify-between gap-3 border-b border-charcoal/5 pb-3 last:border-0">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium leading-tight text-charcoal">{pick(def.shortName)}</p>
+                  <p className="text-sm font-medium leading-tight text-charcoal">{def ? pick(def.shortName) : s.stepType}</p>
                   <p className="truncate text-xs text-charcoal/45">
                     {catalog.cityName(s.city, locale)}
                     {s.date ? ` · ${formatDateTime(`${s.date}T${s.time ?? "00:00"}`, locale, { dateStyle: "short", timeStyle: s.time ? "short" : undefined })}` : ""}

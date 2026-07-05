@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import {
   DRIVER_TASK_STATUSES,
   getCity,
-  getStep,
+  stepLabel,
   vehicleLabel,
 } from "@/lib/domain";
 import { TextArea } from "@/components/ui/Field";
@@ -65,7 +65,6 @@ function TaskCard({ task }: { task: Task }) {
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(task.driverNotes ?? "");
   const step = task.journeyStep;
-  const def = getStep(step.stepType as any);
   const next = NEXT[task.status];
 
   async function update(status: DriverTaskStatus, withNotes = false) {
@@ -87,7 +86,7 @@ function TaskCard({ task }: { task: Task }) {
         </span>
       </div>
       <div className="space-y-3 p-5">
-        <p className="font-medium text-charcoal">{pick(def.name)}</p>
+        <p className="font-medium text-charcoal">{stepLabel(step.stepType, locale)}</p>
         <dl className="grid gap-y-1 text-sm">
           {step.city && <Row k={pick(t.fields.city)} v={getCity(step.city)?.name[locale] ?? step.city} />}
           {step.scheduledAt && <Row k={pick(t.fields.date)} v={formatDateTime(step.scheduledAt, locale)} />}

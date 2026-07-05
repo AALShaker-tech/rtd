@@ -1,24 +1,19 @@
 import { prisma } from "@/lib/prisma";
-import {
-  DEFAULT_LOUNGE_PRICES,
-  DEFAULT_SERVICE_PRICES,
-  DEFAULT_SERVICE_CLASS_PRICES,
-  isCarStep,
-  type StepType,
-} from "@/lib/domain";
+import { DEFAULT_LOUNGE_PRICES } from "@/lib/domain";
+import { getStepCatalog } from "@/server/services/step.service";
 import { PricingManager } from "./PricingManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function PricingPage() {
-  const [services, lounges, vehicles, classPrices] = await Promise.all([
+  const [steps, services, lounges, vehicles, classPrices] = await Promise.all([
+    getStepCatalog(),
     prisma.servicePricing.findMany(),
     prisma.loungePricing.findMany(),
     prisma.vehicleCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.serviceClassPrice.findMany(),
   ]);
 
-  // Merge DB rows with defaults so unseeded values still render.
   const serviceMap = new Map(services.map((s) => [s.stepType, s]));
   const loungeMap = new Map(lounges.map((l) => [l.loungeType, l]));
   const classPriceMap = new Map(classPrices.map((p) => [`${p.stepType}:${p.category}`, p.price]));
@@ -26,22 +21,19 @@ export default async function PricingPage() {
 
   return (
     <PricingManager
-      services={Object.keys(DEFAULT_SERVICE_PRICES).map((stepType) => {
-        const row = serviceMap.get(stepType as StepType);
-        const car = isCarStep(stepType as StepType);
+      services={steps.map((step) => {
+        const row = serviceMap.get(step.code);
+        const car = step.features.transfer || step.features.chauffeur;
         return {
-          stepType,
+          stepType: step.code,
+          name: { en: step.nameEn, ar: step.nameAr },
           isCar: car,
-          basePrice: row?.basePrice ?? DEFAULT_SERVICE_PRICES[stepType as StepType],
+          basePrice: row?.basePrice ?? 0,
           active: row?.active ?? true,
-          // Per-class prices for car services (DB row → default).
           classPrices: car
             ? classCodes.map((cat) => ({
                 category: cat,
-                price:
-                  classPriceMap.get(`${stepType}:${cat}`) ??
-                  DEFAULT_SERVICE_CLASS_PRICES[stepType]?.[cat] ??
-                  DEFAULT_SERVICE_PRICES[stepType as StepType],
+                price: classPriceMap.get(`${step.code}:${cat}`) ?? row?.basePrice ?? 0,
               }))
             : [],
         };

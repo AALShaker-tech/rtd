@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { getStep, LOUNGE_TYPES } from "@/lib/domain";
+import { LOUNGE_TYPES, type Bilingual } from "@/lib/domain";
 import {
   setServiceClassPrice,
   updateLoungePrice,
   updateServicePrice,
   updateVehicle,
 } from "@/server/actions/pricing.actions";
-import type { StepType } from "@prisma/client";
 
 interface VehicleRow {
   category: string;
@@ -27,6 +26,7 @@ interface VehicleRow {
 
 interface ServiceRow {
   stepType: string;
+  name: Bilingual;
   isCar: boolean;
   basePrice: number;
   active: boolean;
@@ -77,26 +77,26 @@ export function PricingManager({ services, lounges, vehicles }: Props) {
             s.isCar ? (
               <ServiceClassEditor
                 key={s.stepType}
-                title={pick(getStep(s.stepType as StepType).name)}
+                title={pick(s.name)}
                 active={s.active}
                 classPrices={s.classPrices}
                 vehicles={vehicles}
                 busy={saving === s.stepType}
                 onSaveClass={(category, price) =>
-                  run(`${s.stepType}:${category}`, () => setServiceClassPrice(s.stepType as StepType, category, price))
+                  run(`${s.stepType}:${category}`, () => setServiceClassPrice(s.stepType, category, price))
                 }
                 onSaveActive={(active) =>
-                  run(`${s.stepType}:active`, () => updateServicePrice(s.stepType as StepType, s.basePrice, active))
+                  run(`${s.stepType}:active`, () => updateServicePrice(s.stepType, s.basePrice, active))
                 }
               />
             ) : (
               <EditRow
                 key={s.stepType}
-                title={pick(getStep(s.stepType as StepType).name)}
+                title={pick(s.name)}
                 fields={[{ key: "basePrice", label: pick(t.pricing.basePrice), value: s.basePrice, step: 10 }]}
                 active={s.active}
                 busy={saving === s.stepType}
-                onSave={(vals, active) => run(s.stepType, () => updateServicePrice(s.stepType as StepType, vals.basePrice, active))}
+                onSave={(vals, active) => run(s.stepType, () => updateServicePrice(s.stepType, vals.basePrice, active))}
               />
             ),
           )}

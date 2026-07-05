@@ -119,7 +119,7 @@ export function SuccessView(props: {
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-charcoal text-[0.62rem] font-bold text-gold-light">
                     {i + 1}
                   </span>
-                  {pick(getStep(s.stepType).shortName)}
+                  {(() => { const d = s.def ?? getStep(s.stepType); return d ? pick(d.shortName) : s.stepType; })()}
                 </li>
               ))}
             </ol>

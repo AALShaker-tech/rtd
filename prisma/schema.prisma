@@ -46,19 +46,6 @@ enum DriverTaskStatus {
   COMPLETED
 }
 
-/// The nine canonical journey segments.
-enum StepType {
-  HOME_TO_RIYADH_AIRPORT
-  DEPARTURE_ASSIST_RIYADH
-  ARRIVAL_ASSIST_DESTINATION
-  AIRPORT_TO_HOTEL
-  CHAUFFEUR_DURING_STAY
-  HOTEL_TO_AIRPORT
-  DEPARTURE_ASSIST_RETURN
-  ARRIVAL_ASSIST_RIYADH
-  RIYADH_AIRPORT_TO_HOME
-}
-
 /// Service composition chosen per step.
 enum ServiceType {
   CAR_ONLY
@@ -221,7 +208,7 @@ model JourneyStep {
   request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   stepOrder Int
-  stepType  StepType
+  stepType  String
 
   city           String?
   airport        String?
@@ -300,11 +287,34 @@ model VehicleCategory {
 }
 
 /// Admin-editable base price per service (journey step type), in whole SAR.
+/// Admin-managed catalog of journey services (steps). Behavior is driven by the
+/// feature flags + cityScope; `code` is the stable key used by pricing and steps.
+model ServiceStep {
+  id             String  @id @default(cuid())
+  code           String  @unique
+  nameEn         String
+  nameAr         String
+  shortNameEn    String
+  shortNameAr    String
+  descriptionEn  String
+  descriptionAr  String
+  sortOrder      Int     @default(0)
+  cityScope      String  @default("DESTINATION") // RIYADH | DESTINATION | ANY
+  featTransfer   Boolean @default(false)
+  featAssistance Boolean @default(false)
+  featFlight     Boolean @default(false)
+  featHotel      Boolean @default(false)
+  featHome       Boolean @default(false)
+  featChauffeur  Boolean @default(false)
+  createsDriverTask Boolean @default(false)
+  active         Boolean @default(true)
+}
+
 /// Used for assistance / no-car services; car services are priced per class
 /// via ServiceClassPrice.
 model ServicePricing {
   id        String   @id @default(cuid())
-  stepType  StepType @unique
+  stepType  String @unique
   basePrice Int
   active    Boolean  @default(true)
   updatedAt DateTime @updatedAt
@@ -314,7 +324,7 @@ model ServicePricing {
 /// Prices are direct amounts (no multipliers); the journey total is their sum.
 model ServiceClassPrice {
   id       String   @id @default(cuid())
-  stepType StepType
+  stepType String
   category String // vehicle class code
   price    Int
 
@@ -326,7 +336,7 @@ model CityServiceClassPrice {
   id       String @id @default(cuid())
   cityCode String
   city     City   @relation(fields: [cityCode], references: [code], onDelete: Cascade)
-  stepType StepType
+  stepType String
   category String
   price    Int
 
@@ -394,7 +404,7 @@ model CityServicePricing {
   id       String   @id @default(cuid())
   cityCode String
   city     City     @relation(fields: [cityCode], references: [code], onDelete: Cascade)
-  stepType StepType
+  stepType String
   price    Int? // null → use the global base price
   enabled  Boolean  @default(true) // false → service unavailable in this city
 

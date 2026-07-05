@@ -2,10 +2,12 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { buildReferenceNumber, combineDateTime } from "@/lib/utils";
 import { getStep, serviceHasCar } from "@/lib/domain";
+import { toStepDef } from "@/lib/steps";
 import { computeStepPrice } from "@/lib/pricing";
 import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
 import { getPricingConfig } from "./pricing.service";
+import { getStepMap } from "./step.service";
 import { isTargetVerified } from "./verification.service";
 import { sendOpsAlert } from "./notify.service";
 import { buildNewRequestAlert } from "@/lib/ops-alert";
@@ -85,9 +87,17 @@ export async function createRequest(input: CreateRequestInput) {
   const e164 = phone.e164 ?? input.customer.phone;
   const language = (input.customer.language.toUpperCase() as Language) ?? "EN";
 
+  // Resolve each step's behavior from the admin-managed catalog (authoritative);
+  // never trust the client-attached def.
+  const stepMap = await getStepMap();
+  const steps = input.steps.map((s) => ({
+    ...s,
+    def: stepMap[s.stepType] ? toStepDef(stepMap[s.stepType]) : getStep(s.stepType),
+  }));
+
   // Trip-level passenger/bag counts come from the Trip Information step.
   // Vehicle category is derived from the first transfer that has a car.
-  const carStep = input.steps.find((s) => !s.skipped && serviceHasCar(s.serviceType) && s.carCategory);
+  const carStep = steps.find((s) => !s.skipped && serviceHasCar(s.serviceType) && s.carCategory);
   const carCategory = carStep?.carCategory ?? "VIP";
   const passengers = input.tripInfo.passengers ?? carStep?.passengers ?? 1;
   const bags = input.tripInfo.bags ?? carStep?.bags ?? 0;
@@ -105,9 +115,9 @@ export async function createRequest(input: CreateRequestInput) {
   // Authoritative server-side pricing — never trust the client estimate.
   const pricingConfig = await getPricingConfig();
   const stepBreakdowns = new Map(
-    input.steps.map((s) => [s.stepType, computeStepPrice(s, pricingConfig)]),
+    steps.map((s) => [s.stepType, computeStepPrice(s, pricingConfig)]),
   );
-  const estimatedTotal = input.steps.reduce(
+  const estimatedTotal = steps.reduce(
     (sum, s) => sum + (stepBreakdowns.get(s.stepType)?.computedPrice ?? 0),
     0,
   );
@@ -152,16 +162,14 @@ export async function createRequest(input: CreateRequestInput) {
     });
 
     // Persist journey steps (in canonical order).
-    const ordered = [...input.steps].sort(
-      (a, b) => getStep(a.stepType).order - getStep(b.stepType).order,
-    );
+    const ordered = [...steps].sort((a, b) => (a.def?.order ?? 0) - (b.def?.order ?? 0));
 
     for (let i = 0; i < ordered.length; i++) {
       const s = ordered[i];
       const scheduledAt = combineDateTime(s.date, s.time);
       // Chauffeur end date is auto-calculated as start + days; otherwise unused.
       let endAt: Date | null = null;
-      if (getStep(s.stepType).features.chauffeur && scheduledAt && s.days) {
+      if (s.def?.features?.chauffeur && scheduledAt && s.days) {
         // Business rule: end date = start date + number of days.
         endAt = new Date(scheduledAt);
         endAt.setDate(endAt.getDate() + Math.max(1, s.days));
@@ -202,7 +210,8 @@ export async function createRequest(input: CreateRequestInput) {
       });
 
       // Spawn driver tasks for transport-type steps that aren't skipped.
-      if (!s.skipped && STEP_DRIVER_TASK.has(s.stepType) && serviceHasCar(s.serviceType)) {
+      const createsDriverTask = stepMap[s.stepType]?.createsDriverTask ?? STEP_DRIVER_TASK.has(s.stepType);
+      if (!s.skipped && createsDriverTask && serviceHasCar(s.serviceType)) {
         await tx.driverTask.create({
           data: { requestId: request.id, journeyStepId: step.id, status: "PENDING" },
         });
