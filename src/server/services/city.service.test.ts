@@ -88,6 +88,20 @@ describe("getCityCatalog — lounge (enable/disable) reflection", () => {
     );
   });
 
+  it("resolves default lounges from the DB country, not the static city list", async () => {
+    // DMM is not in the static domain CITIES; before the fix it fell through to
+    // the international defaults regardless of the DB country. A Saudi city must
+    // offer Executive Office / Marhaba.
+    cityFindMany.mockResolvedValue([city({ code: "DMM", country: "SA", loungePricing: [] })]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).toEqual(
+      expect.arrayContaining(["EXECUTIVE_OFFICE", "MARHABA"]),
+    );
+    expect(catalog.cities[0].lounges).not.toContain("MEET_ASSIST");
+  });
+
   it("removes a disabled default lounge (disable actually sticks)", async () => {
     cityFindMany.mockResolvedValue([
       city({ code: "LON", loungePricing: [{ loungeType: "MEET_ASSIST", enabled: false }] }),

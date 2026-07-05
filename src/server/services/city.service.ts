@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { loungeOptionsForCity } from "@/lib/domain";
+import { loungeValuesForCountry } from "@/lib/domain";
 import type { Catalog } from "@/lib/catalog";
 
 /**
@@ -37,7 +37,10 @@ export async function getCityCatalog(): Promise<Catalog> {
         c.loungePricing.filter((l) => !l.enabled).map((l) => l.loungeType),
       );
       const enabledLounges = c.loungePricing.filter((l) => l.enabled).map((l) => l.loungeType);
-      const defaultLounges = loungeOptionsForCity(c.code).map((l) => l.value);
+      // Resolve defaults from the DB city's country (not the static city list),
+      // so admin-added cities get the right set — e.g. a new Saudi city offers
+      // Executive Office / Marhaba rather than the international defaults.
+      const defaultLounges = loungeValuesForCountry(c.country);
       const lounges = [...new Set([...defaultLounges, ...enabledLounges])].filter(
         (v) => !disabledLounges.has(v),
       );

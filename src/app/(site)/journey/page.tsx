@@ -83,7 +83,11 @@ export default function JourneyPage() {
     </div>
   ) : null;
   function startFlow() {
-    initFlow(destination ?? undefined, flowSteps.map((s) => s.type));
+    initFlow(
+      destination ?? undefined,
+      flowSteps.map((s) => s.type),
+      (city) => catalog.loungeOptions(city).map((o) => o.value),
+    );
     setIdx(0);
     setStage("flow");
   }
