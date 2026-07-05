@@ -3,9 +3,7 @@
 import { create } from "zustand";
 import {
   DEFAULT_CHAUFFEUR_USAGE,
-  getPackage,
   getStep,
-  loungeOptionsForCity,
   STEPS,
   stepSide,
   type PackageType,
@@ -135,7 +133,6 @@ interface JourneyState extends JourneyDraftData {
     enabledStepTypes?: StepType[],
     loungeValuesFor?: (cityCode?: string | null) => string[],
   ) => void;
-  applyPackage: (pkg: PackageType, includedSteps?: StepType[]) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
   removeStep: (stepType: StepType) => void;
@@ -206,7 +203,7 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
        *  - passengers / bags default to the global trip values
        * User-customized fields from a prior pass are preserved.
        */
-      initFlow: (destination, enabledStepTypes, loungeValuesFor) => {
+      initFlow: (destination, enabledStepTypes) => {
         const { tripInfo } = get();
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
@@ -216,53 +213,10 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
         const allowed = enabledStepTypes ? new Set(enabledStepTypes) : null;
         const defs = allowed ? STEPS.filter((def) => allowed.has(def.type)) : STEPS;
         const steps = defs.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
-
-        // For the chosen package, pre-select the recommended lounge option on its
-        // assistance steps so the customer sees a default selection (they still
-        // explicitly Add each step — nothing is auto-added).
-        const pkg = get().selectedPackage;
-        const pkgSteps = pkg ? new Set(getPackage(pkg)?.steps ?? []) : null;
-        if (pkgSteps) {
-          for (const s of steps) {
-            const d = getStep(s.stepType);
-            if (d.features.assistance && !s.loungeType && pkgSteps.has(s.stepType)) {
-              // Prefer the live catalog's available lounges for the city so the
-              // default selection can't be one the admin disabled; fall back to
-              // the static country options when no resolver is supplied.
-              const values = loungeValuesFor
-                ? loungeValuesFor(s.city)
-                : loungeOptionsForCity(s.city).map((l) => l.value);
-              s.loungeType = values[0];
-            }
-          }
-        }
-
         set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
       },
 
-      applyPackage: (pkg, includedSteps) => {
-        // Prefer the admin-managed package's steps (DB); fall back to the static
-        // package definition when none are supplied.
-        const steps = includedSteps ?? getPackage(pkg)?.steps;
-        if (!steps) return;
-        const dest = get().destination;
-        set({
-          selectedPackage: pkg,
-          lastTouched: NOW(),
-          steps: sortByOrder(
-            steps.map((t) => {
-              const step = blankStep(t);
-              // Packages no longer auto-add: the customer explicitly Adds each
-              // service (or Skips). Steps start un-added.
-              step.skipped = true;
-              if (getStep(t).cityScope === "DESTINATION" && dest) step.city = dest;
-              return step;
-            }),
-          ),
-        });
-      },
-
-      startBlank: () => set({ selectedPackage: undefined, steps: [] }),
+      startBlank: () => set({ steps: [] }),
 
       addStep: (stepType) => {
         if (get().steps.some((s) => s.stepType === stepType)) return;

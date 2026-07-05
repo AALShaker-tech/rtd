@@ -74,21 +74,20 @@ async function main() {
       });
     }
   }
-  // ── Packages ──
-  for (const p of PACKAGES) {
-    await prisma.servicePackage.upsert({
-      where: { type: p.type },
-      update: {},
-      create: {
-        type: p.type,
+  // ── Packages (standalone priced products) ──
+  // Packages are admin-managed (add/delete) with generated ids, so seed the
+  // defaults only when none exist yet.
+  if ((await prisma.servicePackage.count()) === 0) {
+    await prisma.servicePackage.createMany({
+      data: PACKAGES.map((p) => ({
         nameEn: p.name.en,
         nameAr: p.name.ar,
         descriptionEn: p.description.en,
         descriptionAr: p.description.ar,
-        includedSteps: p.steps,
+        price: p.price,
         featured: p.featured ?? false,
         sortOrder: p.sortOrder,
-      },
+      })),
     });
   }
 
@@ -258,7 +257,7 @@ async function main() {
         referenceNumber: "RTD-2026-00001",
         customerId: customer.id,
         status: "EMPLOYEE_ASSIGNED",
-        selectedPackage: "DEPARTURE",
+        selectedPackage: null,
         preferredLanguage: "EN",
         carCategory: "VIP",
         passengers: 2,

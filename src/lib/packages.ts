@@ -1,29 +1,29 @@
 /**
- * Package catalog — the admin-managed service packages shown to the customer.
- * The DB (ServicePackage) is the source of truth; the static PACKAGES constant
- * is a typed fallback so the page still works before the catalog loads.
+ * Package catalog — admin-managed standalone products (name, description,
+ * price). The DB (ServicePackage) is the source of truth; the static PACKAGES
+ * constant is a typed fallback shown before the catalog is seeded.
  */
 
 import { PACKAGES, type Locale } from "@/lib/domain";
 
 export interface CatalogPackage {
-  type: string;
+  id: string;
   nameEn: string;
   nameAr: string;
   descriptionEn: string;
   descriptionAr: string;
-  steps: string[];
+  price: number;
   featured: boolean;
   sortOrder: number;
 }
 
 export const FALLBACK_PACKAGES: CatalogPackage[] = PACKAGES.map((p) => ({
-  type: p.type,
+  id: p.type,
   nameEn: p.name.en,
   nameAr: p.name.ar,
   descriptionEn: p.description.en,
   descriptionAr: p.description.ar,
-  steps: p.steps,
+  price: p.price,
   featured: !!p.featured,
   sortOrder: p.sortOrder,
 }));

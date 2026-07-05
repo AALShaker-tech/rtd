@@ -4,8 +4,6 @@ import {
   vehicleLabel,
   SERVICE_TYPES,
   type Locale,
-  type PackageType,
-  getPackage,
 } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
@@ -28,7 +26,7 @@ export interface WhatsAppSummaryInput {
   referenceNumber: string;
   customerName: string;
   phone: string;
-  selectedPackage?: PackageType | null;
+  selectedPackage?: string | null;
   steps: JourneyStepInput[];
   carCategory?: string;
   passengers?: number;
@@ -69,8 +67,7 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
   lines.push((L ? "الجوال: " : "Phone: ") + input.phone);
 
   if (input.selectedPackage) {
-    const pkg = getPackage(input.selectedPackage);
-    if (pkg) lines.push((L ? "الباقة: " : "Package: ") + pkg.name[locale]);
+    lines.push((L ? "الباقة: " : "Package: ") + input.selectedPackage);
   }
   if (input.carCategory) {
     lines.push((L ? "فئة السيارة: " : "Car: ") + vehicleLabel(input.carCategory, locale));

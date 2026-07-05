@@ -398,96 +398,52 @@ export function stepSide(stepType: StepType): "DEPARTURE" | "RETURN" {
 
 // ─────────────────────────── Packages ───────────────────────────
 
-export type PackageType =
-  | "ARRIVAL"
-  | "DEPARTURE"
-  | "FULL_JOURNEY"
-  | "VVIP_CONCIERGE"
-  | "LONDON_CHAUFFEUR"
-  | "AIRPORT_TO_HOTEL"
-  | "HOTEL_TO_AIRPORT";
+// Packages are admin-managed standalone products (see ServicePackage / the
+// package catalog). A "type" here is just a stable id string.
+export type PackageType = string;
 
 export interface PackageDef {
   type: PackageType;
   name: Bilingual;
   description: Bilingual;
-  steps: StepType[];
+  price: number;
   featured?: boolean;
   sortOrder: number;
 }
 
+/** Built-in packages — fallback shown only before the admin seeds/edits the DB. */
 export const PACKAGES: PackageDef[] = [
   {
-    type: "FULL_JOURNEY",
+    type: "ARRIVAL",
     sortOrder: 1,
     featured: true,
-    name: { en: "Full Journey", ar: "الرحلة الكاملة" },
-    description: {
-      en: "Door-to-door perfection — every leg from home to destination and back.",
-      ar: "تكامل من الباب إلى الباب — كل مرحلة من المنزل إلى الوجهة والعودة.",
-    },
-    steps: STEPS.map((s) => s.type),
-  },
-  {
-    type: "VVIP_CONCIERGE",
-    sortOrder: 2,
-    featured: true,
-    name: { en: "VVIP Concierge", ar: "كونسيرج VVIP" },
-    description: {
-      en: "The pinnacle of discretion and care, with our highest service tier throughout.",
-      ar: "قمة الخصوصية والعناية، مع أعلى فئات خدماتنا في كل مرحلة.",
-    },
-    steps: STEPS.map((s) => s.type),
-  },
-  {
-    type: "ARRIVAL",
-    sortOrder: 3,
+    price: 1500,
     name: { en: "Arrival Package", ar: "باقة الوصول" },
     description: {
-      en: "VIP arrival assistance and a private transfer to your hotel.",
-      ar: "خدمة وصول كبار الشخصيات وتوصيل خاص إلى فندقك.",
+      en: "We take care of everything on arrival — VIP assistance, transfer, and hotel check-in.",
+      ar: "نعتني بكل شيء عند الوصول — استقبال كبار الشخصيات والتوصيل وتسجيل الدخول في الفندق.",
     },
-    steps: ["ARRIVAL_ASSIST_DESTINATION", "AIRPORT_TO_HOTEL"],
   },
   {
     type: "DEPARTURE",
-    sortOrder: 4,
+    sortOrder: 2,
+    price: 1200,
     name: { en: "Departure Package", ar: "باقة المغادرة" },
     description: {
-      en: "A seamless transfer and departure assistance at Riyadh Airport.",
-      ar: "توصيل سلس وخدمة مغادرة في مطار الرياض.",
+      en: "A seamless transfer and departure assistance at the airport.",
+      ar: "توصيل سلس وخدمة مغادرة في المطار.",
     },
-    steps: ["HOME_TO_RIYADH_AIRPORT", "DEPARTURE_ASSIST_RIYADH"],
   },
   {
-    type: "LONDON_CHAUFFEUR",
-    sortOrder: 5,
-    name: { en: "London Chauffeur", ar: "سائق لندن الخاص" },
+    type: "FULL_JOURNEY",
+    sortOrder: 3,
+    featured: true,
+    price: 3500,
+    name: { en: "Full Journey", ar: "الرحلة الكاملة" },
     description: {
-      en: "A dedicated chauffeur at your service throughout your London stay.",
-      ar: "سائق خاص في خدمتك طوال إقامتك في لندن.",
+      en: "Door-to-door perfection — everything from home to destination and back.",
+      ar: "تكامل من الباب إلى الباب — كل شيء من المنزل إلى الوجهة والعودة.",
     },
-    steps: ["CHAUFFEUR_DURING_STAY"],
-  },
-  {
-    type: "AIRPORT_TO_HOTEL",
-    sortOrder: 6,
-    name: { en: "Airport to Hotel Transfer", ar: "التوصيل من المطار إلى الفندق" },
-    description: {
-      en: "A single elegant transfer from the airport to your hotel.",
-      ar: "توصيل أنيق واحد من المطار إلى فندقك.",
-    },
-    steps: ["AIRPORT_TO_HOTEL"],
-  },
-  {
-    type: "HOTEL_TO_AIRPORT",
-    sortOrder: 7,
-    name: { en: "Hotel to Airport Transfer", ar: "التوصيل من الفندق إلى المطار" },
-    description: {
-      en: "A single elegant transfer from your hotel to the airport.",
-      ar: "توصيل أنيق واحد من فندقك إلى المطار.",
-    },
-    steps: ["HOTEL_TO_AIRPORT"],
   },
 ];
 

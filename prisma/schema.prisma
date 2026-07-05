@@ -69,16 +69,6 @@ enum ServiceType {
   SKIP
 }
 
-enum PackageType {
-  ARRIVAL
-  DEPARTURE
-  FULL_JOURNEY
-  VVIP_CONCIERGE
-  LONDON_CHAUFFEUR
-  AIRPORT_TO_HOTEL
-  HOTEL_TO_AIRPORT
-}
-
 enum VerificationChannel {
   SMS
   WHATSAPP
@@ -176,7 +166,7 @@ model Request {
   customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   status          RequestStatus @default(REQUEST_RECEIVED)
 
-  selectedPackage   PackageType?
+  selectedPackage   String? // package name snapshot for a package booking
   preferredLanguage Language     @default(EN)
 
   // Trip-level summary defaults (each step can override)
@@ -367,17 +357,18 @@ model RequestPriceHistory {
   @@index([requestId])
 }
 
+/// A standalone package product (name + description + flat price). Booked
+/// directly by the customer (notes optional) — not a bundle of journey steps.
 model ServicePackage {
-  id            String      @id @default(cuid())
-  type          PackageType @unique
+  id            String   @id @default(cuid())
   nameEn        String
   nameAr        String
   descriptionEn String
   descriptionAr String
-  includedSteps StepType[]  @default([])
-  featured      Boolean     @default(false)
-  sortOrder     Int         @default(0)
-  active        Boolean     @default(true)
+  price         Int      @default(0)
+  featured      Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  active        Boolean  @default(true)
 }
 
 model City {
