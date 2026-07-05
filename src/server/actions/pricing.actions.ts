@@ -9,7 +9,7 @@ import { logAudit } from "@/server/services/audit.service";
 import { changeRequestPrice, setPaymentStatus } from "@/server/services/request.service";
 import { getPricingConfig } from "@/server/services/pricing.service";
 import type { PricingConfig } from "@/lib/pricing";
-import type { CarCategory, PaymentStatus, StepType } from "@prisma/client";
+import type { PaymentStatus, StepType } from "@prisma/client";
 
 /** Public: the current pricing config, so the customer UI can show live estimates. */
 export async function fetchPricingConfig(): Promise<PricingConfig> {
@@ -42,17 +42,49 @@ export async function updateServicePrice(stepType: StepType, basePrice: number, 
   return { ok: true as const };
 }
 
-// ── Vehicle multipliers ──
-export async function updateVehicleMultiplier(category: CarCategory, priceMultiplier: number) {
+// ── Vehicles (full category editor) ──
+const vehicleSchema = z.object({
+  category: z.enum(["VVIP", "VIP", "ECONOMY"]),
+  nameEn: z.string().min(1).max(60),
+  nameAr: z.string().min(1).max(60),
+  maxPassengers: z.number().int().min(1).max(50),
+  exampleModels: z.string().max(200),
+  descriptionEn: z.string().max(500),
+  descriptionAr: z.string().max(500),
+  priceMultiplier: z.number().min(0).max(100),
+  isRecommended: z.boolean(),
+  sortOrder: z.number().int().min(0).max(999),
+  active: z.boolean(),
+});
+
+export async function updateVehicle(raw: unknown) {
   const s = await requireAdmin();
-  if (priceMultiplier < 0) return { ok: false as const, error: "Multiplier cannot be negative" };
-  await prisma.vehicleCategory.update({ where: { category }, data: { priceMultiplier } });
+  const p = vehicleSchema.safeParse(raw);
+  if (!p.success) return { ok: false as const, error: "Invalid vehicle data" };
+  const d = p.data;
+  const data = {
+    nameEn: d.nameEn,
+    nameAr: d.nameAr,
+    maxPassengers: d.maxPassengers,
+    exampleModels: d.exampleModels,
+    descriptionEn: d.descriptionEn,
+    descriptionAr: d.descriptionAr,
+    priceMultiplier: d.priceMultiplier,
+    isRecommended: d.isRecommended,
+    sortOrder: d.sortOrder,
+    active: d.active,
+  };
+  await prisma.vehicleCategory.upsert({
+    where: { category: d.category },
+    update: data,
+    create: { category: d.category, ...data },
+  });
   await logAudit({
-    action: "VEHICLE_MULTIPLIER_UPDATED",
+    action: "VEHICLE_UPDATED",
     entity: "VehicleCategory",
-    entityId: category,
+    entityId: d.category,
     actorId: s.userId,
-    metadata: { priceMultiplier },
+    metadata: { priceMultiplier: d.priceMultiplier, active: d.active, isRecommended: d.isRecommended },
   });
   revalidatePath("/admin/pricing");
   return { ok: true as const };

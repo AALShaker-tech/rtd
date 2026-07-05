@@ -25,7 +25,19 @@ export default async function PricingPage() {
         const row = loungeMap.get(loungeType);
         return { loungeType, price: row?.price ?? DEFAULT_LOUNGE_PRICES[loungeType], active: row?.active ?? true };
       })}
-      vehicles={vehicles.map((v) => ({ category: v.category, nameEn: v.nameEn, multiplier: v.priceMultiplier }))}
+      vehicles={vehicles.map((v) => ({
+        category: v.category,
+        nameEn: v.nameEn,
+        nameAr: v.nameAr,
+        maxPassengers: v.maxPassengers,
+        exampleModels: v.exampleModels,
+        descriptionEn: v.descriptionEn,
+        descriptionAr: v.descriptionAr,
+        multiplier: v.priceMultiplier,
+        isRecommended: v.isRecommended,
+        sortOrder: v.sortOrder,
+        active: v.active,
+      }))}
     />
   );
 }

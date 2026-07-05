@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
+import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { stepSide } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasReturnTiming } from "@/lib/service-timing";
@@ -37,6 +38,7 @@ export default function JourneyPage() {
   const resetDraft = useJourneyStore((s) => s.reset);
   const { config } = usePricing();
   const catalog = useCatalog();
+  const { capacityByCategory } = useVehicles();
 
   // Steps the admin has kept enabled for this journey. A service is hidden when
   // it's disabled globally (Pricing page) or for its governing city (Cities
@@ -149,7 +151,7 @@ export default function JourneyPage() {
   const isReturnStep = stepSide(def.type) === "RETURN";
   const returnReady = hasReturnTiming(tripInfo);
   const collectReturnTiming = isReturnStep && !returnReady;
-  const stepValidation = validateStep({ ...step, skipped: false });
+  const stepValidation = validateStep({ ...step, skipped: false }, new Date(), capacityByCategory);
   // Assistance steps require an explicit option (lounge / airport service) before
   // they can be added. Transfer/chauffeur steps have a visible default vehicle.
   const needsService = def.features.assistance && !step.loungeType;

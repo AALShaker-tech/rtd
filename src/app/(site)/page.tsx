@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
-import { CITIES, STEPS, VEHICLES } from "@/lib/domain";
+import { CITIES, STEPS } from "@/lib/domain";
+import { useVehicles } from "@/components/vehicles/VehicleProvider";
+import { vehicleName, vehicleDescription } from "@/lib/vehicles";
 
 export default function HomePage() {
   const { t, pick, locale } = useI18n();
   const ar = locale === "ar";
+  const { vehicles } = useVehicles();
 
   return (
     <>
@@ -80,14 +83,14 @@ export default function HomePage() {
       <section className="luxe-container py-16 md:py-24">
         <SectionTitle eyebrow={pick(t.packages.requestQuote)} title={pick(t.home.fleetTitle)} />
         <div className="grid gap-6 md:grid-cols-3">
-          {VEHICLES.map((v) => (
+          {vehicles.map((v) => (
             <div key={v.category} className={`luxe-card relative overflow-hidden p-7 ${v.isRecommended ? "ring-2 ring-gold" : ""}`}>
               {v.isRecommended && (
                 <span className="badge absolute end-4 top-4 bg-gold-gradient text-charcoal">{ar ? "موصى به" : "Recommended"}</span>
               )}
-              <h3 className="gold-text text-2xl font-semibold">{pick(v.name)}</h3>
+              <h3 className="gold-text text-2xl font-semibold">{vehicleName(v, locale)}</h3>
               <p className="mt-1 text-sm font-medium text-charcoal/70">{v.exampleModels}</p>
-              <p className="mt-4 text-sm leading-relaxed text-charcoal/60">{pick(v.description)}</p>
+              <p className="mt-4 text-sm leading-relaxed text-charcoal/60">{vehicleDescription(v, locale)}</p>
               <p className="mt-5 text-sm text-charcoal/50">{ar ? `حتى ${v.maxPassengers} ركاب` : `Up to ${v.maxPassengers} passengers`}</p>
             </div>
           ))}

@@ -7,14 +7,28 @@ import { getStep, LOUNGE_TYPES } from "@/lib/domain";
 import {
   updateLoungePrice,
   updateServicePrice,
-  updateVehicleMultiplier,
+  updateVehicle,
 } from "@/server/actions/pricing.actions";
-import type { CarCategory, StepType } from "@prisma/client";
+import type { StepType } from "@prisma/client";
+
+interface VehicleRow {
+  category: string;
+  nameEn: string;
+  nameAr: string;
+  maxPassengers: number;
+  exampleModels: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  multiplier: number;
+  isRecommended: boolean;
+  sortOrder: number;
+  active: boolean;
+}
 
 interface Props {
   services: { stepType: string; basePrice: number; active: boolean }[];
   lounges: { loungeType: string; price: number; active: boolean }[];
-  vehicles: { category: string; nameEn: string; multiplier: number }[];
+  vehicles: VehicleRow[];
 }
 
 export function PricingManager({ services, lounges, vehicles }: Props) {
@@ -65,14 +79,13 @@ export function PricingManager({ services, lounges, vehicles }: Props) {
       )}
 
       {tab === "vehicles" && (
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {vehicles.map((v) => (
-            <EditRow
+            <VehicleEditor
               key={v.category}
-              title={v.nameEn}
-              fields={[{ key: "multiplier", label: pick(t.pricing.multiplier), value: v.multiplier, step: 0.1, float: true }]}
+              vehicle={v}
               busy={saving === v.category}
-              onSave={(vals) => run(v.category, () => updateVehicleMultiplier(v.category as CarCategory, vals.multiplier))}
+              onSave={(payload) => run(v.category, () => updateVehicle(payload))}
             />
           ))}
         </div>
@@ -138,6 +151,78 @@ function EditRow({
           </label>
         )}
         <button onClick={() => onSave(vals, isActive)} disabled={busy} className="btn-dark px-4 py-2 text-xs">
+          {busy ? "…" : pick(t.pricing.save)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Full editor for one vehicle category (names, capacity, models, flags, price). */
+function VehicleEditor({
+  vehicle,
+  busy,
+  onSave,
+}: {
+  vehicle: VehicleRow;
+  busy: boolean;
+  onSave: (payload: VehicleRow & { priceMultiplier: number }) => void;
+}) {
+  const { t, pick, locale } = useI18n();
+  const [f, setF] = useState(vehicle);
+  const set = <K extends keyof VehicleRow>(key: K, value: VehicleRow[K]) => setF((s) => ({ ...s, [key]: value }));
+
+  return (
+    <div className="luxe-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="font-medium text-charcoal">{vehicle.category}</p>
+        <label className="flex items-center gap-2 text-sm text-charcoal/70">
+          <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="h-4 w-4 accent-gold" />
+          {pick(t.pricing.enabled)}
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الاسم (EN)" : "Name (EN)"}</span>
+          <input className="field-input" value={f.nameEn} onChange={(e) => set("nameEn", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الاسم (AR)" : "Name (AR)"}</span>
+          <input className="field-input" value={f.nameAr} onChange={(e) => set("nameAr", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "أمثلة الطُرز" : "Example models"}</span>
+          <input className="field-input" value={f.exampleModels} onChange={(e) => set("exampleModels", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الحد الأقصى للركاب" : "Max passengers"}</span>
+          <input type="number" min={1} className="field-input" value={f.maxPassengers} onChange={(e) => set("maxPassengers", parseInt(e.target.value) || 1)} />
+        </label>
+        <label className="block">
+          <span className="field-label">{pick(t.pricing.multiplier)}</span>
+          <input type="number" step={0.1} min={0} className="field-input" value={f.multiplier} onChange={(e) => set("multiplier", parseFloat(e.target.value) || 0)} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الترتيب" : "Sort order"}</span>
+          <input type="number" min={0} className="field-input" value={f.sortOrder} onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)} />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="field-label">{locale === "ar" ? "الوصف (EN)" : "Description (EN)"}</span>
+          <input className="field-input" value={f.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="field-label">{locale === "ar" ? "الوصف (AR)" : "Description (AR)"}</span>
+          <input className="field-input" value={f.descriptionAr} onChange={(e) => set("descriptionAr", e.target.value)} />
+        </label>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
+        <label className="flex items-center gap-2 text-sm text-charcoal/70">
+          <input type="checkbox" checked={f.isRecommended} onChange={(e) => set("isRecommended", e.target.checked)} className="h-4 w-4 accent-gold" />
+          {locale === "ar" ? "موصى به" : "Recommended"}
+        </label>
+        <button onClick={() => onSave({ ...f, priceMultiplier: f.multiplier })} disabled={busy} className="btn-dark px-4 py-2 text-xs">
           {busy ? "…" : pick(t.pricing.save)}
         </button>
       </div>

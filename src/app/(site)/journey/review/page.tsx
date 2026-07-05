@@ -3,10 +3,12 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { VEHICLES, getStep, getVehicle } from "@/lib/domain";
+import { getStep } from "@/lib/domain";
 import { useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
+import { useVehicles } from "@/components/vehicles/VehicleProvider";
+import { vehicleName } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
@@ -20,6 +22,7 @@ export default function ReviewPage() {
   const store = useJourneyStore();
   const { config } = usePricing();
   const catalog = useCatalog();
+  const { vehicles, defaultCategory, capacityByCategory, vehicle } = useVehicles();
   const [submitting, setSubmitting] = useState(false);
   // True once the request is saved — keeps the success/redirect state and
   // suppresses any re-validation while we navigate away.
@@ -42,7 +45,7 @@ export default function ReviewPage() {
   // change, not on every render.
   const draftKey = JSON.stringify(draft);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const validation = useMemo(() => validateJourney(draft), [draftKey]);
+  const validation = useMemo(() => validateJourney(draft, new Date(), capacityByCategory), [draftKey]);
   const blocked = validation.hasErrors;
 
   const ordered = [...store.steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
@@ -121,7 +124,7 @@ export default function ReviewPage() {
             const price = computeStepPrice(step, config).computedPrice;
             const f = def.features;
             const update = (patch: Parameters<typeof store.updateStep>[1]) => store.updateStep(step.stepType, patch);
-            const cap = step.carCategory ? getVehicle(step.carCategory).maxPassengers : Infinity;
+            const cap = step.carCategory ? (capacityByCategory[step.carCategory] ?? Infinity) : Infinity;
             const overCap = on && step.passengers != null && step.passengers > cap;
 
             return (
@@ -152,11 +155,12 @@ export default function ReviewPage() {
 
                 {on && (f.transfer || f.chauffeur) && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {VEHICLES.map((v) => {
-                      const sel = (step.carCategory ?? "VIP") === v.category;
+                    {vehicles.map((v) => {
+                      const cat = v.category as typeof step.carCategory;
+                      const sel = (step.carCategory ?? defaultCategory) === v.category;
                       return (
-                        <button key={v.category} onClick={() => update({ carCategory: v.category })} className={`pill ${sel ? "pill-on" : ""}`}>
-                          {pick(v.name)} · {formatPrice(computeStepPrice({ ...step, carCategory: v.category }, config).computedPrice, locale)}
+                        <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill ${sel ? "pill-on" : ""}`}>
+                          {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat }, config).computedPrice, locale)}
                         </button>
                       );
                     })}
@@ -187,8 +191,8 @@ export default function ReviewPage() {
                 {overCap && (
                   <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                     {ar
-                      ? `فئة ${getVehicle(step.carCategory!).name.ar} تدعم حتى ${cap} ركاب فقط. الرجاء تقليل عدد الركاب أو اختيار فئة أكبر.`
-                      : `${getVehicle(step.carCategory!).name.en} supports up to ${cap} passengers. Please reduce passengers or pick a larger class.`}
+                      ? `فئة ${vehicle(step.carCategory)?.nameAr ?? ""} تدعم حتى ${cap} ركاب فقط. الرجاء تقليل عدد الركاب أو اختيار فئة أكبر.`
+                      : `${vehicle(step.carCategory)?.nameEn ?? ""} supports up to ${cap} passengers. Please reduce passengers or pick a larger class.`}
                   </p>
                 )}
               </div>

@@ -54,10 +54,25 @@ function issue(
 export function validateVehicleCapacity(
   category: CarCategory | undefined,
   passengers: number | undefined,
+  /** Admin-configured capacity for this class (DB). Falls back to the static
+   * capacity when not supplied. */
+  maxOverride?: number,
 ): ValidationIssue | null {
   if (!category || passengers == null) return null;
-  const vehicle = getVehicle(category);
-  if (passengers <= vehicle.maxPassengers) return null;
+  const staticMax = getVehicle(category).maxPassengers;
+  const max = maxOverride ?? staticMax;
+  if (passengers <= max) return null;
+
+  // If the admin customised the capacity, use a generic message with the real
+  // number rather than the hard-coded per-class copy below.
+  if (maxOverride != null && maxOverride !== staticMax) {
+    return issue(
+      "error",
+      `This vehicle class supports up to ${max} passengers. Please choose a larger class or add another vehicle.`,
+      `تدعم هذه الفئة حتى ${max} ركاب. الرجاء اختيار فئة أكبر أو إضافة مركبة أخرى.`,
+      "passengers",
+    );
+  }
 
   if (category === "VVIP") {
     return issue(
@@ -86,7 +101,11 @@ export function validateVehicleCapacity(
 
 // ─────────────────────────── Step-level validation ───────────────────────────
 
-export function validateStep(step: JourneyStepInput, now: Date = new Date()): StepValidationResult {
+export function validateStep(
+  step: JourneyStepInput,
+  now: Date = new Date(),
+  maxByCategory?: Record<string, number>,
+): StepValidationResult {
   const def = getStep(step.stepType);
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
@@ -167,7 +186,11 @@ export function validateStep(step: JourneyStepInput, now: Date = new Date()): St
     if (step.passengers == null || step.passengers < 1)
       errors.push(req("passengers", "عدد الركاب", "passengers"));
 
-    const cap = validateVehicleCapacity(step.carCategory, step.passengers);
+    const cap = validateVehicleCapacity(
+      step.carCategory,
+      step.passengers,
+      step.carCategory ? maxByCategory?.[step.carCategory] : undefined,
+    );
     if (cap) errors.push(cap);
 
     if (step.passengers && step.bags != null) {
@@ -420,9 +443,13 @@ export function validateTimeline(steps: JourneyStepInput[]): ValidationIssue[] {
 
 // ─────────────────────────── Whole journey ───────────────────────────
 
-export function validateJourney(draft: JourneyDraft, now: Date = new Date()): JourneyValidationResult {
+export function validateJourney(
+  draft: JourneyDraft,
+  now: Date = new Date(),
+  maxByCategory?: Record<string, number>,
+): JourneyValidationResult {
   const active = draft.steps.filter((s) => !s.skipped && s.serviceType !== "SKIP");
-  const steps = active.map((s) => validateStep(s, now));
+  const steps = active.map((s) => validateStep(s, now, maxByCategory));
   const timeline = validateTimeline(draft.steps);
 
   // Fold trip-info and customer validation into the journey result so the server
