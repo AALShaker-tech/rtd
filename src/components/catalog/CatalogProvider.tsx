@@ -24,11 +24,21 @@ interface CatalogCtx {
 
 const Ctx = createContext<CatalogCtx | null>(null);
 
-export function CatalogProvider({ children }: { children: React.ReactNode }) {
-  const [catalog, setCatalog] = useState<Catalog>(FALLBACK_CATALOG);
-  const [loaded, setLoaded] = useState(false);
+export function CatalogProvider({
+  children,
+  initialCatalog,
+}: {
+  children: React.ReactNode;
+  /** Live catalog resolved on the server (preferred). When present the client
+   * skips the fetch, so a failed request can never mask admin changes (disabled
+   * services, city edits) with the built-in fallback catalog. */
+  initialCatalog?: Catalog;
+}) {
+  const [catalog, setCatalog] = useState<Catalog>(initialCatalog ?? FALLBACK_CATALOG);
+  const [loaded, setLoaded] = useState(!!initialCatalog?.cities?.length);
 
   useEffect(() => {
+    if (initialCatalog?.cities?.length) return; // already hydrated with live server data
     let active = true;
     fetchCityCatalog()
       .then((c) => {
@@ -41,7 +51,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialCatalog]);
 
   const value: CatalogCtx = {
     catalog,
