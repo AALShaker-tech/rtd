@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { STEPS, LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep } from "@/lib/domain";
+import { STEPS, LOUNGE_TYPES, VEHICLES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
   setCityLoungePrice,
   setCityServicePrice,
+  setCityVehiclePrice,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
@@ -16,13 +17,14 @@ import {
 interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
+interface VehicleRow { category: string; multiplier: number | null; enabled: boolean }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
   multiplier: number; currency: string | null; approxDurationMinutes: number | null; notes: string | null;
-  airports: AirportRow[]; servicePricing: ServiceRow[]; loungePricing: LoungeRow[];
+  airports: AirportRow[]; servicePricing: ServiceRow[]; loungePricing: LoungeRow[]; vehiclePricing: VehicleRow[];
 }
 
-const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [] };
+const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [] };
 
 export function CitiesManager({ cities }: { cities: CityRow[] }) {
   const { t, pick, locale } = useI18n();
@@ -154,6 +156,7 @@ function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; o
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} />
           <ServicePrices cityCode={city.code} rows={city.servicePricing} />
+          <VehiclePrices cityCode={city.code} rows={city.vehiclePricing} />
           <LoungePrices cityCode={city.code} rows={city.loungePricing} />
         </>
       )}
@@ -270,6 +273,67 @@ function PriceRow({ label, fallback, price, enabled, onSave }: { label: string; 
       <input
         type="number" min={0} value={val} onChange={(e) => setVal(e.target.value)}
         placeholder={fallback != null ? `${fallback}` : pick(t.cities.overridePlaceholder)}
+        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+      />
+      <label className="flex items-center gap-1 text-xs text-charcoal/60">
+        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => setOn(e.target.checked)} />{pick(t.cities.enabled)}
+      </label>
+      <button onClick={save} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+    </div>
+  );
+}
+
+function VehiclePrices({ cityCode, rows }: { cityCode: string; rows: VehicleRow[] }) {
+  const { pick, locale } = useI18n();
+  return (
+    <div className="luxe-card p-5">
+      <h3 className="font-serif text-lg font-semibold text-charcoal">
+        {locale === "ar" ? "أسعار المركبات (مضاعف لكل مدينة)" : "Vehicle prices (per-city multiplier)"}
+      </h3>
+      <p className="mb-3 text-xs text-charcoal/45">
+        {locale === "ar"
+          ? "اتركه فارغًا لاستخدام المضاعف العام. ألغِ التفعيل لإخفاء الفئة في هذه المدينة."
+          : "Leave blank to use the global multiplier. Uncheck to hide the class in this city."}
+      </p>
+      <div className="grid gap-2">
+        {VEHICLES.map((v) => {
+          const row = rows.find((r) => r.category === v.category);
+          return (
+            <VehiclePriceRow
+              key={v.category}
+              label={v.category}
+              fallback={v.multiplier}
+              multiplier={row?.multiplier ?? null}
+              enabled={row?.enabled ?? true}
+              onSave={(mult, enabled) => setCityVehiclePrice(cityCode, v.category, mult, enabled)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VehiclePriceRow({ label, fallback, multiplier, enabled, onSave }: { label: string; fallback?: number; multiplier: number | null; enabled: boolean; onSave: (multiplier: number | null, enabled: boolean) => Promise<unknown> }) {
+  const { t, pick } = useI18n();
+  const router = useRouter();
+  const [val, setVal] = useState(multiplier != null ? String(multiplier) : "");
+  const [on, setOn] = useState(enabled);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    await onSave(val.trim() === "" ? null : parseFloat(val) || 0, on);
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-charcoal/10 px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
+      <input
+        type="number" step={0.1} min={0} value={val} onChange={(e) => setVal(e.target.value)}
+        placeholder={fallback != null ? `×${fallback}` : "×"}
         className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
       />
       <label className="flex items-center gap-1 text-xs text-charcoal/60">

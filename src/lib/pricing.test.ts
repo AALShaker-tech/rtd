@@ -58,6 +58,34 @@ describe("computeStepPrice — car transfers", () => {
     // 380 × 1.4 × 1 = 532
     expect(b.computedPrice).toBe(532);
   });
+
+  it("applies a per-city vehicle multiplier override when the admin set one", () => {
+    const config: PricingConfig = {
+      ...DEFAULT_PRICING_CONFIG,
+      cityVehicleMultipliers: { LON: { VIP: 1.8 } }, // London VIP is 1.8× (vs global 1.4)
+    };
+    const b = computeStepPrice(
+      step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "VIP", city: "LON" }),
+      config,
+    );
+    // 380 × 1.8 × 1.3 = 889.2 → 889 ; the city override wins over the global 1.4
+    expect(b.vehicleMultiplier).toBe(1.8);
+    expect(b.computedPrice).toBe(889);
+  });
+
+  it("falls back to the global multiplier for a city with no override", () => {
+    const config: PricingConfig = {
+      ...DEFAULT_PRICING_CONFIG,
+      cityVehicleMultipliers: { LON: { VIP: 1.8 } },
+    };
+    const b = computeStepPrice(
+      step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "VIP", city: "PAR" }),
+      config,
+    );
+    // PAR has no override → global 1.4: 380 × 1.4 × 1.25 = 665
+    expect(b.vehicleMultiplier).toBe(1.4);
+    expect(b.computedPrice).toBe(665);
+  });
 });
 
 describe("computeStepPrice — chauffeur", () => {

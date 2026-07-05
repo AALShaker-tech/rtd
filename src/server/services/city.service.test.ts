@@ -25,6 +25,7 @@ function city(overrides: Partial<any> = {}) {
     airports: [],
     loungePricing: [],
     servicePricing: [],
+    vehiclePricing: [],
     ...overrides,
   };
 }
@@ -73,6 +74,27 @@ describe("getCityCatalog — feature (enable/disable) reflection", () => {
 
     const catalog = await getCityCatalog();
     expect(catalog.cities[0].disabledSteps).toEqual([]);
+  });
+});
+
+describe("getCityCatalog — vehicle (per-city) availability", () => {
+  it("marks a per-city disabled vehicle category as disabled for that city", async () => {
+    cityFindMany.mockResolvedValue([
+      city({ vehiclePricing: [{ category: "VVIP", enabled: false }, { category: "VIP", enabled: true }] }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].disabledVehicles).toContain("VVIP");
+    expect(catalog.cities[0].disabledVehicles).not.toContain("VIP");
+  });
+
+  it("leaves disabledVehicles empty when nothing is turned off", async () => {
+    cityFindMany.mockResolvedValue([city()]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].disabledVehicles).toEqual([]);
   });
 });
 

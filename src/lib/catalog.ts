@@ -30,6 +30,8 @@ export interface CatalogCity {
   lounges: string[];
   /** Journey step types disabled for this city. */
   disabledSteps: string[];
+  /** Vehicle categories disabled for this city. */
+  disabledVehicles: string[];
 }
 
 export interface Catalog {
@@ -48,6 +50,7 @@ export const FALLBACK_CATALOG: Catalog = {
     airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals })),
     lounges: loungeOptionsForCity(c.code).map((l) => l.value),
     disabledSteps: [],
+    disabledVehicles: [],
   })),
 };
 
@@ -74,6 +77,11 @@ export function catalogLoungeOptions(catalog: Catalog, code: string | null | und
   // country defaults when the city isn't in the catalog (e.g. not yet loaded).
   const values = c ? c.lounges : loungeOptionsForCity(code).map((l) => l.value);
   return LOUNGE_TYPES.filter((l) => values.includes(l.value));
+}
+
+/** Vehicle categories disabled for a city (empty when the city isn't loaded). */
+export function catalogDisabledVehicles(catalog: Catalog, code: string | null | undefined): string[] {
+  return catalogCity(catalog, code)?.disabledVehicles ?? [];
 }
 
 /** Destination cities (non-origin, active in catalog). */

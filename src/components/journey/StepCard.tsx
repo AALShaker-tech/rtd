@@ -10,7 +10,7 @@ import {
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
-import { vehicleName } from "@/lib/vehicles";
+import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
 import { formatDateOnly } from "@/lib/utils";
@@ -46,7 +46,7 @@ export function StepCard({
   const { t, pick, locale } = useI18n();
   const { config } = usePricing();
   const catalog = useCatalog();
-  const { vehicles, defaultCategory, capacityByCategory } = useVehicles();
+  const { vehicles, capacityByCategory } = useVehicles();
   const ar = locale === "ar";
   const def = getStep(step.stepType);
   const f = def.features;
@@ -54,7 +54,10 @@ export function StepCard({
   const result = validateStep(step, new Date(), capacityByCategory);
   const errFor = (field: string) => result.errors.find((e) => e.field === field)?.[ar ? "messageAr" : "messageEn"];
 
-  const selVeh = step.carCategory ?? defaultCategory;
+  // Only the vehicle classes offered in this step's city (admin per-city toggle).
+  const disabledForCity = new Set(catalog.city(step.city)?.disabledVehicles ?? []);
+  const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category));
+  const selVeh = step.carCategory ?? defaultVehicleCategory(cityVehicles);
   const capacityIssue = validateVehicleCapacity(
     step.carCategory,
     step.passengers,
@@ -91,7 +94,7 @@ export function StepCard({
         <div className="grid gap-2.5">
           <p className="text-sm font-medium text-charcoal/70">{pick(t.builder.chooseCar)}</p>
           <div className="grid gap-2.5 sm:grid-cols-3">
-            {vehicles.map((v) => {
+            {cityVehicles.map((v) => {
               const sel = selVeh === v.category;
               const unit = priceFor({ carCategory: v.category as typeof step.carCategory, days: f.chauffeur ? 1 : step.days });
               return (
