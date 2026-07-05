@@ -21,7 +21,6 @@ export async function getVehicleCatalog(): Promise<CatalogVehicle[]> {
     descriptionEn: v.descriptionEn,
     descriptionAr: v.descriptionAr,
     isRecommended: v.isRecommended,
-    multiplier: v.priceMultiplier,
     sortOrder: v.sortOrder,
   }));
 }

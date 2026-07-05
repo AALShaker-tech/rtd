@@ -16,8 +16,6 @@ export interface CatalogVehicle {
   descriptionEn: string;
   descriptionAr: string;
   isRecommended: boolean;
-  /** Price multiplier applied to car-based services. */
-  multiplier: number;
   sortOrder: number;
 }
 
@@ -31,7 +29,6 @@ export const FALLBACK_VEHICLES: CatalogVehicle[] = VEHICLES.map((v) => ({
   descriptionEn: v.description.en,
   descriptionAr: v.description.ar,
   isRecommended: !!v.isRecommended,
-  multiplier: v.multiplier,
   sortOrder: v.sortOrder,
 }));
 

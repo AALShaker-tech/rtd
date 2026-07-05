@@ -77,8 +77,6 @@ const vehicleSchema = z.object({
   exampleModels: z.string().max(200),
   descriptionEn: z.string().max(500),
   descriptionAr: z.string().max(500),
-  // Multipliers were removed from pricing; the column is kept for back-compat.
-  priceMultiplier: z.number().min(0).max(100).optional().default(1),
   isRecommended: z.boolean(),
   sortOrder: z.number().int().min(0).max(999),
   active: z.boolean(),
@@ -96,7 +94,6 @@ export async function updateVehicle(raw: unknown) {
     exampleModels: d.exampleModels,
     descriptionEn: d.descriptionEn,
     descriptionAr: d.descriptionAr,
-    priceMultiplier: d.priceMultiplier,
     isRecommended: d.isRecommended,
     sortOrder: d.sortOrder,
     active: d.active,
@@ -111,7 +108,7 @@ export async function updateVehicle(raw: unknown) {
     entity: "VehicleCategory",
     entityId: d.category,
     actorId: s.userId,
-    metadata: { priceMultiplier: d.priceMultiplier, active: d.active, isRecommended: d.isRecommended },
+    metadata: { active: d.active, isRecommended: d.isRecommended },
   });
   revalidatePath("/admin/pricing");
   return { ok: true as const };

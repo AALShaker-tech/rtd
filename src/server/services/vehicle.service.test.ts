@@ -37,7 +37,6 @@ describe("getVehicleCatalog", () => {
       nameEn: "Business",
       maxPassengers: 8,
       isRecommended: true,
-      multiplier: 1.6, // priceMultiplier → multiplier
     });
   });
 

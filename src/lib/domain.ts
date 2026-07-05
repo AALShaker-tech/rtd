@@ -580,12 +580,3 @@ export const DEFAULT_LOUNGE_PRICES: Record<string, number> = {
   MEET_ASSIST: 180,
   FAST_TRACK: 200,
 };
-
-/** Default destination price factor. Riyadh = 1.0 (origin). */
-export const DEFAULT_DESTINATION_FACTORS: Record<string, number> = {
-  RUH: 1.0,
-  LON: 1.3,
-  PAR: 1.25,
-  DXB: 1.1,
-  CAI: 0.9,
-};

@@ -10,7 +10,7 @@ export default async function CitiesPage() {
   return (
     <CitiesManager
       cities={serialize(cities)}
-      vehicles={vehicles.map((v) => ({ category: v.category, nameEn: v.nameEn, multiplier: v.multiplier }))}
+      vehicles={vehicles.map((v) => ({ category: v.category, nameEn: v.nameEn }))}
     />
   );
 }

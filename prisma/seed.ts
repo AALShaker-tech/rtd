@@ -10,7 +10,6 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import {
   CITIES,
-  DEFAULT_DESTINATION_FACTORS,
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
   DEFAULT_SERVICE_CLASS_PRICES,
@@ -35,7 +34,7 @@ async function main() {
   for (const v of VEHICLES) {
     await prisma.vehicleCategory.upsert({
       where: { category: v.category },
-      update: { priceMultiplier: v.multiplier },
+      update: {},
       create: {
         category: v.category,
         nameEn: v.name.en,
@@ -44,7 +43,6 @@ async function main() {
         exampleModels: v.exampleModels,
         descriptionEn: v.description.en,
         descriptionAr: v.description.ar,
-        priceMultiplier: v.multiplier,
         isRecommended: v.isRecommended ?? false,
         sortOrder: v.sortOrder,
       },
@@ -76,14 +74,6 @@ async function main() {
       });
     }
   }
-  for (const [cityCode, factor] of Object.entries(DEFAULT_DESTINATION_FACTORS)) {
-    await prisma.destinationPricing.upsert({
-      where: { cityCode },
-      update: {},
-      create: { cityCode, factor },
-    });
-  }
-
   // ── Packages ──
   for (const p of PACKAGES) {
     await prisma.servicePackage.upsert({
@@ -110,7 +100,6 @@ async function main() {
       nameAr: c.name.ar,
       country: c.country,
       isOrigin,
-      multiplier: DEFAULT_DESTINATION_FACTORS[c.code] ?? 1.0,
       approxDurationMinutes: isOrigin ? null : routeDuration("RUH", c.airports[0]?.code ?? c.code),
     };
     const city = await prisma.city.upsert({
@@ -299,8 +288,7 @@ async function main() {
         carCategory: "VIP",
         passengers: 2,
         bags: 3,
-        basePrice: 250,
-        vehicleMultiplier: 1.4,
+        basePrice: 350,
         computedPrice: 350,
         flightLookupStatus: "VERIFIED",
       },
@@ -326,7 +314,6 @@ async function main() {
         flightNumber: "SV021",
         serviceType: "MEET_ASSIST_FASTTRACK_CAR",
         basePrice: 300,
-        vehicleMultiplier: 1,
         computedPrice: 300,
       },
     });
