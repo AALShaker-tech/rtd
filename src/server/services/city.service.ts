@@ -72,7 +72,13 @@ export async function getCityCatalog(): Promise<Catalog> {
 export async function getCityAdmin(code: string) {
   return prisma.city.findUnique({
     where: { code },
-    include: { airports: true, servicePricing: true, loungePricing: true, vehiclePricing: true },
+    include: {
+      airports: true,
+      servicePricing: true,
+      loungePricing: true,
+      vehiclePricing: true,
+      serviceClassPricing: true,
+    },
   });
 }
 
@@ -84,6 +90,7 @@ export async function listCitiesAdmin() {
       servicePricing: true,
       loungePricing: true,
       vehiclePricing: true,
+      serviceClassPricing: true,
     },
   });
 }

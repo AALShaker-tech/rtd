@@ -551,6 +551,27 @@ export const DEFAULT_SERVICE_PRICES: Record<StepType, number> = {
   RIYADH_AIRPORT_TO_HOME: 250,
 };
 
+/** Does this step use a vehicle (priced per class), rather than assistance only? */
+export function isCarStep(stepType: StepType): boolean {
+  const f = getStep(stepType).features;
+  return !!(f.transfer || f.chauffeur);
+}
+
+/**
+ * Default per-class price for each car service, in whole SAR. Seeded from the
+ * previous base × class-multiplier so existing prices are preserved when the
+ * pricing model switched to a direct per-(service × class) amount.
+ */
+export const DEFAULT_SERVICE_CLASS_PRICES: Record<string, Record<string, number>> = (() => {
+  const out: Record<string, Record<string, number>> = {};
+  for (const def of STEPS) {
+    if (!(def.features.transfer || def.features.chauffeur)) continue;
+    const base = DEFAULT_SERVICE_PRICES[def.type];
+    out[def.type] = Object.fromEntries(VEHICLES.map((v) => [v.category, Math.round(base * v.multiplier)]));
+  }
+  return out;
+})();
+
 /** Default price per lounge / assistance option, in whole SAR. */
 export const DEFAULT_LOUNGE_PRICES: Record<string, number> = {
   EXECUTIVE_OFFICE: 320,

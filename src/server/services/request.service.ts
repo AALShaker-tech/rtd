@@ -194,7 +194,7 @@ export async function createRequest(input: CreateRequestInput) {
           dailyUsage: s.dailyUsage ?? null,
           skipped: s.skipped,
           basePrice: breakdown?.basePrice ?? null,
-          vehicleMultiplier: breakdown?.vehicleMultiplier ?? null,
+          vehicleMultiplier: null, // multipliers were removed; kept nullable for back-compat
           computedPrice: breakdown?.computedPrice ?? null,
           flightLookupStatus: s.flightLookupStatus ?? "MANUAL",
           flightData: s.flightData ? (s.flightData as object) : undefined,

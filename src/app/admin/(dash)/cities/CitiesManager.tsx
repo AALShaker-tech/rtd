@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { STEPS, LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep } from "@/lib/domain";
+import { STEPS, LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES, getStep, isCarStep } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
   setCityLoungePrice,
   setCityServicePrice,
+  setCityServiceClassPrice,
   setCityVehiclePrice,
   upsertAirport,
   upsertCity,
@@ -18,13 +19,15 @@ interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: 
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
 interface VehicleRow { category: string; multiplier: number | null; enabled: boolean }
+interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
   multiplier: number; currency: string | null; approxDurationMinutes: number | null; notes: string | null;
   airports: AirportRow[]; servicePricing: ServiceRow[]; loungePricing: LoungeRow[]; vehiclePricing: VehicleRow[];
+  serviceClassPricing: ClassPriceRow[];
 }
 
-const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [] };
+const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
 interface VehicleOption { category: string; nameEn: string; multiplier: number }
 
@@ -58,7 +61,6 @@ export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicle
                 <span className="ms-2 text-xs text-charcoal/40">{c.code}</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="text-xs text-charcoal/50">×{c.multiplier}</span>
                 <span className={`h-2 w-2 rounded-full ${c.active ? "bg-emerald-500" : "bg-charcoal/20"}`} />
               </span>
             </button>
@@ -83,7 +85,7 @@ function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicle
   const router = useRouter();
   const [form, setForm] = useState({
     code: city.code, nameEn: city.nameEn, nameAr: city.nameAr, country: city.country,
-    multiplier: String(city.multiplier), currency: city.currency ?? "", approxDurationMinutes: city.approxDurationMinutes != null ? String(city.approxDurationMinutes) : "",
+    currency: city.currency ?? "", approxDurationMinutes: city.approxDurationMinutes != null ? String(city.approxDurationMinutes) : "",
     notes: city.notes ?? "", isOrigin: city.isOrigin,
   });
   const [busy, setBusy] = useState(false);
@@ -96,7 +98,7 @@ function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicle
       // Active is toggled only via the explicit Enable/Disable button (a single
       // source of truth); saving details must never silently flip it. New cities
       // default to active.
-      active: city.active, isOrigin: form.isOrigin, multiplier: parseFloat(form.multiplier) || 0,
+      active: city.active, isOrigin: form.isOrigin, multiplier: 1, // multiplier retired; kept for schema back-compat
       currency: form.currency || undefined, approxDurationMinutes: form.approxDurationMinutes ? parseInt(form.approxDurationMinutes) : undefined,
       notes: form.notes || undefined,
     });
@@ -122,9 +124,6 @@ function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicle
           </FieldWrap>
           <FieldWrap label={pick(t.cities.nameAr)}>
             <TextInput value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
-          </FieldWrap>
-          <FieldWrap label={pick(t.cities.multiplier)}>
-            <TextInput type="number" step={0.05} min={0} value={form.multiplier} onChange={(e) => setForm({ ...form, multiplier: e.target.value })} />
           </FieldWrap>
           <FieldWrap label={pick(t.cities.duration)}>
             <TextInput type="number" min={0} value={form.approxDurationMinutes} onChange={(e) => setForm({ ...form, approxDurationMinutes: e.target.value })} />
@@ -157,8 +156,8 @@ function CityEditor({ city, vehicles, isNew, onSaved }: { city: CityRow; vehicle
       ) : (
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} />
-          <ServicePrices cityCode={city.code} rows={city.servicePricing} />
-          <VehiclePrices cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
+          <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} />
+          <VehicleAvailability cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
           <LoungePrices cityCode={city.code} rows={city.loungePricing} />
         </>
       )}
@@ -205,14 +204,26 @@ function AirportEditor({ cityCode, airports }: { cityCode: string; airports: Air
   );
 }
 
-function ServicePrices({ cityCode, rows }: { cityCode: string; rows: ServiceRow[] }) {
-  const { t, pick, locale } = useI18n();
+function ServicePrices({ cityCode, rows, classRows, vehicles }: { cityCode: string; rows: ServiceRow[]; classRows: ClassPriceRow[]; vehicles: VehicleOption[] }) {
+  const { t, pick } = useI18n();
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.cities.servicePrices)}</h3>
       <p className="mb-3 text-xs text-charcoal/45">{pick(t.cities.overrideHint)}</p>
       <div className="grid gap-2">
         {STEPS.map((s) => {
+          if (isCarStep(s.type)) {
+            return (
+              <CityClassPrices
+                key={s.type}
+                label={pick(getStep(s.type).name)}
+                cityCode={cityCode}
+                stepType={s.type}
+                vehicles={vehicles}
+                rows={classRows.filter((r) => r.stepType === s.type)}
+              />
+            );
+          }
           const row = rows.find((r) => r.stepType === s.type);
           return (
             <PriceRow
@@ -285,29 +296,66 @@ function PriceRow({ label, fallback, price, enabled, onSave }: { label: string; 
   );
 }
 
-function VehiclePrices({ cityCode, rows, vehicles }: { cityCode: string; rows: VehicleRow[]; vehicles: VehicleOption[] }) {
+/** Per-city per-class price overrides for one car service. Blank = use global. */
+function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label: string; cityCode: string; stepType: string; vehicles: VehicleOption[]; rows: ClassPriceRow[] }) {
+  const { t, pick, locale } = useI18n();
+  const router = useRouter();
+  const [vals, setVals] = useState<Record<string, string>>(
+    Object.fromEntries(vehicles.map((v) => [v.category, (rows.find((r) => r.category === v.category)?.price ?? "").toString()])),
+  );
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function save(cat: string) {
+    setBusy(cat);
+    const raw = (vals[cat] ?? "").trim();
+    await setCityServiceClassPrice(cityCode, stepType, cat, raw === "" ? null : parseInt(raw) || 0);
+    setBusy(null);
+    router.refresh();
+  }
+
+  return (
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <p className="mb-1.5 text-sm font-medium text-charcoal/80">{label}</p>
+      <div className="grid gap-1.5">
+        {vehicles.map((v) => (
+          <div key={v.category} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs text-charcoal/55">{v.nameEn} ({v.category})</span>
+            <input
+              type="number" min={0} step={10}
+              value={vals[v.category] ?? ""}
+              placeholder={locale === "ar" ? "عام" : "global"}
+              onChange={(e) => setVals((p) => ({ ...p, [v.category]: e.target.value }))}
+              className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+            />
+            <button onClick={() => save(v.category)} disabled={busy === v.category} className="btn-dark px-2.5 py-1 text-xs">{pick(t.pricing.save)}</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Per-city vehicle availability (enable/disable a class). No pricing here. */
+function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; rows: VehicleRow[]; vehicles: VehicleOption[] }) {
   const { locale } = useI18n();
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">
-        {locale === "ar" ? "أسعار المركبات (مضاعف لكل مدينة)" : "Vehicle prices (per-city multiplier)"}
+        {locale === "ar" ? "توفّر المركبات" : "Vehicle availability"}
       </h3>
       <p className="mb-3 text-xs text-charcoal/45">
-        {locale === "ar"
-          ? "اتركه فارغًا لاستخدام المضاعف العام. ألغِ التفعيل لإخفاء الفئة في هذه المدينة."
-          : "Leave blank to use the global multiplier. Uncheck to hide the class in this city."}
+        {locale === "ar" ? "ألغِ التفعيل لإخفاء الفئة في هذه المدينة." : "Uncheck to hide a class in this city."}
       </p>
       <div className="grid gap-2">
         {vehicles.map((v) => {
           const row = rows.find((r) => r.category === v.category);
           return (
-            <VehiclePriceRow
+            <VehicleToggleRow
               key={v.category}
+              cityCode={cityCode}
+              category={v.category}
               label={`${v.nameEn} (${v.category})`}
-              fallback={v.multiplier}
-              multiplier={row?.multiplier ?? null}
               enabled={row?.enabled ?? true}
-              onSave={(mult, enabled) => setCityVehiclePrice(cityCode, v.category, mult, enabled)}
             />
           );
         })}
@@ -316,32 +364,27 @@ function VehiclePrices({ cityCode, rows, vehicles }: { cityCode: string; rows: V
   );
 }
 
-function VehiclePriceRow({ label, fallback, multiplier, enabled, onSave }: { label: string; fallback?: number; multiplier: number | null; enabled: boolean; onSave: (multiplier: number | null, enabled: boolean) => Promise<unknown> }) {
+function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: string; category: string; label: string; enabled: boolean }) {
   const { t, pick } = useI18n();
   const router = useRouter();
-  const [val, setVal] = useState(multiplier != null ? String(multiplier) : "");
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);
 
-  async function save() {
+  async function toggle(v: boolean) {
+    setOn(v);
     setBusy(true);
-    await onSave(val.trim() === "" ? null : parseFloat(val) || 0, on);
+    await setCityVehiclePrice(cityCode, category, null, v);
     setBusy(false);
     router.refresh();
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-charcoal/10 px-3 py-2">
+    <div className="flex items-center justify-between rounded-lg border border-charcoal/10 px-3 py-2">
       <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
-      <input
-        type="number" step={0.1} min={0} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder={fallback != null ? `×${fallback}` : "×"}
-        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
-      />
       <label className="flex items-center gap-1 text-xs text-charcoal/60">
-        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => setOn(e.target.checked)} />{pick(t.cities.enabled)}
+        <input type="checkbox" disabled={busy} className="h-4 w-4 accent-gold" checked={on} onChange={(e) => toggle(e.target.checked)} />
+        {pick(t.cities.enabled)}
       </label>
-      <button onClick={save} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
     </div>
   );
 }
