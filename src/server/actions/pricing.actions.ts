@@ -42,6 +42,26 @@ export async function updateServicePrice(stepType: StepType, basePrice: number, 
   return { ok: true as const };
 }
 
+// ── Per-class car service prices (direct amount, no multiplier) ──
+export async function setServiceClassPrice(stepType: StepType, category: string, price: number) {
+  const s = await requireAdmin();
+  if (price < 0) return { ok: false as const, error: "Price cannot be negative" };
+  await prisma.serviceClassPrice.upsert({
+    where: { stepType_category: { stepType, category } },
+    update: { price },
+    create: { stepType, category, price },
+  });
+  await logAudit({
+    action: "SERVICE_CLASS_PRICE_SET",
+    entity: "ServiceClassPrice",
+    entityId: `${stepType}:${category}`,
+    actorId: s.userId,
+    metadata: { price },
+  });
+  revalidatePath("/admin/pricing");
+  return { ok: true as const };
+}
+
 // ── Vehicles (full category editor) ──
 const vehicleSchema = z.object({
   // Any uppercase code; new codes create a brand-new class.
@@ -57,7 +77,8 @@ const vehicleSchema = z.object({
   exampleModels: z.string().max(200),
   descriptionEn: z.string().max(500),
   descriptionAr: z.string().max(500),
-  priceMultiplier: z.number().min(0).max(100),
+  // Multipliers were removed from pricing; the column is kept for back-compat.
+  priceMultiplier: z.number().min(0).max(100).optional().default(1),
   isRecommended: z.boolean(),
   sortOrder: z.number().int().min(0).max(999),
   active: z.boolean(),

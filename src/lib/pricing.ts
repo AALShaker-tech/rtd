@@ -3,73 +3,75 @@
  * and server (authoritative recompute). The server is the source of truth and
  * always recomputes before persisting; the client estimate is never trusted.
  *
- * Formulas
- *  - Car transfer:   base × vehicleMultiplier × destinationFactor
- *  - Chauffeur:      base × vehicleMultiplier × days × usageMultiplier × destinationFactor
- *  - Lounge/assist:  loungePrice (if a lounge is chosen) else base, × destinationFactor
- *  - Skipped:        0
+ * Prices are direct amounts entered by the admin — no multipliers, no
+ * destination factor. The journey total is the accumulative sum of steps.
+ *   - Car transfer:  the per-(service × class) price for the chosen vehicle class
+ *   - Chauffeur:     that per-class price × days × daily-usage tier (kept for now)
+ *   - Lounge/assist: the lounge price (if chosen) else the service's base price
+ *   - Skipped:       0
+ * Per-city prices override the global price for the same key.
  */
 
 import {
-  DEFAULT_DESTINATION_FACTORS,
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
-  VEHICLES,
+  DEFAULT_SERVICE_CLASS_PRICES,
   chauffeurUsageMultiplier,
   getStep,
   serviceHasCar,
-  type CarCategory,
   type StepType,
 } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
 
 export interface PricingConfig {
-  services: Record<string, number>; // StepType → global base price
-  lounges: Record<string, number>; // loungeType → global price
-  multipliers: Record<string, number>; // CarCategory → multiplier
-  destinationFactors: Record<string, number>; // cityCode → factor (City.multiplier)
+  services: Record<string, number>; // stepType → base price (assistance / no-car)
+  lounges: Record<string, number>; // loungeType → price
+  serviceClassPrices: Record<string, Record<string, number>>; // stepType → class → price (car)
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
   cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
-  cityVehicleMultipliers?: Record<string, Record<string, number>>; // cityCode → category → multiplier
+  cityServiceClassPrices?: Record<string, Record<string, Record<string, number>>>; // city → stepType → class → price
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   services: { ...DEFAULT_SERVICE_PRICES },
   lounges: { ...DEFAULT_LOUNGE_PRICES },
-  multipliers: Object.fromEntries(VEHICLES.map((v) => [v.category, v.multiplier])),
-  destinationFactors: { ...DEFAULT_DESTINATION_FACTORS },
+  serviceClassPrices: structuredClone(DEFAULT_SERVICE_CLASS_PRICES),
   cityServicePrices: {},
   cityLoungePrices: {},
-  cityVehicleMultipliers: {},
+  cityServiceClassPrices: {},
 };
 
 export interface StepPriceBreakdown {
+  /** The unit price for the step (per-day for chauffeur). */
   basePrice: number;
-  vehicleMultiplier: number;
-  destinationFactor: number;
   /** Final computed price for the step, rounded to whole SAR. */
   computedPrice: number;
 }
 
-function destinationFactor(config: PricingConfig, cityCode?: string | null): number {
-  if (!cityCode) return 1;
-  return config.destinationFactors[cityCode] ?? 1;
-}
-
 /**
- * Vehicle multiplier for a category, honoring a per-city override when the admin
- * has set one for that city (falls back to the global category multiplier).
+ * The per-class price for a car step: per-city override → global → built-in
+ * default → the plain service base as a last resort.
  */
-function vehicleMultiplier(
+function carClassPrice(
   config: PricingConfig,
   cityCode: string | null | undefined,
+  stepType: string,
   category: string | null | undefined,
 ): number {
   const cat = category ?? "VIP";
-  const cityMult = cityCode ? config.cityVehicleMultipliers?.[cityCode]?.[cat] : undefined;
-  return cityMult ?? config.multipliers[cat] ?? 1;
+  const cityPrice = cityCode
+    ? config.cityServiceClassPrices?.[cityCode]?.[stepType]?.[cat]
+    : undefined;
+  return (
+    cityPrice ??
+    config.serviceClassPrices?.[stepType]?.[cat] ??
+    DEFAULT_SERVICE_CLASS_PRICES[stepType]?.[cat] ??
+    config.services[stepType] ??
+    DEFAULT_SERVICE_PRICES[stepType as StepType] ??
+    0
+  );
 }
 
 /** Compute the price breakdown for a single journey step. */
@@ -80,52 +82,34 @@ export function computeStepPrice(
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
-  const zero: StepPriceBreakdown = { basePrice: 0, vehicleMultiplier: 1, destinationFactor: 1, computedPrice: 0 };
-  if (step.skipped || step.serviceType === "SKIP") return zero;
+  if (step.skipped || step.serviceType === "SKIP") return { basePrice: 0, computedPrice: 0 };
 
   const def = getStep(step.stepType);
-  const factor = destinationFactor(config, step.city);
-  // Per-city service override takes precedence over the global base; the city
-  // multiplier (factor) still applies on top so it stays a consistent dial.
-  const cityBase = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
-  const base = cityBase ?? config.services[step.stepType] ?? 0;
 
-  // Chauffeur — per-day pricing × daily-usage multiplier.
+  // Chauffeur — per-day per-class price × days × daily-usage tier.
   if (def.features.chauffeur) {
-    const mult = vehicleMultiplier(config, step.city, step.carCategory);
+    const unit = carClassPrice(config, step.city, step.stepType, step.carCategory);
     const days = Math.max(1, step.days ?? 1);
     const usage = chauffeurUsageMultiplier(step.dailyUsage);
-    return {
-      basePrice: base,
-      vehicleMultiplier: mult,
-      destinationFactor: factor,
-      computedPrice: Math.round(base * mult * days * usage * factor),
-    };
+    return { basePrice: unit, computedPrice: Math.round(unit * days * usage) };
   }
 
-  // Car transfer.
+  // Car transfer — the direct per-class price.
   if (def.features.transfer && serviceHasCar(step.serviceType)) {
-    const mult = vehicleMultiplier(config, step.city, step.carCategory);
-    return {
-      basePrice: base,
-      vehicleMultiplier: mult,
-      destinationFactor: factor,
-      computedPrice: Math.round(base * mult * factor),
-    };
+    const price = carClassPrice(config, step.city, step.stepType, step.carCategory);
+    return { basePrice: price, computedPrice: Math.round(price) };
   }
 
-  // Lounge / assistance — lounge price overrides base when one is selected
-  // (per-city lounge price takes precedence over the global lounge price).
+  // Lounge / assistance — lounge price overrides the base when one is selected
+  // (per-city price takes precedence over the global price).
   const loungePrice = step.loungeType
-    ? (step.city ? config.cityLoungePrices?.[step.city]?.[step.loungeType] : undefined) ?? config.lounges[step.loungeType]
+    ? (step.city ? config.cityLoungePrices?.[step.city]?.[step.loungeType] : undefined) ??
+      config.lounges[step.loungeType]
     : undefined;
-  const effectiveBase = loungePrice ?? base;
-  return {
-    basePrice: effectiveBase,
-    vehicleMultiplier: 1,
-    destinationFactor: factor,
-    computedPrice: Math.round(effectiveBase * factor),
-  };
+  const cityBase = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
+  const base = cityBase ?? config.services[step.stepType] ?? 0;
+  const price = loungePrice ?? base;
+  return { basePrice: price, computedPrice: Math.round(price) };
 }
 
 export interface JourneyPricing {

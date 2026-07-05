@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getStep, LOUNGE_TYPES } from "@/lib/domain";
 import {
+  setServiceClassPrice,
   updateLoungePrice,
   updateServicePrice,
   updateVehicle,
@@ -19,14 +20,21 @@ interface VehicleRow {
   exampleModels: string;
   descriptionEn: string;
   descriptionAr: string;
-  multiplier: number;
   isRecommended: boolean;
   sortOrder: number;
   active: boolean;
 }
 
+interface ServiceRow {
+  stepType: string;
+  isCar: boolean;
+  basePrice: number;
+  active: boolean;
+  classPrices: { category: string; price: number }[];
+}
+
 interface Props {
-  services: { stepType: string; basePrice: number; active: boolean }[];
+  services: ServiceRow[];
   lounges: { loungeType: string; price: number; active: boolean }[];
   vehicles: VehicleRow[];
 }
@@ -65,16 +73,33 @@ export function PricingManager({ services, lounges, vehicles }: Props) {
 
       {tab === "services" && (
         <div className="grid gap-3 md:grid-cols-2">
-          {services.map((s) => (
-            <EditRow
-              key={s.stepType}
-              title={pick(getStep(s.stepType as StepType).name)}
-              fields={[{ key: "basePrice", label: pick(t.pricing.basePrice), value: s.basePrice, step: 10 }]}
-              active={s.active}
-              busy={saving === s.stepType}
-              onSave={(vals, active) => run(s.stepType, () => updateServicePrice(s.stepType as StepType, vals.basePrice, active))}
-            />
-          ))}
+          {services.map((s) =>
+            s.isCar ? (
+              <ServiceClassEditor
+                key={s.stepType}
+                title={pick(getStep(s.stepType as StepType).name)}
+                active={s.active}
+                classPrices={s.classPrices}
+                vehicles={vehicles}
+                busy={saving === s.stepType}
+                onSaveClass={(category, price) =>
+                  run(`${s.stepType}:${category}`, () => setServiceClassPrice(s.stepType as StepType, category, price))
+                }
+                onSaveActive={(active) =>
+                  run(`${s.stepType}:active`, () => updateServicePrice(s.stepType as StepType, s.basePrice, active))
+                }
+              />
+            ) : (
+              <EditRow
+                key={s.stepType}
+                title={pick(getStep(s.stepType as StepType).name)}
+                fields={[{ key: "basePrice", label: pick(t.pricing.basePrice), value: s.basePrice, step: 10 }]}
+                active={s.active}
+                busy={saving === s.stepType}
+                onSave={(vals, active) => run(s.stepType, () => updateServicePrice(s.stepType as StepType, vals.basePrice, active))}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -161,6 +186,67 @@ function EditRow({
   );
 }
 
+/** Per-class price editor for a car service (direct amounts, no multiplier). */
+function ServiceClassEditor({
+  title,
+  active,
+  classPrices,
+  vehicles,
+  busy,
+  onSaveClass,
+  onSaveActive,
+}: {
+  title: string;
+  active: boolean;
+  classPrices: { category: string; price: number }[];
+  vehicles: VehicleRow[];
+  busy: boolean;
+  onSaveClass: (category: string, price: number) => void;
+  onSaveActive: (active: boolean) => void;
+}) {
+  const { t, pick, locale } = useI18n();
+  const [prices, setPrices] = useState<Record<string, number>>(
+    Object.fromEntries(classPrices.map((c) => [c.category, c.price])),
+  );
+  const [isActive, setIsActive] = useState(active);
+  const label = (cat: string) => vehicles.find((v) => v.category === cat)?.[locale === "ar" ? "nameAr" : "nameEn"] ?? cat;
+
+  return (
+    <div className="luxe-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="font-medium text-charcoal">{title}</p>
+        <label className="flex items-center gap-2 text-sm text-charcoal/70">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(e) => { setIsActive(e.target.checked); onSaveActive(e.target.checked); }}
+            className="h-4 w-4 accent-gold"
+          />
+          {pick(t.pricing.enabled)}
+        </label>
+      </div>
+      <div className="grid gap-2">
+        {classPrices.map((c) => (
+          <div key={c.category} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">
+              {label(c.category)} <span className="text-charcoal/40">({c.category})</span>
+            </span>
+            <input
+              type="number" min={0} step={10}
+              value={prices[c.category] ?? 0}
+              onChange={(e) => setPrices((p) => ({ ...p, [c.category]: parseInt(e.target.value) || 0 }))}
+              className="w-28 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+            />
+            <button onClick={() => onSaveClass(c.category, prices[c.category] ?? 0)} disabled={busy} className="btn-dark px-3 py-1 text-xs">
+              {pick(t.pricing.save)}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Full editor for one vehicle category (names, capacity, models, flags, price). */
 function VehicleEditor({
   vehicle,
@@ -169,7 +255,7 @@ function VehicleEditor({
 }: {
   vehicle: VehicleRow;
   busy: boolean;
-  onSave: (payload: VehicleRow & { priceMultiplier: number }) => void;
+  onSave: (payload: VehicleRow) => void;
 }) {
   const { t, pick, locale } = useI18n();
   const [f, setF] = useState(vehicle);
@@ -203,10 +289,6 @@ function VehicleEditor({
           <input type="number" min={1} className="field-input" value={f.maxPassengers} onChange={(e) => set("maxPassengers", parseInt(e.target.value) || 1)} />
         </label>
         <label className="block">
-          <span className="field-label">{pick(t.pricing.multiplier)}</span>
-          <input type="number" step={0.1} min={0} className="field-input" value={f.multiplier} onChange={(e) => set("multiplier", parseFloat(e.target.value) || 0)} />
-        </label>
-        <label className="block">
           <span className="field-label">{locale === "ar" ? "الترتيب" : "Sort order"}</span>
           <input type="number" min={0} className="field-input" value={f.sortOrder} onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)} />
         </label>
@@ -225,7 +307,7 @@ function VehicleEditor({
           <input type="checkbox" checked={f.isRecommended} onChange={(e) => set("isRecommended", e.target.checked)} className="h-4 w-4 accent-gold" />
           {locale === "ar" ? "موصى به" : "Recommended"}
         </label>
-        <button onClick={() => onSave({ ...f, priceMultiplier: f.multiplier })} disabled={busy} className="btn-dark px-4 py-2 text-xs">
+        <button onClick={() => onSave(f)} disabled={busy} className="btn-dark px-4 py-2 text-xs">
           {busy ? "…" : pick(t.pricing.save)}
         </button>
       </div>
@@ -236,14 +318,14 @@ function VehicleEditor({
 interface NewVehiclePayload {
   category: string; nameEn: string; nameAr: string; maxPassengers: number;
   exampleModels: string; descriptionEn: string; descriptionAr: string;
-  priceMultiplier: number; isRecommended: boolean; sortOrder: number; active: boolean;
+  isRecommended: boolean; sortOrder: number; active: boolean;
 }
 
 /** Create a brand-new vehicle class. The code is the stable key (e.g. LUXURY_SUV). */
 function NewVehicleClass({ onCreate, busy }: { onCreate: (p: NewVehiclePayload) => void; busy: boolean }) {
-  const { t, pick, locale } = useI18n();
+  const { locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ category: "", nameEn: "", nameAr: "", maxPassengers: 4, multiplier: 1 });
+  const [f, setF] = useState({ category: "", nameEn: "", nameAr: "", maxPassengers: 4 });
   const canSave = /^[A-Za-z0-9_]{2,30}$/.test(f.category) && f.nameEn.trim() !== "" && f.nameAr.trim() !== "";
 
   function create() {
@@ -256,12 +338,11 @@ function NewVehicleClass({ onCreate, busy }: { onCreate: (p: NewVehiclePayload) 
       exampleModels: "",
       descriptionEn: "",
       descriptionAr: "",
-      priceMultiplier: f.multiplier,
       isRecommended: false,
       sortOrder: 99,
       active: true,
     });
-    setF({ category: "", nameEn: "", nameAr: "", maxPassengers: 4, multiplier: 1 });
+    setF({ category: "", nameEn: "", nameAr: "", maxPassengers: 4 });
     setOpen(false);
   }
 
@@ -293,11 +374,12 @@ function NewVehicleClass({ onCreate, busy }: { onCreate: (p: NewVehiclePayload) 
           <span className="field-label">{locale === "ar" ? "الاسم (AR)" : "Name (AR)"}</span>
           <input className="field-input" value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} />
         </label>
-        <label className="block">
-          <span className="field-label">{pick(t.pricing.multiplier)}</span>
-          <input type="number" step={0.1} min={0} className="field-input" value={f.multiplier} onChange={(e) => setF({ ...f, multiplier: parseFloat(e.target.value) || 0 })} />
-        </label>
       </div>
+      <p className="mt-2 text-xs text-charcoal/45">
+        {locale === "ar"
+          ? "بعد الإنشاء، حدّد سعر كل خدمة لهذه الفئة من تبويب الخدمات."
+          : "After creating, set this class's price for each service in the Services tab."}
+      </p>
       <div className="mt-3 flex items-center gap-2">
         <button onClick={create} disabled={busy || !canSave} className="btn-dark px-4 py-2 text-xs">
           {busy ? "…" : (locale === "ar" ? "إنشاء" : "Create")}

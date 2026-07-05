@@ -13,6 +13,7 @@ import {
   DEFAULT_DESTINATION_FACTORS,
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
+  DEFAULT_SERVICE_CLASS_PRICES,
   PACKAGES,
   VEHICLES,
 } from "../src/lib/domain";
@@ -64,6 +65,16 @@ async function main() {
       update: {},
       create: { loungeType, price },
     });
+  }
+  // Per-class car prices (direct amounts).
+  for (const [stepType, byClass] of Object.entries(DEFAULT_SERVICE_CLASS_PRICES)) {
+    for (const [category, price] of Object.entries(byClass)) {
+      await prisma.serviceClassPrice.upsert({
+        where: { stepType_category: { stepType: stepType as StepType, category } },
+        update: {},
+        create: { stepType: stepType as StepType, category, price },
+      });
+    }
   }
   for (const [cityCode, factor] of Object.entries(DEFAULT_DESTINATION_FACTORS)) {
     await prisma.destinationPricing.upsert({

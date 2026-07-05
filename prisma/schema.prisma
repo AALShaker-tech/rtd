@@ -312,12 +312,37 @@ model VehicleCategory {
 }
 
 /// Admin-editable base price per service (journey step type), in whole SAR.
+/// Used for assistance / no-car services; car services are priced per class
+/// via ServiceClassPrice.
 model ServicePricing {
   id        String   @id @default(cuid())
   stepType  StepType @unique
   basePrice Int
   active    Boolean  @default(true)
   updatedAt DateTime @updatedAt
+}
+
+/// Admin-entered price for a car service at a specific vehicle class (whole SAR).
+/// Prices are direct amounts (no multipliers); the journey total is their sum.
+model ServiceClassPrice {
+  id       String   @id @default(cuid())
+  stepType StepType
+  category String // vehicle class code
+  price    Int
+
+  @@unique([stepType, category])
+}
+
+/// Per-city override of a car service's per-class price.
+model CityServiceClassPrice {
+  id       String @id @default(cuid())
+  cityCode String
+  city     City   @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  stepType StepType
+  category String
+  price    Int
+
+  @@unique([cityCode, stepType, category])
 }
 
 /// Admin-editable price per lounge / assistance option.
@@ -382,6 +407,7 @@ model City {
   servicePricing CityServicePricing[]
   loungePricing  CityLoungePricing[]
   vehiclePricing CityVehiclePricing[]
+  serviceClassPricing CityServiceClassPrice[]
 }
 
 /// Per-city override of a service (journey step) base price + availability.

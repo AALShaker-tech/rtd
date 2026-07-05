@@ -175,6 +175,37 @@ export async function setCityServicePrice(
   return { ok: true as const };
 }
 
+export async function setCityServiceClassPrice(
+  cityCode: string,
+  stepType: string,
+  category: string,
+  price: number | null,
+) {
+  const s = await requireAdmin();
+  if (price != null && price < 0) return { ok: false as const, error: "Price cannot be negative" };
+  if (price == null) {
+    // Blank clears the per-city override → falls back to the global price.
+    await prisma.cityServiceClassPrice.deleteMany({
+      where: { cityCode, stepType: stepType as StepType, category },
+    });
+  } else {
+    await prisma.cityServiceClassPrice.upsert({
+      where: { cityCode_stepType_category: { cityCode, stepType: stepType as StepType, category } },
+      update: { price },
+      create: { cityCode, stepType: stepType as StepType, category, price },
+    });
+  }
+  await logAudit({
+    action: "CITY_SERVICE_CLASS_PRICE_SET",
+    entity: "CityServiceClassPrice",
+    entityId: `${cityCode}:${stepType}:${category}`,
+    actorId: s.userId,
+    metadata: { price },
+  });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
 export async function setCityVehiclePrice(
   cityCode: string,
   category: string,
