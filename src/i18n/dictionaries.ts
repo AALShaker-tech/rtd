@@ -153,6 +153,7 @@ export const dict = {
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
+    nav: { en: "Cities and Specifications", ar: "المدن و المواصفات" },
     subtitle: {
       en: "Manage destinations, airports and per-city pricing. Journey steps stay the same for every city.",
       ar: "إدارة الوجهات والمطارات والأسعار لكل مدينة. تبقى خطوات الرحلة ثابتة لكل المدن.",
