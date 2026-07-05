@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/server/services/audit.service";
 import { getCityCatalog } from "@/server/services/city.service";
 import type { Catalog } from "@/lib/catalog";
-import type { StepType } from "@prisma/client";
+import type { CarCategory, StepType } from "@prisma/client";
 
 /** Public: the active city catalog used by the customer flow. */
 export async function fetchCityCatalog(): Promise<Catalog> {
@@ -170,6 +170,31 @@ export async function setCityServicePrice(
     entityId: `${cityCode}:${stepType}`,
     actorId: s.userId,
     metadata: { price, enabled },
+  });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
+export async function setCityVehiclePrice(
+  cityCode: string,
+  category: string,
+  multiplier: number | null,
+  enabled: boolean,
+) {
+  const s = await requireAdmin();
+  if (multiplier != null && multiplier < 0)
+    return { ok: false as const, error: "Multiplier cannot be negative" };
+  await prisma.cityVehiclePricing.upsert({
+    where: { cityCode_category: { cityCode, category: category as CarCategory } },
+    update: { multiplier, enabled },
+    create: { cityCode, category: category as CarCategory, multiplier, enabled },
+  });
+  await logAudit({
+    action: "CITY_VEHICLE_PRICE_SET",
+    entity: "CityVehiclePricing",
+    entityId: `${cityCode}:${category}`,
+    actorId: s.userId,
+    metadata: { multiplier, enabled },
   });
   revalidatePath("/admin/cities");
   return { ok: true as const };

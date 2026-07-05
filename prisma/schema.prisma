@@ -387,6 +387,7 @@ model City {
   airports  Airport[]
   servicePricing CityServicePricing[]
   loungePricing  CityLoungePricing[]
+  vehiclePricing CityVehiclePricing[]
 }
 
 /// Per-city override of a service (journey step) base price + availability.
@@ -411,6 +412,18 @@ model CityLoungePricing {
   enabled    Boolean @default(true)
 
   @@unique([cityCode, loungeType])
+}
+
+/// Per-city override of a vehicle category's multiplier + availability.
+model CityVehiclePricing {
+  id         String      @id @default(cuid())
+  cityCode   String
+  city       City        @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  category   CarCategory
+  multiplier Float? // null → use the global VehicleCategory.priceMultiplier
+  enabled    Boolean     @default(true) // false → category not offered in this city
+
+  @@unique([cityCode, category])
 }
 
 model Airport {

@@ -11,14 +11,16 @@ import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/lib/pricing";
  * admin-managed City / CityServicePricing / CityLoungePricing tables.
  */
 export async function getPricingConfig(): Promise<PricingConfig> {
-  const [services, lounges, vehicles, cities, cityServices, cityLounges] = await Promise.all([
-    prisma.servicePricing.findMany({ where: { active: true } }),
-    prisma.loungePricing.findMany({ where: { active: true } }),
-    prisma.vehicleCategory.findMany(),
-    prisma.city.findMany(),
-    prisma.cityServicePricing.findMany({ where: { enabled: true, price: { not: null } } }),
-    prisma.cityLoungePricing.findMany({ where: { enabled: true, price: { not: null } } }),
-  ]);
+  const [services, lounges, vehicles, cities, cityServices, cityLounges, cityVehicles] =
+    await Promise.all([
+      prisma.servicePricing.findMany({ where: { active: true } }),
+      prisma.loungePricing.findMany({ where: { active: true } }),
+      prisma.vehicleCategory.findMany(),
+      prisma.city.findMany(),
+      prisma.cityServicePricing.findMany({ where: { enabled: true, price: { not: null } } }),
+      prisma.cityLoungePricing.findMany({ where: { enabled: true, price: { not: null } } }),
+      prisma.cityVehiclePricing.findMany({ where: { enabled: true, multiplier: { not: null } } }),
+    ]);
 
   const config: PricingConfig = {
     services: { ...DEFAULT_PRICING_CONFIG.services },
@@ -27,6 +29,7 @@ export async function getPricingConfig(): Promise<PricingConfig> {
     destinationFactors: { ...DEFAULT_PRICING_CONFIG.destinationFactors },
     cityServicePrices: {},
     cityLoungePrices: {},
+    cityVehicleMultipliers: {},
   };
 
   for (const s of services) config.services[s.stepType] = s.basePrice;
@@ -42,6 +45,11 @@ export async function getPricingConfig(): Promise<PricingConfig> {
   }
   for (const cl of cityLounges) {
     (config.cityLoungePrices![cl.cityCode] ??= {})[cl.loungeType] = cl.price as number;
+  }
+
+  // Per-city vehicle multiplier overrides.
+  for (const cv of cityVehicles) {
+    (config.cityVehicleMultipliers![cv.cityCode] ??= {})[cv.category] = cv.multiplier as number;
   }
 
   return config;

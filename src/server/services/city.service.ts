@@ -16,6 +16,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         airports: { orderBy: { id: "asc" } }, // natural (seed) order → primary airport first
         loungePricing: true,
         servicePricing: true,
+        vehiclePricing: true,
       },
     }),
     // A service turned off globally (Pricing page → "Enabled" unchecked) is
@@ -50,6 +51,7 @@ export async function getCityCatalog(): Promise<Catalog> {
           ...globallyDisabled,
         ]),
       ];
+      const disabledVehicles = c.vehiclePricing.filter((v) => !v.enabled).map((v) => v.category);
       return {
         code: c.code,
         nameEn: c.nameEn,
@@ -60,6 +62,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         airports: c.airports.map((a) => ({ code: a.code, nameEn: a.nameEn, nameAr: a.nameAr, terminals: a.terminals })),
         lounges,
         disabledSteps,
+        disabledVehicles,
       };
     }),
   };
@@ -69,13 +72,18 @@ export async function getCityCatalog(): Promise<Catalog> {
 export async function getCityAdmin(code: string) {
   return prisma.city.findUnique({
     where: { code },
-    include: { airports: true, servicePricing: true, loungePricing: true },
+    include: { airports: true, servicePricing: true, loungePricing: true, vehiclePricing: true },
   });
 }
 
 export async function listCitiesAdmin() {
   return prisma.city.findMany({
     orderBy: [{ isOrigin: "desc" }, { nameEn: "asc" }],
-    include: { airports: { orderBy: { code: "asc" } }, servicePricing: true, loungePricing: true },
+    include: {
+      airports: { orderBy: { code: "asc" } },
+      servicePricing: true,
+      loungePricing: true,
+      vehiclePricing: true,
+    },
   });
 }

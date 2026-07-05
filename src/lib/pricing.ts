@@ -31,6 +31,7 @@ export interface PricingConfig {
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
   cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
+  cityVehicleMultipliers?: Record<string, Record<string, number>>; // cityCode → category → multiplier
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
@@ -41,6 +42,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   destinationFactors: { ...DEFAULT_DESTINATION_FACTORS },
   cityServicePrices: {},
   cityLoungePrices: {},
+  cityVehicleMultipliers: {},
 };
 
 export interface StepPriceBreakdown {
@@ -54,6 +56,20 @@ export interface StepPriceBreakdown {
 function destinationFactor(config: PricingConfig, cityCode?: string | null): number {
   if (!cityCode) return 1;
   return config.destinationFactors[cityCode] ?? 1;
+}
+
+/**
+ * Vehicle multiplier for a category, honoring a per-city override when the admin
+ * has set one for that city (falls back to the global category multiplier).
+ */
+function vehicleMultiplier(
+  config: PricingConfig,
+  cityCode: string | null | undefined,
+  category: string | null | undefined,
+): number {
+  const cat = category ?? "VIP";
+  const cityMult = cityCode ? config.cityVehicleMultipliers?.[cityCode]?.[cat] : undefined;
+  return cityMult ?? config.multipliers[cat] ?? 1;
 }
 
 /** Compute the price breakdown for a single journey step. */
@@ -76,7 +92,7 @@ export function computeStepPrice(
 
   // Chauffeur — per-day pricing × daily-usage multiplier.
   if (def.features.chauffeur) {
-    const mult = config.multipliers[step.carCategory ?? "VIP"] ?? 1;
+    const mult = vehicleMultiplier(config, step.city, step.carCategory);
     const days = Math.max(1, step.days ?? 1);
     const usage = chauffeurUsageMultiplier(step.dailyUsage);
     return {
@@ -89,7 +105,7 @@ export function computeStepPrice(
 
   // Car transfer.
   if (def.features.transfer && serviceHasCar(step.serviceType)) {
-    const mult = config.multipliers[step.carCategory ?? "VIP"] ?? 1;
+    const mult = vehicleMultiplier(config, step.city, step.carCategory);
     return {
       basePrice: base,
       vehicleMultiplier: mult,

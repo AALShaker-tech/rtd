@@ -8,7 +8,7 @@ import { useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
-import { vehicleName } from "@/lib/vehicles";
+import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
@@ -22,7 +22,7 @@ export default function ReviewPage() {
   const store = useJourneyStore();
   const { config } = usePricing();
   const catalog = useCatalog();
-  const { vehicles, defaultCategory, capacityByCategory, vehicle } = useVehicles();
+  const { vehicles, capacityByCategory, vehicle } = useVehicles();
   const [submitting, setSubmitting] = useState(false);
   // True once the request is saved — keeps the success/redirect state and
   // suppresses any re-validation while we navigate away.
@@ -126,6 +126,8 @@ export default function ReviewPage() {
             const update = (patch: Parameters<typeof store.updateStep>[1]) => store.updateStep(step.stepType, patch);
             const cap = step.carCategory ? (capacityByCategory[step.carCategory] ?? Infinity) : Infinity;
             const overCap = on && step.passengers != null && step.passengers > cap;
+            const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
+            const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category));
 
             return (
               <div key={step.stepType} className={`luxe-card p-5 ${on ? "" : "opacity-60"} ${overCap ? "ring-1 ring-red-300" : ""}`}>
@@ -155,9 +157,9 @@ export default function ReviewPage() {
 
                 {on && (f.transfer || f.chauffeur) && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {vehicles.map((v) => {
+                    {stepVehicles.map((v) => {
                       const cat = v.category as typeof step.carCategory;
-                      const sel = (step.carCategory ?? defaultCategory) === v.category;
+                      const sel = (step.carCategory ?? defaultVehicleCategory(stepVehicles)) === v.category;
                       return (
                         <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill ${sel ? "pill-on" : ""}`}>
                           {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat }, config).computedPrice, locale)}
