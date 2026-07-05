@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { PACKAGES, STEPS, VEHICLES } from "@/lib/domain";
+import { STEPS, VEHICLES } from "@/lib/domain";
 import { SettingsIntegrations } from "./SettingsIntegrations";
 import type { AdminSettings } from "@/server/services/settings.service";
 
@@ -13,15 +13,12 @@ export function SettingsView(props: {
   canEdit: boolean;
 }) {
   const { t, pick, locale } = useI18n();
-  const [tab, setTab] = useState<"integrations" | "services" | "vehicles" | "packages">(
-    "integrations",
-  );
+  const [tab, setTab] = useState<"integrations" | "services" | "vehicles">("integrations");
 
   const tabs = [
     { key: "integrations", label: pick(t.admin.whatsappSettings) },
     { key: "services", label: pick(t.admin.services) },
     { key: "vehicles", label: pick(t.admin.vehicles) },
-    { key: "packages", label: pick(t.packages.title) },
   ] as const;
 
   return (
@@ -93,19 +90,6 @@ export function SettingsView(props: {
         </div>
       )}
 
-      {tab === "packages" && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {PACKAGES.map((p) => (
-            <div key={p.type} className="luxe-card p-4">
-              <p className="font-medium text-charcoal">{pick(p.name)}</p>
-              <p className="mt-1 text-sm text-charcoal/50">{pick(p.description)}</p>
-              <p className="mt-2 text-xs text-charcoal/40">
-                {p.steps.length} {pick(t.admin.services)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
