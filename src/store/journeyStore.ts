@@ -135,7 +135,7 @@ interface JourneyState extends JourneyDraftData {
     enabledStepTypes?: StepType[],
     loungeValuesFor?: (cityCode?: string | null) => string[],
   ) => void;
-  applyPackage: (pkg: PackageType) => void;
+  applyPackage: (pkg: PackageType, includedSteps?: StepType[]) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
   removeStep: (stepType: StepType) => void;
@@ -240,15 +240,17 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
         set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
       },
 
-      applyPackage: (pkg) => {
-        const def = getPackage(pkg);
-        if (!def) return;
+      applyPackage: (pkg, includedSteps) => {
+        // Prefer the admin-managed package's steps (DB); fall back to the static
+        // package definition when none are supplied.
+        const steps = includedSteps ?? getPackage(pkg)?.steps;
+        if (!steps) return;
         const dest = get().destination;
         set({
           selectedPackage: pkg,
           lastTouched: NOW(),
           steps: sortByOrder(
-            def.steps.map((t) => {
+            steps.map((t) => {
               const step = blankStep(t);
               // Packages no longer auto-add: the customer explicitly Adds each
               // service (or Skips). Steps start un-added.
