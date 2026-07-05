@@ -78,30 +78,10 @@ export async function updateLoungePrice(loungeType: string, price: number, activ
   return { ok: true as const };
 }
 
-// ── Destination pricing ──
-export async function updateDestinationPricing(
-  cityCode: string,
-  factor: number,
-  surcharge: number,
-) {
-  const s = await requireAdmin();
-  if (factor < 0 || surcharge < 0)
-    return { ok: false as const, error: "Values cannot be negative" };
-  await prisma.destinationPricing.upsert({
-    where: { cityCode },
-    update: { factor, surcharge },
-    create: { cityCode, factor, surcharge },
-  });
-  await logAudit({
-    action: "DESTINATION_PRICE_UPDATED",
-    entity: "DestinationPricing",
-    entityId: cityCode,
-    actorId: s.userId,
-    metadata: { factor, surcharge },
-  });
-  revalidatePath("/admin/pricing");
-  return { ok: true as const };
-}
+// Destination pricing is controlled by City.multiplier (Cities page). The old
+// DestinationPricing table / updateDestinationPricing action were never wired to
+// any UI and never read by the pricing engine, so they were removed to avoid a
+// second, dead source of truth for the same concept.
 
 // ── Per-request price override / adjustment ──
 const priceChangeSchema = z.object({

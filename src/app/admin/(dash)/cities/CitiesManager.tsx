@@ -80,7 +80,7 @@ function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; o
   const [form, setForm] = useState({
     code: city.code, nameEn: city.nameEn, nameAr: city.nameAr, country: city.country,
     multiplier: String(city.multiplier), currency: city.currency ?? "", approxDurationMinutes: city.approxDurationMinutes != null ? String(city.approxDurationMinutes) : "",
-    notes: city.notes ?? "", active: city.active, isOrigin: city.isOrigin,
+    notes: city.notes ?? "", isOrigin: city.isOrigin,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -89,7 +89,10 @@ function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; o
     setBusy(true); setError(undefined);
     const res = await upsertCity({
       code: form.code, nameEn: form.nameEn, nameAr: form.nameAr, country: form.country,
-      active: form.active, isOrigin: form.isOrigin, multiplier: parseFloat(form.multiplier) || 0,
+      // Active is toggled only via the explicit Enable/Disable button (a single
+      // source of truth); saving details must never silently flip it. New cities
+      // default to active.
+      active: city.active, isOrigin: form.isOrigin, multiplier: parseFloat(form.multiplier) || 0,
       currency: form.currency || undefined, approxDurationMinutes: form.approxDurationMinutes ? parseInt(form.approxDurationMinutes) : undefined,
       notes: form.notes || undefined,
     });
@@ -130,12 +133,15 @@ function CityEditor({ city, isNew, onSaved }: { city: CityRow; isNew: boolean; o
           </FieldWrap>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-5">
-          <label className="flex items-center gap-2 text-sm text-charcoal/70"><input type="checkbox" className="h-4 w-4 accent-gold" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />{pick(t.cities.active)}</label>
           <label className="flex items-center gap-2 text-sm text-charcoal/70"><input type="checkbox" className="h-4 w-4 accent-gold" checked={form.isOrigin} onChange={(e) => setForm({ ...form, isOrigin: e.target.checked })} />{pick(t.cities.isOrigin)}</label>
           {!isNew && (
-            <button onClick={async () => { await setCityActive(city.code, !city.active); router.refresh(); }} className="btn-ghost px-3 py-1.5 text-xs">
-              {city.active ? (locale === "ar" ? "تعطيل" : "Disable") : (locale === "ar" ? "تفعيل" : "Enable")}
-            </button>
+            <span className="flex items-center gap-2 text-sm text-charcoal/70">
+              <span className={`h-2 w-2 rounded-full ${city.active ? "bg-emerald-500" : "bg-charcoal/25"}`} />
+              {city.active ? pick(t.cities.active) : (locale === "ar" ? "معطّلة" : "Disabled")}
+              <button onClick={async () => { await setCityActive(city.code, !city.active); router.refresh(); }} className="btn-ghost px-3 py-1.5 text-xs">
+                {city.active ? (locale === "ar" ? "تعطيل" : "Disable") : (locale === "ar" ? "تفعيل" : "Enable")}
+              </button>
+            </span>
           )}
           {error && <span className="text-xs text-red-600">{error}</span>}
           <button onClick={saveCity} disabled={busy} className="btn-gold ms-auto px-5 py-2 text-xs">{pick(t.pricing.save)}</button>

@@ -28,7 +28,6 @@ export interface PricingConfig {
   lounges: Record<string, number>; // loungeType → global price
   multipliers: Record<string, number>; // CarCategory → multiplier
   destinationFactors: Record<string, number>; // cityCode → factor (City.multiplier)
-  destinationSurcharges?: Record<string, number>; // cityCode → flat surcharge
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
   cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
@@ -40,7 +39,6 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   lounges: { ...DEFAULT_LOUNGE_PRICES },
   multipliers: Object.fromEntries(VEHICLES.map((v) => [v.category, v.multiplier])),
   destinationFactors: { ...DEFAULT_DESTINATION_FACTORS },
-  destinationSurcharges: {},
   cityServicePrices: {},
   cityLoungePrices: {},
 };

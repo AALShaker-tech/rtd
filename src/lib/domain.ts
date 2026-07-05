@@ -346,10 +346,17 @@ const INTL_LOUNGES = ["MEET_ASSIST", "FAST_TRACK"];
  *  - Saudi Arabia → Executive Office, Marhaba
  *  - elsewhere    → Meet & Assist, Fast Track
  */
+/** Lounge option values a country offers (Saudi airports vs international). */
+export function loungeValuesForCountry(country?: string | null): string[] {
+  return country === "SA" ? SAUDI_LOUNGES : INTL_LOUNGES;
+}
+
 export function loungeOptionsForCity(cityCode?: string | null): typeof LOUNGE_TYPES {
+  // Resolves country from the STATIC city list, so it only covers built-in
+  // cities. Server code holding a DB city should use loungeValuesForCountry with
+  // the DB country instead — admin-added cities aren't in this static list.
   const country = cityCode ? getCity(cityCode)?.country : undefined;
-  const allowed = country === "SA" ? SAUDI_LOUNGES : INTL_LOUNGES;
-  return LOUNGE_TYPES.filter((l) => allowed.includes(l.value));
+  return LOUNGE_TYPES.filter((l) => loungeValuesForCountry(country).includes(l.value));
 }
 
 /** Is a lounge option valid for the given city's country? */

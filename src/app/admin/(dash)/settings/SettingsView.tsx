@@ -44,6 +44,14 @@ export function SettingsView(props: {
         ))}
       </div>
 
+      {tab !== "integrations" && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {locale === "ar"
+            ? "للاطلاع فقط — هذه القوائم معرّفة في الكود. تُدار الأسعار من صفحة التسعير، والتوفّر (تفعيل/تعطيل) من صفحة المدن."
+            : "Reference only — these are defined in code. Prices are managed on the Pricing page; availability (enable/disable) on the Cities page."}
+        </p>
+      )}
+
       {tab === "integrations" && (
         <SettingsIntegrations
           settings={props.settings}

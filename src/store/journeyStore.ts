@@ -130,7 +130,11 @@ interface JourneyState extends JourneyDraftData {
   setDestination: (code: string) => void;
   setTripInfo: (patch: Partial<TripInfoInput>) => void;
   applyTripInfoToSteps: () => void;
-  initFlow: (destination?: string, enabledStepTypes?: StepType[]) => void;
+  initFlow: (
+    destination?: string,
+    enabledStepTypes?: StepType[],
+    loungeValuesFor?: (cityCode?: string | null) => string[],
+  ) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
@@ -202,7 +206,7 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
        *  - passengers / bags default to the global trip values
        * User-customized fields from a prior pass are preserved.
        */
-      initFlow: (destination, enabledStepTypes) => {
+      initFlow: (destination, enabledStepTypes, loungeValuesFor) => {
         const { tripInfo } = get();
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
@@ -222,7 +226,13 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
           for (const s of steps) {
             const d = getStep(s.stepType);
             if (d.features.assistance && !s.loungeType && pkgSteps.has(s.stepType)) {
-              s.loungeType = loungeOptionsForCity(s.city)[0]?.value;
+              // Prefer the live catalog's available lounges for the city so the
+              // default selection can't be one the admin disabled; fall back to
+              // the static country options when no resolver is supplied.
+              const values = loungeValuesFor
+                ? loungeValuesFor(s.city)
+                : loungeOptionsForCity(s.city).map((l) => l.value);
+              s.loungeType = values[0];
             }
           }
         }

@@ -25,7 +25,6 @@ export async function getPricingConfig(): Promise<PricingConfig> {
     lounges: { ...DEFAULT_PRICING_CONFIG.lounges },
     multipliers: { ...DEFAULT_PRICING_CONFIG.multipliers },
     destinationFactors: { ...DEFAULT_PRICING_CONFIG.destinationFactors },
-    destinationSurcharges: {},
     cityServicePrices: {},
     cityLoungePrices: {},
   };
