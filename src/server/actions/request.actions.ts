@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { createRequestSchema } from "@/lib/validation/schemas";
 import { validateJourney } from "@/lib/validation/journey";
 import { createRequest } from "@/server/services/request.service";
+import { getVehicleCatalog } from "@/server/services/vehicle.service";
+import { vehicleCapacityMap } from "@/lib/vehicles";
 import { logger } from "@/lib/logger";
 import type { JourneyDraft } from "@/lib/types";
 
@@ -14,9 +16,11 @@ export async function submitJourney(raw: unknown) {
     return { ok: false as const, error: "Please review your journey — some details are invalid." };
   }
 
-  // Server-side authoritative re-validation (never trust the client).
+  // Server-side authoritative re-validation (never trust the client). Vehicle
+  // capacities come from the DB so validation matches the admin-configured fleet.
   const draft = parsed.data as unknown as JourneyDraft;
-  const validation = validateJourney(draft);
+  const capacityByCategory = vehicleCapacityMap(await getVehicleCatalog());
+  const validation = validateJourney(draft, new Date(), capacityByCategory);
   logger.info("submitJourney: validated", {
     hasErrors: validation.hasErrors,
     errorCount:

@@ -2,11 +2,14 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { PricingProvider } from "@/components/pricing/PricingProvider";
 import { CatalogProvider } from "@/components/catalog/CatalogProvider";
+import { VehicleProvider } from "@/components/vehicles/VehicleProvider";
 import { getPublicConfig } from "@/server/services/settings.service";
 import { getPricingConfig } from "@/server/services/pricing.service";
 import { getCityCatalog } from "@/server/services/city.service";
+import { getVehicleCatalog } from "@/server/services/vehicle.service";
 import { DEFAULT_PRICING_CONFIG } from "@/lib/pricing";
 import { FALLBACK_CATALOG } from "@/lib/catalog";
+import { FALLBACK_VEHICLES } from "@/lib/vehicles";
 
 // Always render against live admin data. Without this the segment can be
 // statically cached, so admin price / availability changes would never reach
@@ -16,19 +19,22 @@ import { FALLBACK_CATALOG } from "@/lib/catalog";
 export const dynamic = "force-dynamic";
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [{ whatsappNumber, whatsappDisplay }, catalog, pricingConfig] = await Promise.all([
+  const [{ whatsappNumber, whatsappDisplay }, catalog, pricingConfig, vehicles] = await Promise.all([
     getPublicConfig(),
     getCityCatalog().catch(() => FALLBACK_CATALOG),
     getPricingConfig().catch(() => DEFAULT_PRICING_CONFIG),
+    getVehicleCatalog().catch(() => FALLBACK_VEHICLES),
   ]);
   return (
     <CatalogProvider initialCatalog={catalog}>
       <PricingProvider initialConfig={pricingConfig}>
-        <div className="flex min-h-screen flex-col bg-ivory text-charcoal">
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-          <SiteFooter whatsappNumber={whatsappNumber} whatsappDisplay={whatsappDisplay} />
-        </div>
+        <VehicleProvider initialVehicles={vehicles}>
+          <div className="flex min-h-screen flex-col bg-ivory text-charcoal">
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <SiteFooter whatsappNumber={whatsappNumber} whatsappDisplay={whatsappDisplay} />
+          </div>
+        </VehicleProvider>
       </PricingProvider>
     </CatalogProvider>
   );

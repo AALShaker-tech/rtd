@@ -48,6 +48,15 @@ describe("validateVehicleCapacity", () => {
   it("returns null when the category is missing", () => {
     expect(validateVehicleCapacity(undefined, 10)).toBeNull();
   });
+
+  it("honors an admin-configured (DB) capacity override", () => {
+    // Admin raised VIP capacity to 8 → 7 passengers now fits.
+    expect(validateVehicleCapacity("VIP", 7, 8)).toBeNull();
+    // Admin lowered VVIP capacity to 2 → 3 passengers now errors.
+    const issue = validateVehicleCapacity("VVIP", 3, 2);
+    expect(issue?.severity).toBe("error");
+    expect(issue?.messageEn).toContain("2");
+  });
 });
 
 describe("validateStep — required fields", () => {

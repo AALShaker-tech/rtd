@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   CHAUFFEUR_USAGE,
-  VEHICLES,
   getStep,
   serviceHasCar,
 } from "@/lib/domain";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
+import { useVehicles } from "@/components/vehicles/VehicleProvider";
+import { vehicleName } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
 import { formatDateOnly } from "@/lib/utils";
@@ -45,15 +46,20 @@ export function StepCard({
   const { t, pick, locale } = useI18n();
   const { config } = usePricing();
   const catalog = useCatalog();
+  const { vehicles, defaultCategory, capacityByCategory } = useVehicles();
   const ar = locale === "ar";
   const def = getStep(step.stepType);
   const f = def.features;
   const hasCar = serviceHasCar(step.serviceType);
-  const result = validateStep(step);
+  const result = validateStep(step, new Date(), capacityByCategory);
   const errFor = (field: string) => result.errors.find((e) => e.field === field)?.[ar ? "messageAr" : "messageEn"];
 
-  const selVeh = step.carCategory ?? "VIP";
-  const capacityIssue = validateVehicleCapacity(step.carCategory, step.passengers);
+  const selVeh = step.carCategory ?? defaultCategory;
+  const capacityIssue = validateVehicleCapacity(
+    step.carCategory,
+    step.passengers,
+    step.carCategory ? capacityByCategory[step.carCategory] : undefined,
+  );
 
   // Single source of truth for the price of any option/state. Force `skipped:false`
   // so prices are visible while the customer is still deciding (the step starts
@@ -85,12 +91,12 @@ export function StepCard({
         <div className="grid gap-2.5">
           <p className="text-sm font-medium text-charcoal/70">{pick(t.builder.chooseCar)}</p>
           <div className="grid gap-2.5 sm:grid-cols-3">
-            {VEHICLES.map((v) => {
+            {vehicles.map((v) => {
               const sel = selVeh === v.category;
-              const unit = priceFor({ carCategory: v.category, days: f.chauffeur ? 1 : step.days });
+              const unit = priceFor({ carCategory: v.category as typeof step.carCategory, days: f.chauffeur ? 1 : step.days });
               return (
-                <button key={v.category} onClick={() => onChange({ carCategory: v.category })} className={`sel-card ${sel ? "sel-card-on" : ""}`}>
-                  <span className="block font-semibold text-charcoal">{pick(v.name)}</span>
+                <button key={v.category} onClick={() => onChange({ carCategory: v.category as typeof step.carCategory })} className={`sel-card ${sel ? "sel-card-on" : ""}`}>
+                  <span className="block font-semibold text-charcoal">{vehicleName(v, locale)}</span>
                   <span className="block text-[0.7rem] text-charcoal/50">{v.exampleModels}</span>
                   <span className="mt-1 block text-[0.7rem] text-charcoal/40">{ar ? `حتى ${v.maxPassengers} ركاب` : `Up to ${v.maxPassengers}`}</span>
                   <span className={`mt-2 block text-sm font-semibold ${sel ? "text-gold-dark" : "text-charcoal/60"}`}>
