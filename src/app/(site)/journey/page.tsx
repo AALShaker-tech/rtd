@@ -3,11 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ALL_STEPS, useJourneyStore } from "@/store/journeyStore";
+import { useJourneyStore } from "@/store/journeyStore";
 import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
-import { stepSide } from "@/lib/domain";
+import { useStepCatalog } from "@/components/steps/StepCatalogProvider";
+import { stepSideFromOrder } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasReturnTiming } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
@@ -39,19 +40,20 @@ export default function JourneyPage() {
   const { config } = usePricing();
   const catalog = useCatalog();
   const { capacityByCategory } = useVehicles();
+  const { steps: catalogSteps } = useStepCatalog();
 
-  // Steps the admin has kept enabled for this journey. A service is hidden when
-  // it's disabled globally (Pricing page) or for its governing city (Cities
+  // Services the admin has kept enabled for this journey. A service is hidden
+  // when it's disabled globally (Pricing page) or for its governing city (Cities
   // page): Riyadh-side steps follow RUH, destination-side steps follow the
-  // chosen destination. Falls back to all steps if nothing resolves.
+  // chosen destination. Falls back to all services if nothing resolves.
   const disabledInRiyadh = new Set(catalog.city("RUH")?.disabledSteps ?? []);
   const disabledInDestination = new Set(catalog.city(destination)?.disabledSteps ?? []);
-  const enabledSteps = ALL_STEPS.filter((def) =>
+  const enabledSteps = catalogSteps.filter((def) =>
     (def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination).has(def.type)
       ? false
       : true,
   );
-  const flowSteps = enabledSteps.length ? enabledSteps : ALL_STEPS;
+  const flowSteps = enabledSteps.length ? enabledSteps : catalogSteps;
 
   const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
     destination ? (tripInfo.departureDate ? "flow" : "tripinfo") : "destination",
@@ -85,7 +87,7 @@ export default function JourneyPage() {
     </div>
   ) : null;
   function startFlow() {
-    initFlow(destination ?? undefined, flowSteps.map((s) => s.type));
+    initFlow(destination ?? undefined, flowSteps);
     setIdx(0);
     setStage("flow");
   }
@@ -144,7 +146,7 @@ export default function JourneyPage() {
   // steps never re-ask. For RETURN steps, if the return date/time wasn't entered
   // up front we collect it once here (the return source of truth); once set, it
   // propagates to every later return step and is never asked again.
-  const isReturnStep = stepSide(def.type) === "RETURN";
+  const isReturnStep = stepSideFromOrder(def.order) === "RETURN";
   const returnReady = hasReturnTiming(tripInfo);
   const collectReturnTiming = isReturnStep && !returnReady;
   const stepValidation = validateStep({ ...step, skipped: false }, new Date(), capacityByCategory);

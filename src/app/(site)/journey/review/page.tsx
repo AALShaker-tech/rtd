@@ -48,7 +48,7 @@ export default function ReviewPage() {
   const validation = useMemo(() => validateJourney(draft, new Date(), capacityByCategory), [draftKey]);
   const blocked = validation.hasErrors;
 
-  const ordered = [...store.steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
+  const ordered = [...store.steps].sort((a, b) => (a.def?.order ?? getStep(a.stepType)?.order ?? 0) - (b.def?.order ?? getStep(b.stepType)?.order ?? 0));
   const estimatedTotal = ordered.filter((s) => !s.skipped && s.serviceType !== "SKIP").reduce((sum, s) => sum + computeStepPrice(s, config).computedPrice, 0);
 
   async function confirm() {
@@ -119,10 +119,10 @@ export default function ReviewPage() {
         {/* Itinerary */}
         <div className="space-y-3">
           {ordered.map((step) => {
-            const def = getStep(step.stepType);
+            const def = step.def ?? getStep(step.stepType);
             const on = !step.skipped && step.serviceType !== "SKIP";
             const price = computeStepPrice(step, config).computedPrice;
-            const f = def.features;
+            const f = def?.features ?? { transfer: false, assistance: false, flight: false, hotel: false, home: false, chauffeur: false };
             const update = (patch: Parameters<typeof store.updateStep>[1]) => store.updateStep(step.stepType, patch);
             const cap = step.carCategory ? (capacityByCategory[step.carCategory] ?? Infinity) : Infinity;
             const overCap = on && step.passengers != null && step.passengers > cap;
@@ -145,7 +145,7 @@ export default function ReviewPage() {
                     {on ? "✓" : "+"}
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-charcoal">{pick(def.name)}</p>
+                    <p className="font-medium text-charcoal">{def ? pick(def.name) : step.stepType}</p>
                     <p className="truncate text-xs text-charcoal/45">
                       {catalog.cityName(step.city, locale)}
                       {step.date ? ` · ${formatDateTime(`${step.date}T${step.time ?? "00:00"}`, locale, { dateStyle: "short", timeStyle: step.time ? "short" : undefined })}` : ""}

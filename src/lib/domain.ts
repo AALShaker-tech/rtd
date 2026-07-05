@@ -153,16 +153,9 @@ export function vehicleLabel(category: string | null | undefined, locale: Locale
 
 // ─────────────────────────── Journey steps ───────────────────────────
 
-export type StepType =
-  | "HOME_TO_RIYADH_AIRPORT"
-  | "DEPARTURE_ASSIST_RIYADH"
-  | "ARRIVAL_ASSIST_DESTINATION"
-  | "AIRPORT_TO_HOTEL"
-  | "CHAUFFEUR_DURING_STAY"
-  | "HOTEL_TO_AIRPORT"
-  | "DEPARTURE_ASSIST_RETURN"
-  | "ARRIVAL_ASSIST_RIYADH"
-  | "RIYADH_AIRPORT_TO_HOME";
+// Services (steps) are admin-managed (see ServiceStep / the step catalog), so a
+// step "type" is any string code. The built-in codes below are the seed set.
+export type StepType = string;
 
 /** Which kinds of input a step needs (drives progressive disclosure in the form). */
 export interface StepFeatureSet {
@@ -306,8 +299,36 @@ export const STEPS: StepDef[] = [
   },
 ];
 
-export function getStep(type: StepType): StepDef {
-  return STEPS.find((s) => s.type === type)!;
+/** Built-in step definition for a code, or undefined for an admin-added step
+ * (those live only in the DB / step catalog). */
+export function getStep(type: StepType): StepDef | undefined {
+  return STEPS.find((s) => s.type === type);
+}
+
+/** Which built-in steps spawn a driver task. Admin steps use their own flag. */
+export const DRIVER_TASK_STEPS = new Set<string>([
+  "HOME_TO_RIYADH_AIRPORT",
+  "AIRPORT_TO_HOTEL",
+  "HOTEL_TO_AIRPORT",
+  "RIYADH_AIRPORT_TO_HOME",
+  "CHAUFFEUR_DURING_STAY",
+]);
+
+/** Which trip leg an order belongs to (first half = departure). */
+export function stepSideFromOrder(order: number): "DEPARTURE" | "RETURN" {
+  return order <= 5 ? "DEPARTURE" : "RETURN";
+}
+
+/** Display label for a step: the built-in name, else the raw code. */
+export function stepLabel(code: string | null | undefined, locale: Locale): string {
+  if (!code) return "";
+  return getStep(code)?.name[locale] ?? code;
+}
+
+/** Short display label for a step: the built-in short name, else the raw code. */
+export function stepShortLabel(code: string | null | undefined, locale: Locale): string {
+  if (!code) return "";
+  return getStep(code)?.shortName[locale] ?? code;
 }
 
 // ─────────────────────────── Service types ───────────────────────────
@@ -393,7 +414,7 @@ export function chauffeurUsageMultiplier(usage?: string | null): number {
 
 /** Which leg of the trip a step belongs to (drives default date auto-fill). */
 export function stepSide(stepType: StepType): "DEPARTURE" | "RETURN" {
-  return getStep(stepType).order <= 5 ? "DEPARTURE" : "RETURN";
+  return stepSideFromOrder(getStep(stepType)?.order ?? 99);
 }
 
 // ─────────────────────────── Packages ───────────────────────────
@@ -509,8 +530,8 @@ export const DEFAULT_SERVICE_PRICES: Record<StepType, number> = {
 
 /** Does this step use a vehicle (priced per class), rather than assistance only? */
 export function isCarStep(stepType: StepType): boolean {
-  const f = getStep(stepType).features;
-  return !!(f.transfer || f.chauffeur);
+  const f = getStep(stepType)?.features;
+  return !!(f?.transfer || f?.chauffeur);
 }
 
 /**

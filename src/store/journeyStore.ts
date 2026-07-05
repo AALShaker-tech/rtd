@@ -5,8 +5,9 @@ import {
   DEFAULT_CHAUFFEUR_USAGE,
   getStep,
   STEPS,
-  stepSide,
+  stepSideFromOrder,
   type PackageType,
+  type StepDef,
   type StepType,
 } from "@/lib/domain";
 import { estimateServiceTime } from "@/lib/service-timing";
@@ -27,14 +28,16 @@ function applyTripToStep(
   dest: string | undefined,
   prior?: JourneyStepInput,
 ): JourneyStepInput {
-  const def = getStep(base.stepType);
-  const side = stepSide(base.stepType);
+  const def = base.def ?? getStep(base.stepType);
+  const f = def?.features;
+  const side = stepSideFromOrder(def?.order ?? 99);
   const est = estimateServiceTime(base.stepType, tripInfo, tripInfo.departureFlight, tripInfo.returnFlight);
   const flightCode = side === "DEPARTURE" ? tripInfo.departureFlightCode : tripInfo.returnFlightCode;
 
   const step: JourneyStepInput = {
     ...base,
-    city: def.cityScope === "DESTINATION" ? dest : "RUH",
+    def,
+    city: def?.cityScope === "DESTINATION" ? dest : "RUH",
     // service-specific choices preserved
     skipped: prior ? prior.skipped : true,
     serviceType: prior?.serviceType ?? base.serviceType,
@@ -46,13 +49,13 @@ function applyTripToStep(
     notes: prior?.notes,
     // trip-info-driven — always recomputed (no stale values)
     date: est.date,
-    time: def.features.flight || def.features.transfer ? est.time : undefined,
-    flightNumber: def.features.flight ? flightCode : undefined,
-    passengers: def.features.transfer ? tripInfo.passengers : undefined,
-    bags: def.features.transfer ? tripInfo.bags : undefined,
+    time: f?.flight || f?.transfer ? est.time : undefined,
+    flightNumber: f?.flight ? flightCode : undefined,
+    passengers: f?.transfer ? tripInfo.passengers : undefined,
+    bags: f?.transfer ? tripInfo.bags : undefined,
   };
 
-  if (def.features.chauffeur) {
+  if (f?.chauffeur) {
     // Chauffeur starts at destination arrival (or departure date); days/usage are service-specific.
     step.date = tripInfo.departureFlight?.estimatedArrivalDate ?? (tripInfo.departureDate || undefined);
     step.time = undefined;
@@ -97,15 +100,16 @@ const emptyTripInfo: TripInfoInput = {
   returnLookupStatus: undefined,
 };
 
-function blankStep(stepType: StepType): JourneyStepInput {
-  const def = getStep(stepType);
+function blankStep(def: StepDef): JourneyStepInput {
+  const f = def.features;
   return {
-    stepType,
-    serviceType: def.features.assistance && !def.features.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY",
+    stepType: def.type,
+    def,
+    serviceType: f.assistance && !f.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY",
     skipped: false,
-    carCategory: def.features.transfer ? "VIP" : undefined,
-    passengers: def.features.transfer ? 1 : undefined,
-    bags: def.features.transfer ? 0 : undefined,
+    carCategory: f.transfer ? "VIP" : undefined,
+    passengers: f.transfer ? 1 : undefined,
+    bags: f.transfer ? 0 : undefined,
     city: def.cityScope === "RIYADH" ? "RUH" : undefined,
   };
 }
@@ -128,18 +132,10 @@ interface JourneyState extends JourneyDraftData {
   setDestination: (code: string) => void;
   setTripInfo: (patch: Partial<TripInfoInput>) => void;
   applyTripInfoToSteps: () => void;
-  initFlow: (
-    destination?: string,
-    enabledStepTypes?: StepType[],
-    loungeValuesFor?: (cityCode?: string | null) => string[],
-  ) => void;
+  initFlow: (destination?: string, stepDefs?: StepDef[]) => void;
   startBlank: () => void;
-  addStep: (stepType: StepType) => void;
-  removeStep: (stepType: StepType) => void;
-  toggleStep: (stepType: StepType) => void;
   updateStep: (stepType: StepType, patch: Partial<JourneyStepInput>) => void;
   setSkipped: (stepType: StepType, skipped: boolean) => void;
-  hasStep: (stepType: StepType) => boolean;
   setCustomer: (patch: Partial<CustomerDetailsInput>) => void;
   setPhoneVerified: (v: boolean) => void;
   setEmailVerified: (v: boolean) => void;
@@ -162,8 +158,11 @@ function freshDraft(): JourneyDraftData {
   };
 }
 
+const orderOf = (s: JourneyStepInput) => s.def?.order ?? getStep(s.stepType)?.order ?? 0;
+const defOf = (s: JourneyStepInput): StepDef | undefined => s.def ?? getStep(s.stepType);
+
 function sortByOrder(steps: JourneyStepInput[]): JourneyStepInput[] {
-  return [...steps].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
+  return [...steps].sort((a, b) => orderOf(a) - orderOf(b));
 }
 
 const NOW = () => Date.now();
@@ -178,7 +177,7 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
           destination: code,
           lastTouched: NOW(),
           steps: st.steps.map((s) =>
-            getStep(s.stepType).cityScope === "DESTINATION" ? { ...s, city: code } : s,
+            defOf(s)?.cityScope === "DESTINATION" ? { ...s, city: code } : s,
           ),
         })),
 
@@ -192,7 +191,10 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
       applyTripInfoToSteps: () =>
         set((st) => ({
           lastTouched: NOW(),
-          steps: st.steps.map((s) => applyTripToStep(blankStep(s.stepType), st.tripInfo, st.destination, s)),
+          steps: st.steps.map((s) => {
+            const d = defOf(s);
+            return d ? applyTripToStep(blankStep(d), st.tripInfo, st.destination, s) : s;
+          }),
         })),
 
       /**
@@ -203,36 +205,18 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
        *  - passengers / bags default to the global trip values
        * User-customized fields from a prior pass are preserved.
        */
-      initFlow: (destination, enabledStepTypes) => {
+      initFlow: (destination, stepDefs) => {
         const { tripInfo } = get();
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
-        // Respect the admin's feature toggles: only build steps the admin has
-        // kept enabled (globally on the Pricing page, and per-city on Cities).
-        // When no explicit list is given, fall back to every step.
-        const allowed = enabledStepTypes ? new Set(enabledStepTypes) : null;
-        const defs = allowed ? STEPS.filter((def) => allowed.has(def.type)) : STEPS;
-        const steps = defs.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
+        // Build from the provided (admin-managed, already availability-filtered)
+        // service catalog; fall back to the built-in steps when none supplied.
+        const defs = stepDefs?.length ? stepDefs : STEPS;
+        const steps = defs.map((def) => applyTripToStep(blankStep(def), tripInfo, dest, prior.get(def.type)));
         set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
       },
 
       startBlank: () => set({ steps: [] }),
-
-      addStep: (stepType) => {
-        if (get().steps.some((s) => s.stepType === stepType)) return;
-        const step = blankStep(stepType);
-        const dest = get().destination;
-        if (getStep(stepType).cityScope === "DESTINATION" && dest) step.city = dest;
-        set((st) => ({ steps: sortByOrder([...st.steps, step]), lastTouched: NOW() }));
-      },
-
-      removeStep: (stepType) =>
-        set((st) => ({ steps: st.steps.filter((s) => s.stepType !== stepType), lastTouched: NOW() })),
-
-      toggleStep: (stepType) => {
-        if (get().steps.some((s) => s.stepType === stepType)) get().removeStep(stepType);
-        else get().addStep(stepType);
-      },
 
       updateStep: (stepType, patch) =>
         set((st) => ({
@@ -247,8 +231,6 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
             s.stepType === stepType ? { ...s, skipped, serviceType: skipped ? "SKIP" : "CAR_ONLY" } : s,
           ),
         })),
-
-      hasStep: (stepType) => get().steps.some((s) => s.stepType === stepType),
 
       setCustomer: (patch) => set((st) => ({ customer: { ...st.customer, ...patch }, lastTouched: NOW() })),
       setPhoneVerified: (v) => set({ phoneVerified: v }),

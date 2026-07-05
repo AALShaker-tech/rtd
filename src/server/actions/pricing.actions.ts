@@ -9,7 +9,8 @@ import { logAudit } from "@/server/services/audit.service";
 import { changeRequestPrice, setPaymentStatus } from "@/server/services/request.service";
 import { getPricingConfig } from "@/server/services/pricing.service";
 import type { PricingConfig } from "@/lib/pricing";
-import type { PaymentStatus, StepType } from "@prisma/client";
+import type { StepType } from "@/lib/domain";
+import type { PaymentStatus } from "@prisma/client";
 
 /** Public: the current pricing config, so the customer UI can show live estimates. */
 export async function fetchPricingConfig(): Promise<PricingConfig> {

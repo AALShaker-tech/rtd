@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
-import { CITIES, STEPS } from "@/lib/domain";
+import { CITIES } from "@/lib/domain";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
+import { useStepCatalog } from "@/components/steps/StepCatalogProvider";
 import { vehicleName, vehicleDescription } from "@/lib/vehicles";
 
 export default function HomePage() {
   const { t, pick, locale } = useI18n();
   const ar = locale === "ar";
   const { vehicles } = useVehicles();
+  const { steps: STEPS } = useStepCatalog();
 
   return (
     <>
@@ -46,7 +48,9 @@ export default function HomePage() {
                     <span className="text-sm text-ivory/80">{pick(s.shortName)}</span>
                   </li>
                 ))}
-                <li className="ps-9 text-xs text-ivory/40">{ar ? "و٥ خدمات أخرى…" : "+ 5 more services…"}</li>
+                {STEPS.length > 4 && (
+                  <li className="ps-9 text-xs text-ivory/40">{ar ? `و${STEPS.length - 4} خدمات أخرى…` : `+ ${STEPS.length - 4} more services…`}</li>
+                )}
               </ul>
             </div>
           </div>

@@ -14,6 +14,7 @@ export function AdminNav({
   const nav = [
     { href: "/admin", label: pick(t.admin.overview) },
     { href: "/admin/requests", label: pick(t.admin.requests) },
+    { href: "/admin/services", label: pick(t.admin.services) },
     { href: "/admin/pricing", label: pick(t.pricing.servicePricing) },
     { href: "/admin/packages", label: pick(t.packages.title) },
     { href: "/admin/cities", label: pick(t.cities.title) },

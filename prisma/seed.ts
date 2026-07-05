@@ -13,7 +13,9 @@ import {
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
   DEFAULT_SERVICE_CLASS_PRICES,
+  DRIVER_TASK_STEPS,
   PACKAGES,
+  STEPS,
   VEHICLES,
 } from "../src/lib/domain";
 import type { StepType } from "../src/lib/domain";
@@ -74,6 +76,34 @@ async function main() {
       });
     }
   }
+  // ── Services (journey steps) ──
+  // Admin-managed catalog; the DB is the source of truth. Seed the built-in
+  // steps as the starting set (upsert by code so re-seeding is safe).
+  for (const s of STEPS) {
+    await prisma.serviceStep.upsert({
+      where: { code: s.type },
+      update: {},
+      create: {
+        code: s.type,
+        nameEn: s.name.en,
+        nameAr: s.name.ar,
+        shortNameEn: s.shortName.en,
+        shortNameAr: s.shortName.ar,
+        descriptionEn: s.description.en,
+        descriptionAr: s.description.ar,
+        sortOrder: s.order,
+        cityScope: s.cityScope,
+        featTransfer: s.features.transfer,
+        featAssistance: s.features.assistance,
+        featFlight: s.features.flight,
+        featHotel: s.features.hotel,
+        featHome: s.features.home,
+        featChauffeur: s.features.chauffeur,
+        createsDriverTask: DRIVER_TASK_STEPS.has(s.type),
+      },
+    });
+  }
+
   // ── Packages (standalone priced products) ──
   // Packages are admin-managed (add/delete) with generated ids, so seed the
   // defaults only when none exist yet.

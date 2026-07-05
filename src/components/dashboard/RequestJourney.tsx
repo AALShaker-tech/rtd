@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/i18n/I18nProvider";
-import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, getStep, vehicleLabel } from "@/lib/domain";
+import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, stepLabel, vehicleLabel } from "@/lib/domain";
 import { formatDateTime } from "@/lib/utils";
 
 export interface DisplayStep {
@@ -40,7 +40,6 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
     <ol className="relative space-y-4 ps-8">
       <span className="timeline-line bottom-4 start-[11px] top-2" aria-hidden />
       {visible.map((s) => {
-        const def = getStep(s.stepType as any);
         const service = SERVICE_TYPES.find((x) => x.type === s.serviceType)?.name[locale];
         return (
           <li key={s.stepOrder} className="relative">
@@ -49,7 +48,7 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
             </span>
             <div className="luxe-card p-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-charcoal">{pick(def.name)}</p>
+                <p className="font-medium text-charcoal">{stepLabel(s.stepType, locale)}</p>
                 {s.flightNumber && s.flightLookupStatus && <FlightBadge status={s.flightLookupStatus} />}
               </div>
               <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">

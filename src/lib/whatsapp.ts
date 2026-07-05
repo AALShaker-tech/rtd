@@ -89,10 +89,10 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
 
   const active = input.steps.filter((s) => !s.skipped && s.serviceType !== "SKIP");
   active
-    .sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order)
+    .sort((a, b) => (a.def?.order ?? getStep(a.stepType)?.order ?? 0) - (b.def?.order ?? getStep(b.stepType)?.order ?? 0))
     .forEach((s, i) => {
-      const def = getStep(s.stepType);
-      const parts: string[] = [`${i + 1}. ${def.name[locale]}`];
+      const def = s.def ?? getStep(s.stepType);
+      const parts: string[] = [`${i + 1}. ${def ? def.name[locale] : s.stepType}`];
       const city = s.city ? getCity(s.city)?.name[locale] : undefined;
       if (city) parts.push(`• ${L ? "المدينة" : "City"}: ${city}`);
       if (s.date) {

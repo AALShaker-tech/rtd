@@ -3,6 +3,7 @@ import type {
   Locale,
   PackageType,
   ServiceType,
+  StepDef,
   StepType,
 } from "./domain";
 import type { NormalizedFlight, ResolvedFlight, FlightLookupStatusValue } from "./flight";
@@ -12,6 +13,9 @@ export type FlightLookupStatus = "MANUAL" | "VERIFIED" | "LOOKUP_FAILED";
 /** A single journey step as held in the client draft / submitted to the API. */
 export interface JourneyStepInput {
   stepType: StepType;
+  /** Resolved service definition (behavior + presentation). Attached when the
+   * step is built from the catalog; the engine prefers it over the static def. */
+  def?: StepDef;
   serviceType: ServiceType;
   skipped: boolean;
 

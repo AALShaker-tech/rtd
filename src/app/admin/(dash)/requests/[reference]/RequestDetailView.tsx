@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { REQUEST_STATUSES, getStep, type RequestStatus } from "@/lib/domain";
+import { REQUEST_STATUSES, stepShortLabel, type RequestStatus } from "@/lib/domain";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RequestJourney, type DisplayStep } from "@/components/dashboard/RequestJourney";
 import { Select, TextArea } from "@/components/ui/Field";
@@ -362,7 +362,7 @@ function PricingPanel({ request }: { request: RequestData }) {
         <ul className="mt-2 space-y-1">
           {request.journeySteps.filter((s) => !s.skipped).map((s) => (
             <li key={s.stepOrder} className="flex justify-between text-xs">
-              <span className="text-charcoal/60">{pick(getStep(s.stepType as any).shortName)}</span>
+              <span className="text-charcoal/60">{stepShortLabel(s.stepType, locale)}</span>
               <span className="text-charcoal">{s.computedPrice != null ? formatPrice(s.computedPrice, locale) : "—"}</span>
             </li>
           ))}

@@ -48,8 +48,8 @@ export function StepCard({
   const catalog = useCatalog();
   const { vehicles, capacityByCategory } = useVehicles();
   const ar = locale === "ar";
-  const def = getStep(step.stepType);
-  const f = def.features;
+  const def = step.def ?? getStep(step.stepType);
+  const f = def?.features ?? { transfer: false, assistance: false, flight: false, hotel: false, home: false, chauffeur: false };
   const hasCar = serviceHasCar(step.serviceType);
   const result = validateStep(step, new Date(), capacityByCategory);
   const errFor = (field: string) => result.errors.find((e) => e.field === field)?.[ar ? "messageAr" : "messageEn"];

@@ -107,7 +107,7 @@ export function validateStep(
   now: Date = new Date(),
   maxByCategory?: Record<string, number>,
 ): StepValidationResult {
-  const def = getStep(step.stepType);
+  const def = step.def ?? getStep(step.stepType);
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 
@@ -115,7 +115,9 @@ export function validateStep(
     return { stepType: step.stepType, errors, warnings };
   }
 
-  const f = def.features;
+  // A step with no known behavior (a brand-new admin service with no flags set)
+  // is validated leniently — only the generic required fields apply.
+  const f = def?.features ?? { transfer: false, assistance: false, flight: false, hotel: false, home: false, chauffeur: false };
   const hasCar = serviceHasCar(step.serviceType);
 
   // Date / time
@@ -220,7 +222,7 @@ export function validateStep(
       issue("warning", "Add your hotel so we can plan the transfer.", "أضف اسم فندقك لنتمكن من تخطيط التوصيل.", "hotelName"),
     );
   }
-  if (f.transfer && hasCar && def.cityScope === "DESTINATION" && !step.airport) {
+  if (f.transfer && hasCar && def?.cityScope === "DESTINATION" && !step.airport) {
     warnings.push(issue("warning", "Select the airport for this transfer.", "اختر المطار لهذا التوصيل.", "airport"));
   }
 
@@ -326,7 +328,9 @@ export function validateTimeline(steps: JourneyStepInput[]): ValidationIssue[] {
   // 1) Active steps must be in non-decreasing order by DAY. We compare calendar
   //    days (not clock time) so estimated same-day buffers and date-only services
   //    (e.g. chauffeur) don't produce false ordering errors.
-  const ordered = [...active].sort((a, b) => getStep(a.stepType).order - getStep(b.stepType).order);
+  const ordered = [...active].sort(
+    (a, b) => (a.def?.order ?? getStep(a.stepType)?.order ?? 0) - (b.def?.order ?? getStep(b.stepType)?.order ?? 0),
+  );
   let prev: { step: JourneyStepInput; t: Date } | null = null;
   for (const s of ordered) {
     const full = stepTime(s);
