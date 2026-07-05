@@ -20,15 +20,6 @@ export const stepTypeEnum = z.enum([
   "ARRIVAL_ASSIST_RIYADH",
   "RIYADH_AIRPORT_TO_HOME",
 ]);
-export const packageEnum = z.enum([
-  "ARRIVAL",
-  "DEPARTURE",
-  "FULL_JOURNEY",
-  "VVIP_CONCIERGE",
-  "LONDON_CHAUFFEUR",
-  "AIRPORT_TO_HOTEL",
-  "HOTEL_TO_AIRPORT",
-]);
 export const localeEnum = z.enum(["en", "ar"]);
 
 export const journeyStepSchema = z.object({
@@ -91,7 +82,7 @@ export const tripInfoSchema = z.object({
 });
 
 export const createRequestSchema = z.object({
-  selectedPackage: packageEnum.optional(),
+  selectedPackage: z.string().optional(),
   destination: z.string().optional(),
   steps: z.array(journeyStepSchema).min(1),
   customer: customerDetailsSchema,

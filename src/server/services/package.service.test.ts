@@ -14,22 +14,22 @@ const findMany = (prisma as any).servicePackage.findMany as ReturnType<typeof vi
 beforeEach(() => findMany.mockReset());
 
 describe("getPackageCatalog", () => {
-  it("maps active DB packages (includedSteps → steps)", async () => {
+  it("maps active DB packages to the flat product shape", async () => {
     findMany.mockResolvedValue([
       {
-        type: "ARRIVAL",
+        id: "pkg_1",
         nameEn: "Arrival",
         nameAr: "الوصول",
         descriptionEn: "d",
         descriptionAr: "و",
-        includedSteps: ["ARRIVAL_ASSIST_DESTINATION", "AIRPORT_TO_HOTEL"],
+        price: 1500,
         featured: true,
         sortOrder: 1,
       },
     ]);
     const cat = await getPackageCatalog();
     expect(cat).toHaveLength(1);
-    expect(cat[0]).toMatchObject({ type: "ARRIVAL", featured: true, steps: ["ARRIVAL_ASSIST_DESTINATION", "AIRPORT_TO_HOTEL"] });
+    expect(cat[0]).toMatchObject({ id: "pkg_1", price: 1500, featured: true });
   });
 
   it("falls back to the built-in packages when the DB is empty", async () => {

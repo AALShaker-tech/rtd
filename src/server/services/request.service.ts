@@ -258,6 +258,93 @@ export async function createRequest(input: CreateRequestInput) {
   return result;
 }
 
+/**
+ * Create a request from a package booking — a standalone product (flat price,
+ * name snapshot, no journey steps). No OTP; the customer just supplies contact
+ * details and optional notes.
+ */
+export async function createPackageRequest(input: {
+  packageId: string;
+  fullName: string;
+  phone: string;
+  phoneCountry: string;
+  email?: string;
+  language: "en" | "ar";
+  notes?: string;
+}) {
+  const pkg = await prisma.servicePackage.findUnique({ where: { id: input.packageId } });
+  if (!pkg || !pkg.active) return null;
+
+  const phone = parsePhone(input.phone, input.phoneCountry);
+  const e164 = phone.e164 ?? input.phone;
+  const language = (input.language.toUpperCase() as Language) ?? "EN";
+  const price = pkg.price;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const referenceNumber = await nextReference(tx);
+    const customer = await tx.customer.create({
+      data: {
+        fullName: input.fullName,
+        phone: e164,
+        email: input.email ?? "",
+        language,
+        phoneVerified: false,
+        emailVerified: false,
+      },
+    });
+    const request = await tx.request.create({
+      data: {
+        referenceNumber,
+        customerId: customer.id,
+        status: "REQUEST_RECEIVED",
+        selectedPackage: pkg.nameEn, // name snapshot (survives package deletion)
+        preferredLanguage: language,
+        carCategory: "VIP",
+        passengers: 1,
+        bags: 0,
+        notes: input.notes ?? null,
+        validationStatus: "VALID",
+        estimatedTotal: price,
+        finalPrice: price,
+        priceStatus: "FINALIZED",
+        paymentStatus: "UNPAID",
+      },
+    });
+    await tx.statusHistory.create({ data: { requestId: request.id, toStatus: "REQUEST_RECEIVED" } });
+    await tx.requestPriceHistory.create({
+      data: { requestId: request.id, changeType: "RECALCULATED", newPrice: price, reason: "Package price" },
+    });
+    return request;
+  });
+
+  await logAudit({
+    action: "REQUEST_CREATED",
+    entity: "Request",
+    entityId: result.id,
+    requestId: result.id,
+    metadata: { referenceNumber: result.referenceNumber, package: pkg.nameEn },
+  });
+
+  try {
+    await sendOpsAlert(
+      buildNewRequestAlert({
+        referenceNumber: result.referenceNumber,
+        customerName: input.fullName,
+        phone: e164,
+        destination: pkg.nameEn,
+        estimatedTotal: price,
+        currency: "SAR",
+        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+        contactMeInstead: false,
+      }),
+    );
+  } catch (e) {
+    logger.error("ops alert failed", { err: e, reference: result.referenceNumber });
+  }
+
+  return result;
+}
+
 export async function changeStatus(params: {
   requestId: string;
   toStatus: RequestStatus;
