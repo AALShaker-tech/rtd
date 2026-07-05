@@ -60,7 +60,7 @@ export function PricingManager({ services, lounges, vehicles }: Props) {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-serif text-2xl font-semibold text-charcoal">{pick(t.pricing.servicePricing)}</h1>
+      <h1 className="font-serif text-2xl font-semibold text-charcoal">{pick(t.pricing.pricesNav)}</h1>
 
       <div className="flex flex-wrap gap-2 border-b border-charcoal/10">
         {tabs.map((tb) => (
