@@ -38,6 +38,19 @@ export default function JourneyPage() {
   const { config } = usePricing();
   const catalog = useCatalog();
 
+  // Steps the admin has kept enabled for this journey. A service is hidden when
+  // it's disabled globally (Pricing page) or for its governing city (Cities
+  // page): Riyadh-side steps follow RUH, destination-side steps follow the
+  // chosen destination. Falls back to all steps if nothing resolves.
+  const disabledInRiyadh = new Set(catalog.city("RUH")?.disabledSteps ?? []);
+  const disabledInDestination = new Set(catalog.city(destination)?.disabledSteps ?? []);
+  const enabledSteps = ALL_STEPS.filter((def) =>
+    (def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination).has(def.type)
+      ? false
+      : true,
+  );
+  const flowSteps = enabledSteps.length ? enabledSteps : ALL_STEPS;
+
   const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
     destination ? (tripInfo.departureDate ? "flow" : "tripinfo") : "destination",
   );
@@ -70,12 +83,12 @@ export default function JourneyPage() {
     </div>
   ) : null;
   function startFlow() {
-    initFlow();
+    initFlow(destination ?? undefined, flowSteps.map((s) => s.type));
     setIdx(0);
     setStage("flow");
   }
   function advance() {
-    if (idx < ALL_STEPS.length - 1) setIdx(idx + 1);
+    if (idx < flowSteps.length - 1) setIdx(idx + 1);
     else router.push("/journey/review");
   }
   function back() {
@@ -119,9 +132,9 @@ export default function JourneyPage() {
   }
 
   // ─────────── Step-by-step flow ───────────
-  const def = ALL_STEPS[idx];
+  const def = flowSteps[Math.min(idx, flowSteps.length - 1)];
   const step = steps.find((s) => s.stepType === def.type);
-  const progress = Math.round((idx / ALL_STEPS.length) * 100);
+  const progress = Math.round((idx / flowSteps.length) * 100);
   if (!step) return null;
 
   const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
@@ -152,7 +165,7 @@ export default function JourneyPage() {
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-charcoal/10">
               <div className="h-full rounded-full bg-gold-gradient transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
-            <span className="text-xs text-charcoal/50">{pick(t.common.step)} {idx + 1} {pick(t.common.of)} {ALL_STEPS.length}</span>
+            <span className="text-xs text-charcoal/50">{pick(t.common.step)} {idx + 1} {pick(t.common.of)} {flowSteps.length}</span>
           </div>
 
           <div key={def.type} className="luxe-card animate-fade-up p-6 md:p-8">
