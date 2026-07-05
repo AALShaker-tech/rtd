@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/server/services/audit.service";
 import { getCityCatalog } from "@/server/services/city.service";
 import type { Catalog } from "@/lib/catalog";
-import type { CarCategory, StepType } from "@prisma/client";
+import type { StepType } from "@prisma/client";
 
 /** Public: the active city catalog used by the customer flow. */
 export async function fetchCityCatalog(): Promise<Catalog> {
@@ -185,9 +185,9 @@ export async function setCityVehiclePrice(
   if (multiplier != null && multiplier < 0)
     return { ok: false as const, error: "Multiplier cannot be negative" };
   await prisma.cityVehiclePricing.upsert({
-    where: { cityCode_category: { cityCode, category: category as CarCategory } },
+    where: { cityCode_category: { cityCode, category } },
     update: { multiplier, enabled },
-    create: { cityCode, category: category as CarCategory, multiplier, enabled },
+    create: { cityCode, category, multiplier, enabled },
   });
   await logAudit({
     action: "CITY_VEHICLE_PRICE_SET",

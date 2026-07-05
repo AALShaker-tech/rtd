@@ -79,15 +79,18 @@ export function PricingManager({ services, lounges, vehicles }: Props) {
       )}
 
       {tab === "vehicles" && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {vehicles.map((v) => (
-            <VehicleEditor
-              key={v.category}
-              vehicle={v}
-              busy={saving === v.category}
-              onSave={(payload) => run(v.category, () => updateVehicle(payload))}
-            />
-          ))}
+        <div className="space-y-3">
+          <NewVehicleClass onCreate={(payload) => run(`new:${payload.category}`, () => updateVehicle(payload))} busy={saving?.startsWith("new:") ?? false} />
+          <div className="grid gap-3 md:grid-cols-2">
+            {vehicles.map((v) => (
+              <VehicleEditor
+                key={v.category}
+                vehicle={v}
+                busy={saving === v.category}
+                onSave={(payload) => run(v.category, () => updateVehicle(payload))}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -225,6 +228,84 @@ function VehicleEditor({
         <button onClick={() => onSave({ ...f, priceMultiplier: f.multiplier })} disabled={busy} className="btn-dark px-4 py-2 text-xs">
           {busy ? "…" : pick(t.pricing.save)}
         </button>
+      </div>
+    </div>
+  );
+}
+
+interface NewVehiclePayload {
+  category: string; nameEn: string; nameAr: string; maxPassengers: number;
+  exampleModels: string; descriptionEn: string; descriptionAr: string;
+  priceMultiplier: number; isRecommended: boolean; sortOrder: number; active: boolean;
+}
+
+/** Create a brand-new vehicle class. The code is the stable key (e.g. LUXURY_SUV). */
+function NewVehicleClass({ onCreate, busy }: { onCreate: (p: NewVehiclePayload) => void; busy: boolean }) {
+  const { t, pick, locale } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ category: "", nameEn: "", nameAr: "", maxPassengers: 4, multiplier: 1 });
+  const canSave = /^[A-Za-z0-9_]{2,30}$/.test(f.category) && f.nameEn.trim() !== "" && f.nameAr.trim() !== "";
+
+  function create() {
+    if (!canSave) return;
+    onCreate({
+      category: f.category.toUpperCase(),
+      nameEn: f.nameEn,
+      nameAr: f.nameAr,
+      maxPassengers: f.maxPassengers,
+      exampleModels: "",
+      descriptionEn: "",
+      descriptionAr: "",
+      priceMultiplier: f.multiplier,
+      isRecommended: false,
+      sortOrder: 99,
+      active: true,
+    });
+    setF({ category: "", nameEn: "", nameAr: "", maxPassengers: 4, multiplier: 1 });
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="btn-gold px-4 py-2 text-xs">
+        + {locale === "ar" ? "إضافة فئة مركبة جديدة" : "Add a new vehicle class"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="luxe-card p-4">
+      <p className="mb-3 font-medium text-charcoal">{locale === "ar" ? "فئة مركبة جديدة" : "New vehicle class"}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الرمز (مثل LUXURY_SUV)" : "Code (e.g. LUXURY_SUV)"}</span>
+          <input className="field-input" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value.toUpperCase() })} placeholder="LUXURY_SUV" />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الحد الأقصى للركاب" : "Max passengers"}</span>
+          <input type="number" min={1} className="field-input" value={f.maxPassengers} onChange={(e) => setF({ ...f, maxPassengers: parseInt(e.target.value) || 1 })} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الاسم (EN)" : "Name (EN)"}</span>
+          <input className="field-input" value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} />
+        </label>
+        <label className="block">
+          <span className="field-label">{locale === "ar" ? "الاسم (AR)" : "Name (AR)"}</span>
+          <input className="field-input" value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} />
+        </label>
+        <label className="block">
+          <span className="field-label">{pick(t.pricing.multiplier)}</span>
+          <input type="number" step={0.1} min={0} className="field-input" value={f.multiplier} onChange={(e) => setF({ ...f, multiplier: parseFloat(e.target.value) || 0 })} />
+        </label>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <button onClick={create} disabled={busy || !canSave} className="btn-dark px-4 py-2 text-xs">
+          {busy ? "…" : (locale === "ar" ? "إنشاء" : "Create")}
+        </button>
+        <button onClick={() => setOpen(false)} className="btn-ghost px-4 py-2 text-xs">
+          {locale === "ar" ? "إلغاء" : "Cancel"}
+        </button>
+        <span className="text-xs text-charcoal/45">{locale === "ar" ? "يمكنك تعديل باقي التفاصيل بعد الإنشاء." : "You can edit the rest of the details after creating."}</span>
       </div>
     </div>
   );

@@ -44,7 +44,13 @@ export async function updateServicePrice(stepType: StepType, basePrice: number, 
 
 // ── Vehicles (full category editor) ──
 const vehicleSchema = z.object({
-  category: z.enum(["VVIP", "VIP", "ECONOMY"]),
+  // Any uppercase code; new codes create a brand-new class.
+  category: z
+    .string()
+    .min(2)
+    .max(30)
+    .regex(/^[A-Za-z0-9_]+$/, "Use letters, numbers and underscores only")
+    .transform((v) => v.toUpperCase()),
   nameEn: z.string().min(1).max(60),
   nameAr: z.string().min(1).max(60),
   maxPassengers: z.number().int().min(1).max(50),

@@ -1,7 +1,7 @@
 import {
   getCity,
   getStep,
-  getVehicle,
+  vehicleLabel,
   SERVICE_TYPES,
   type Locale,
   type PackageType,
@@ -73,7 +73,7 @@ export function buildWhatsAppMessage(input: WhatsAppSummaryInput): string {
     if (pkg) lines.push((L ? "الباقة: " : "Package: ") + pkg.name[locale]);
   }
   if (input.carCategory) {
-    lines.push((L ? "فئة السيارة: " : "Car: ") + getVehicle(input.carCategory as any).name[locale]);
+    lines.push((L ? "فئة السيارة: " : "Car: ") + vehicleLabel(input.carCategory, locale));
   }
   if (input.passengers != null) lines.push((L ? "الركاب: " : "Passengers: ") + input.passengers);
   if (input.bags != null) lines.push((L ? "الحقائب: " : "Bags: ") + input.bags);

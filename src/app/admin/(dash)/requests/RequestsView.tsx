@@ -10,7 +10,7 @@ import {
   STEPS,
   VEHICLES,
   getCity,
-  getVehicle,
+  vehicleLabel,
   type CarCategory,
   type RequestStatus,
 } from "@/lib/domain";
@@ -151,7 +151,7 @@ export function RequestsView({
                     <p className="text-xs text-charcoal/40">{r.phone}</p>
                   </Td>
                   <Td>{r.cities.map((c) => getCity(c)?.name[locale] ?? c).join(", ") || "—"}</Td>
-                  <Td>{getVehicle(r.carCategory).name[locale]}</Td>
+                  <Td>{vehicleLabel(r.carCategory, locale)}</Td>
                   <Td>
                     <span className="font-medium text-charcoal">{formatPrice(r.finalPrice ?? r.estimatedTotal, locale)}</span>
                     {r.finalPrice != null && <span className="ms-1 text-[0.65rem] text-gold-dark">★</span>}
