@@ -24,7 +24,6 @@ export interface CatalogCity {
   nameAr: string;
   country: string;
   isOrigin: boolean;
-  multiplier: number;
   airports: CatalogAirport[];
   /** Enabled lounge/airport-service option values for this city. */
   lounges: string[];
@@ -46,7 +45,6 @@ export const FALLBACK_CATALOG: Catalog = {
     nameAr: c.name.ar,
     country: c.country,
     isOrigin: !!c.isOrigin,
-    multiplier: 1,
     airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals })),
     lounges: loungeOptionsForCity(c.code).map((l) => l.value),
     disabledSteps: [],

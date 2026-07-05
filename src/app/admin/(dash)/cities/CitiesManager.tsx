@@ -10,7 +10,7 @@ import {
   setCityLoungePrice,
   setCityServicePrice,
   setCityServiceClassPrice,
-  setCityVehiclePrice,
+  setCityVehicleEnabled,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
@@ -18,7 +18,7 @@ import {
 interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
-interface VehicleRow { category: string; multiplier: number | null; enabled: boolean }
+interface VehicleRow { category: string; enabled: boolean }
 interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
@@ -29,7 +29,7 @@ interface CityRow {
 
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
-interface VehicleOption { category: string; nameEn: string; multiplier: number }
+interface VehicleOption { category: string; nameEn: string }
 
 export function CitiesManager({ cities, vehicles }: { cities: CityRow[]; vehicles: VehicleOption[] }) {
   const { t, pick, locale } = useI18n();
@@ -373,7 +373,7 @@ function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: st
   async function toggle(v: boolean) {
     setOn(v);
     setBusy(true);
-    await setCityVehiclePrice(cityCode, category, null, v);
+    await setCityVehicleEnabled(cityCode, category, v);
     setBusy(false);
     router.refresh();
   }

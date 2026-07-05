@@ -259,8 +259,7 @@ model JourneyStep {
   skipped Boolean @default(false)
 
   // ── Pricing (computed server-side; admin may adjust per step) ──
-  basePrice          Int? // base price for this service before multipliers
-  vehicleMultiplier  Float? // applied vehicle multiplier (1.0 when no car)
+  basePrice          Int? // unit price for this service (per-day for chauffeur)
   computedPrice      Int? // engine result for this step
   adminAdjustedPrice Int? // optional per-step admin override
 
@@ -305,7 +304,6 @@ model VehicleCategory {
   exampleModels   String
   descriptionEn   String
   descriptionAr   String
-  priceMultiplier Float       @default(1.0)
   isRecommended   Boolean     @default(false)
   sortOrder       Int         @default(0)
   active          Boolean     @default(true)
@@ -353,15 +351,6 @@ model LoungePricing {
   active     Boolean @default(true)
 }
 
-/// Destination-specific price adjustment (multiplicative factor + flat surcharge).
-model DestinationPricing {
-  id       String  @id @default(cuid())
-  cityCode String  @unique
-  factor   Float   @default(1.0)
-  surcharge Int    @default(0)
-  active   Boolean @default(true)
-}
-
 /// Audit trail of price changes on a request (override / discount / surcharge).
 model RequestPriceHistory {
   id          String          @id @default(cuid())
@@ -399,7 +388,6 @@ model City {
   country   String
   active    Boolean  @default(true)
   isOrigin  Boolean  @default(false) // Riyadh is the journey origin
-  multiplier Float   @default(1.0) // destination price factor
   currency  String?
   approxDurationMinutes Int? // approx flight time from Riyadh
   notes     String?
@@ -440,7 +428,6 @@ model CityVehiclePricing {
   cityCode   String
   city       City        @relation(fields: [cityCode], references: [code], onDelete: Cascade)
   category   String // vehicle class code (see VehicleCategory.category)
-  multiplier Float? // null → use the global VehicleCategory.priceMultiplier
   enabled    Boolean     @default(true) // false → category not offered in this city
 
   @@unique([cityCode, category])

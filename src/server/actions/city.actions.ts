@@ -36,7 +36,6 @@ const citySchema = z.object({
     .transform((v) => v.toUpperCase()),
   active: z.boolean().default(true),
   isOrigin: z.boolean().default(false),
-  multiplier: z.number().min(0).max(10),
   currency: z.string().optional(),
   approxDurationMinutes: z.number().int().min(0).max(2000).optional(),
   notes: z.string().max(2000).optional(),
@@ -55,7 +54,6 @@ export async function upsertCity(raw: unknown) {
       country: d.country,
       active: d.active,
       isOrigin: d.isOrigin,
-      multiplier: d.multiplier,
       currency: d.currency ?? null,
       approxDurationMinutes: d.approxDurationMinutes ?? null,
       notes: d.notes ?? null,
@@ -67,7 +65,6 @@ export async function upsertCity(raw: unknown) {
       country: d.country,
       active: d.active,
       isOrigin: d.isOrigin,
-      multiplier: d.multiplier,
       currency: d.currency ?? null,
       approxDurationMinutes: d.approxDurationMinutes ?? null,
       notes: d.notes ?? null,
@@ -78,7 +75,7 @@ export async function upsertCity(raw: unknown) {
     entity: "City",
     entityId: d.code,
     actorId: s.userId,
-    metadata: { multiplier: d.multiplier, active: d.active },
+    metadata: { active: d.active },
   });
   revalidatePath("/admin/cities");
   return { ok: true as const };
@@ -206,26 +203,20 @@ export async function setCityServiceClassPrice(
   return { ok: true as const };
 }
 
-export async function setCityVehiclePrice(
-  cityCode: string,
-  category: string,
-  multiplier: number | null,
-  enabled: boolean,
-) {
+/** Per-city vehicle availability (enable/disable a class in a city). */
+export async function setCityVehicleEnabled(cityCode: string, category: string, enabled: boolean) {
   const s = await requireAdmin();
-  if (multiplier != null && multiplier < 0)
-    return { ok: false as const, error: "Multiplier cannot be negative" };
   await prisma.cityVehiclePricing.upsert({
     where: { cityCode_category: { cityCode, category } },
-    update: { multiplier, enabled },
-    create: { cityCode, category, multiplier, enabled },
+    update: { enabled },
+    create: { cityCode, category, enabled },
   });
   await logAudit({
-    action: "CITY_VEHICLE_PRICE_SET",
+    action: "CITY_VEHICLE_ENABLED_SET",
     entity: "CityVehiclePricing",
     entityId: `${cityCode}:${category}`,
     actorId: s.userId,
-    metadata: { multiplier, enabled },
+    metadata: { enabled },
   });
   revalidatePath("/admin/cities");
   return { ok: true as const };
