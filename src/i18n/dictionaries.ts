@@ -153,6 +153,7 @@ export const dict = {
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
+    nav: { en: "Cities and Specifications", ar: "المدن و المواصفات" },
     subtitle: {
       en: "Manage destinations, airports and per-city pricing. Journey steps stay the same for every city.",
       ar: "إدارة الوجهات والمطارات والأسعار لكل مدينة. تبقى خطوات الرحلة ثابتة لكل المدن.",
@@ -206,7 +207,8 @@ export const dict = {
     reason: { en: "Reason", ar: "السبب" },
     priceHistory: { en: "Price history", ar: "سجل الأسعار" },
     servicePricing: { en: "Service prices", ar: "أسعار الخدمات" },
-    vehiclePricing: { en: "Vehicle multipliers", ar: "معاملات السيارات" },
+    pricesNav: { en: "Prices", ar: "الأسعار" },
+    vehiclePricing: { en: "Vehicle Class", ar: "فئه السيارة" },
     loungePricing: { en: "Lounge prices", ar: "أسعار الصالات" },
     destinationPricing: { en: "Destination pricing", ar: "تسعير الوجهات" },
     basePrice: { en: "Base price", ar: "السعر الأساسي" },

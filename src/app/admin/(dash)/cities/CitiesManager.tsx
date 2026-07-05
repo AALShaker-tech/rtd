@@ -43,7 +43,7 @@ export function CitiesManager({ cities, vehicles, steps }: { cities: CityRow[]; 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-2xl font-semibold text-charcoal">{pick(t.cities.title)}</h1>
+        <h1 className="font-serif text-2xl font-semibold text-charcoal">{pick(t.cities.nav)}</h1>
         <p className="mt-1 text-sm text-charcoal/55">{pick(t.cities.subtitle)}</p>
       </div>
 
