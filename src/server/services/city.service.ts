@@ -8,15 +8,22 @@ import type { Catalog } from "@/lib/catalog";
  * comes from CityLoungePricing rows when present, otherwise the country default.
  */
 export async function getCityCatalog(): Promise<Catalog> {
-  const cities = await prisma.city.findMany({
-    where: { active: true },
-    orderBy: [{ isOrigin: "desc" }, { nameEn: "asc" }],
-    include: {
-      airports: { orderBy: { id: "asc" } }, // natural (seed) order → primary airport first
-      loungePricing: true,
-      servicePricing: true,
-    },
-  });
+  const [cities, globalServices] = await Promise.all([
+    prisma.city.findMany({
+      where: { active: true },
+      orderBy: [{ isOrigin: "desc" }, { nameEn: "asc" }],
+      include: {
+        airports: { orderBy: { id: "asc" } }, // natural (seed) order → primary airport first
+        loungePricing: true,
+        servicePricing: true,
+      },
+    }),
+    // A service turned off globally (Pricing page → "Enabled" unchecked) is
+    // unavailable everywhere, not just where a per-city rule disables it.
+    prisma.servicePricing.findMany({ where: { active: false } }),
+  ]);
+
+  const globallyDisabled = globalServices.map((s) => s.stepType);
 
   return {
     cities: cities.map((c) => {
@@ -24,7 +31,12 @@ export async function getCityCatalog(): Promise<Catalog> {
       const lounges = configuredLounges.length
         ? configuredLounges
         : loungeOptionsForCity(c.code).map((l) => l.value);
-      const disabledSteps = c.servicePricing.filter((s) => !s.enabled).map((s) => s.stepType);
+      const disabledSteps = [
+        ...new Set([
+          ...c.servicePricing.filter((s) => !s.enabled).map((s) => s.stepType),
+          ...globallyDisabled,
+        ]),
+      ];
       return {
         code: c.code,
         nameEn: c.nameEn,

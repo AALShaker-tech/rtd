@@ -130,7 +130,7 @@ interface JourneyState extends JourneyDraftData {
   setDestination: (code: string) => void;
   setTripInfo: (patch: Partial<TripInfoInput>) => void;
   applyTripInfoToSteps: () => void;
-  initFlow: (destination?: string) => void;
+  initFlow: (destination?: string, enabledStepTypes?: StepType[]) => void;
   applyPackage: (pkg: PackageType) => void;
   startBlank: () => void;
   addStep: (stepType: StepType) => void;
@@ -202,11 +202,16 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
        *  - passengers / bags default to the global trip values
        * User-customized fields from a prior pass are preserved.
        */
-      initFlow: (destination) => {
+      initFlow: (destination, enabledStepTypes) => {
         const { tripInfo } = get();
         const dest = destination ?? get().destination;
         const prior = new Map(get().steps.map((s) => [s.stepType, s]));
-        const steps = STEPS.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
+        // Respect the admin's feature toggles: only build steps the admin has
+        // kept enabled (globally on the Pricing page, and per-city on Cities).
+        // When no explicit list is given, fall back to every step.
+        const allowed = enabledStepTypes ? new Set(enabledStepTypes) : null;
+        const defs = allowed ? STEPS.filter((def) => allowed.has(def.type)) : STEPS;
+        const steps = defs.map((def) => applyTripToStep(blankStep(def.type), tripInfo, dest, prior.get(def.type)));
 
         // For the chosen package, pre-select the recommended lounge option on its
         // assistance steps so the customer sees a default selection (they still
