@@ -206,6 +206,7 @@ export const dict = {
     reason: { en: "Reason", ar: "السبب" },
     priceHistory: { en: "Price history", ar: "سجل الأسعار" },
     servicePricing: { en: "Service prices", ar: "أسعار الخدمات" },
+    pricesNav: { en: "Prices", ar: "الأسعار" },
     vehiclePricing: { en: "Vehicle Class", ar: "فئه السيارة" },
     loungePricing: { en: "Lounge prices", ar: "أسعار الصالات" },
     destinationPricing: { en: "Destination pricing", ar: "تسعير الوجهات" },
