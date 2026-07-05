@@ -69,7 +69,10 @@ export function catalogCityName(catalog: Catalog, code: string | null | undefine
 /** Lounge option {value,name} list for a city, using catalog availability. */
 export function catalogLoungeOptions(catalog: Catalog, code: string | null | undefined) {
   const c = catalogCity(catalog, code);
-  const values = c?.lounges?.length ? c.lounges : loungeOptionsForCity(code).map((l) => l.value);
+  // When the city is in the catalog, trust its resolved lounge list exactly —
+  // even an empty one (the admin disabled them all). Only fall back to the
+  // country defaults when the city isn't in the catalog (e.g. not yet loaded).
+  const values = c ? c.lounges : loungeOptionsForCity(code).map((l) => l.value);
   return LOUNGE_TYPES.filter((l) => values.includes(l.value));
 }
 

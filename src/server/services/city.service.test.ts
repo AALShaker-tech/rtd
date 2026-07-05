@@ -75,3 +75,66 @@ describe("getCityCatalog — feature (enable/disable) reflection", () => {
     expect(catalog.cities[0].disabledSteps).toEqual([]);
   });
 });
+
+describe("getCityCatalog — lounge (enable/disable) reflection", () => {
+  // LON is an international city → default lounges are MEET_ASSIST & FAST_TRACK.
+  it("offers the country default lounges when nothing is configured", async () => {
+    cityFindMany.mockResolvedValue([city({ code: "LON", loungePricing: [] })]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).toEqual(
+      expect.arrayContaining(["MEET_ASSIST", "FAST_TRACK"]),
+    );
+  });
+
+  it("removes a disabled default lounge (disable actually sticks)", async () => {
+    cityFindMany.mockResolvedValue([
+      city({ code: "LON", loungePricing: [{ loungeType: "MEET_ASSIST", enabled: false }] }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).not.toContain("MEET_ASSIST");
+    expect(catalog.cities[0].lounges).toContain("FAST_TRACK");
+  });
+
+  it("does not resurrect a disabled lounge that was explicitly added then turned off", async () => {
+    // The reported case: Marhaba offered for a destination, then disabled.
+    cityFindMany.mockResolvedValue([
+      city({ code: "IST", country: "TR", loungePricing: [{ loungeType: "MARHABA", enabled: false }] }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).not.toContain("MARHABA");
+  });
+
+  it("adds an explicitly enabled non-default lounge on top of the defaults", async () => {
+    cityFindMany.mockResolvedValue([
+      city({ code: "LON", loungePricing: [{ loungeType: "MARHABA", enabled: true }] }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).toEqual(
+      expect.arrayContaining(["MARHABA", "MEET_ASSIST", "FAST_TRACK"]),
+    );
+  });
+
+  it("can disable every lounge for a city (empty list, no fallback to defaults)", async () => {
+    cityFindMany.mockResolvedValue([
+      city({
+        code: "LON",
+        loungePricing: [
+          { loungeType: "MEET_ASSIST", enabled: false },
+          { loungeType: "FAST_TRACK", enabled: false },
+        ],
+      }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].lounges).toEqual([]);
+  });
+});

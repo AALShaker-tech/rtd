@@ -27,10 +27,20 @@ export async function getCityCatalog(): Promise<Catalog> {
 
   return {
     cities: cities.map((c) => {
-      const configuredLounges = c.loungePricing.filter((l) => l.enabled).map((l) => l.loungeType);
-      const lounges = configuredLounges.length
-        ? configuredLounges
-        : loungeOptionsForCity(c.code).map((l) => l.value);
+      // Available lounges = the city's default set (by country) plus any lounge
+      // the admin explicitly enabled, minus any the admin explicitly disabled.
+      // Treating the CityLoungePricing rows as overrides (not a replacement
+      // allowlist) means a disable actually sticks — the previous fallback
+      // resurrected the defaults whenever nothing was left explicitly enabled,
+      // so disabling a default lounge (e.g. Marhaba) appeared to do nothing.
+      const disabledLounges = new Set(
+        c.loungePricing.filter((l) => !l.enabled).map((l) => l.loungeType),
+      );
+      const enabledLounges = c.loungePricing.filter((l) => l.enabled).map((l) => l.loungeType);
+      const defaultLounges = loungeOptionsForCity(c.code).map((l) => l.value);
+      const lounges = [...new Set([...defaultLounges, ...enabledLounges])].filter(
+        (v) => !disabledLounges.has(v),
+      );
       const disabledSteps = [
         ...new Set([
           ...c.servicePricing.filter((s) => !s.enabled).map((s) => s.stepType),
