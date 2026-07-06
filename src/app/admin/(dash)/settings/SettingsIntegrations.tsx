@@ -96,16 +96,15 @@ function ConfigForm({ settings, ar }: { settings: AdminSettings; ar: boolean }) 
       <Section title={ar ? "التنبيهات" : "Notifications"}>
         <FieldWrap label={ar ? "بريد تنبيه الطلبات الجديدة" : "New-request alert email"}>
           <TextInput
-            type="email"
             value={form.opsAlertEmail}
             onChange={(e) => set("opsAlertEmail", e.target.value)}
-            placeholder="ops@ratbli.sa"
+            placeholder="ops@ratbli.sa, alerts@ratbli.sa"
           />
         </FieldWrap>
         <p className="text-xs text-charcoal/40">
           {ar
-            ? "تصل تنبيهات الطلبات الجديدة إلى جميع المسؤولين النشطين تلقائيًا. هذا البريد اختياري ويُضاف كمستلم إضافي."
-            : "New-request alerts go to all active admins automatically. This address is optional and added as an extra recipient."}
+            ? "تصل تنبيهات الطلبات الجديدة إلى جميع المسؤولين النشطين تلقائيًا. هذه الحقل اختياري ويقبل أكثر من بريد مفصولة بفاصلة كمستلمين إضافيين."
+            : "New-request alerts go to all active admins automatically. This field is optional and accepts multiple comma-separated addresses as extra recipients."}
         </p>
       </Section>
 

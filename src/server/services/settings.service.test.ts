@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { prisma } from "@/lib/prisma";
-import { resolveSettings, getOpsTargets } from "@/server/services/settings.service";
+import { resolveSettings, getOpsTargets, splitEmails } from "@/server/services/settings.service";
 import { encryptSecret } from "@/lib/secret-box";
 
 const findMany = (prisma as any).setting.findMany as ReturnType<typeof vi.fn>;
@@ -68,6 +68,20 @@ describe("getOpsTargets", () => {
     expect(emails).toEqual(["ops@ratbli.sa", "a@ratbli.sa"]);
   });
 
+  it("splits multiple configured addresses into separate recipients", async () => {
+    findMany.mockResolvedValue([
+      { key: "ops.alertEmail", value: "ops@ratbli.sa, alerts@ratbli.sa; boss@ratbli.sa" },
+    ]);
+    userFindMany.mockResolvedValue([{ email: "a@ratbli.sa" }]);
+    const { emails } = await getOpsTargets();
+    expect(emails).toEqual([
+      "ops@ratbli.sa",
+      "alerts@ratbli.sa",
+      "boss@ratbli.sa",
+      "a@ratbli.sa",
+    ]);
+  });
+
   it("dedupes the configured email against an admin (case-insensitive)", async () => {
     findMany.mockResolvedValue([{ key: "ops.alertEmail", value: "Admin@Ratbli.sa" }]);
     userFindMany.mockResolvedValue([{ email: "admin@ratbli.sa" }]);
@@ -83,5 +97,20 @@ describe("getOpsTargets", () => {
       where: { isActive: true, role: "ADMIN" },
       select: { email: true },
     });
+  });
+});
+
+describe("splitEmails", () => {
+  it("splits on commas, semicolons, and whitespace, trimming blanks", () => {
+    expect(splitEmails("a@x.sa, b@x.sa;  c@x.sa\nd@x.sa")).toEqual([
+      "a@x.sa",
+      "b@x.sa",
+      "c@x.sa",
+      "d@x.sa",
+    ]);
+  });
+
+  it("returns an empty array for a blank field", () => {
+    expect(splitEmails("   ")).toEqual([]);
   });
 });

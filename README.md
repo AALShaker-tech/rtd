@@ -173,9 +173,10 @@ Verification is optional at submission — unverified contacts are clearly marke
 **Ops alerts:** when a customer submits a request, the operations team is alerted
 via `sendOpsAlert` (same provider abstraction). The email goes to **every active
 admin** (ADMIN accounts; superadmins excluded); the superadmin-editable *New-request alert
-email* (`OPS_ALERT_EMAIL`) is added as an optional extra recipient — e.g. a shared
-ops mailbox that isn't a staff login. Each address is emailed independently, so a
-single bad address never blocks the rest. Set `OPS_ALERT_PHONE` (with
+email* (`OPS_ALERT_EMAIL`) adds optional extra recipients — e.g. shared ops mailboxes
+that aren't staff logins. That field accepts several addresses separated by commas,
+semicolons, or whitespace. Each address is emailed independently, so a single bad
+address never blocks the rest. Set `OPS_ALERT_PHONE` (with
 `OPS_ALERT_SMS_CHANNEL=SMS|WHATSAPP`) to also send an SMS/WhatsApp; if no channel
 is reachable, the alert is logged to the server console. The alert is
 fire-and-forget — a delivery failure never blocks the submission.
