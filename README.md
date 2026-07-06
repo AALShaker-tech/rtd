@@ -153,6 +153,26 @@ setup link and prints it directly — handy for bootstrapping before the email
 provider (`EMAIL_PROVIDER`) is configured. Requires `NEXT_PUBLIC_APP_URL` for
 the absolute link.
 
+### Managing admins
+
+Creating an admin (or any staff account) never sets a password directly — the
+new user activates their own via an emailed one-time link:
+
+1. Log in at `/admin/login` as the **superadmin**.
+2. In the left nav, click **Admins** (this link only appears for the superadmin).
+3. In the **Add new** form, fill in **Full name** (required), **Email**
+   (required), and **Phone** (optional).
+4. Click **Save** — the account is created _pending activation_.
+5. An **activation email** with a one-time setup link is sent to the new admin.
+6. They open the link and **set their own password** (min. 10 characters).
+7. They're signed in and can use `/admin/login` from then on.
+
+If the activation email can't be delivered, the user can request a fresh link
+themselves at `/admin/set-password`. Existing admins can be **activated /
+deactivated** from the same page (no one can deactivate their own account, and
+only the superadmin can toggle admin-level accounts). The same emailed-activation
+flow applies to Employees and Drivers created from their respective pages.
+
 ---
 
 ## 🔐 Verification & notifications
@@ -172,8 +192,8 @@ Verification is optional at submission — unverified contacts are clearly marke
 
 **Ops alerts:** when a customer submits a request, the operations team is alerted
 via `sendOpsAlert` (same provider abstraction). The email goes to **every active
-admin** (ADMIN accounts; superadmins excluded); the superadmin-editable *New-request alert
-email* (`OPS_ALERT_EMAIL`) adds optional extra recipients — e.g. shared ops mailboxes
+admin** (ADMIN accounts; superadmins excluded); the superadmin-editable _New-request alert
+email_ (`OPS_ALERT_EMAIL`) adds optional extra recipients — e.g. shared ops mailboxes
 that aren't staff logins. That field accepts several addresses separated by commas,
 semicolons, or whitespace. Each address is emailed independently, so a single bad
 address never blocks the rest. Set `OPS_ALERT_PHONE` (with
