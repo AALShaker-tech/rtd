@@ -104,9 +104,42 @@ export async function resolveEmailConfig(): Promise<EmailConfig> {
   };
 }
 
-export async function getOpsTargets(): Promise<{ email: string; phone: string }> {
+/**
+ * Emails of every active ADMIN account (`isActive`). These are the people who
+ * should be alerted about new requests. Superadmins are intentionally excluded.
+ * Deduped and lowercased by the caller alongside any manually configured ops
+ * address.
+ */
+export async function getActiveAdminEmails(): Promise<string[]> {
+  const admins = await prisma.user.findMany({
+    where: { isActive: true, role: "ADMIN" },
+    select: { email: true },
+  });
+  return admins.map((u: { email: string }) => u.email).filter(Boolean);
+}
+
+/**
+ * Who to alert about new requests. Every active admin gets the alert; the
+ * superadmin-configured `ops.alertEmail` (if set) is added as an extra recipient
+ * — e.g. a shared ops mailbox that is not a staff login. Addresses are deduped
+ * case-insensitively. The phone target stays env-only for now.
+ */
+export async function getOpsTargets(): Promise<{ emails: string[]; phone: string }> {
   const s = await resolveSettings();
-  return { email: s["ops.alertEmail"] || "", phone: process.env.OPS_ALERT_PHONE || "" };
+  const configured = s["ops.alertEmail"] || "";
+  const adminEmails = await getActiveAdminEmails();
+
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  for (const raw of [configured, ...adminEmails]) {
+    const email = raw.trim();
+    if (!email) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    emails.push(email);
+  }
+  return { emails, phone: process.env.OPS_ALERT_PHONE || "" };
 }
 
 /** Values for the admin form. Secrets are surfaced only as a boolean "isSet". */

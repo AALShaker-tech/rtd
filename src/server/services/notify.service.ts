@@ -150,27 +150,33 @@ export async function sendEmail(msg: EmailMessage) {
 }
 
 /**
- * Alert the operations team. Routes to whichever ops channels are configured
- * (ops-alert email and/or `OPS_ALERT_PHONE`); if none are set, the alert is
- * logged so it's still visible in the server logs. The email target is
- * superadmin-editable (Setting store); the phone stays env-only for now.
+ * Alert the operations team. Emails every active admin (plus any configured
+ * ops-alert mailbox) and, if `OPS_ALERT_PHONE` is set, sends an SMS/WhatsApp
+ * too. Each email is delivered independently so one bad address never blocks the
+ * rest. If no channel is reachable, the alert is logged so it stays visible in
+ * the server logs. The phone stays env-only for now.
  */
 export async function sendOpsAlert(msg: { subject: string; body: string }): Promise<void> {
-  const { email, phone } = await getOpsTargets();
+  const { emails, phone } = await getOpsTargets();
   const channel: "SMS" | "WHATSAPP" =
     process.env.OPS_ALERT_SMS_CHANNEL === "WHATSAPP" ? "WHATSAPP" : "SMS";
 
   let delivered = false;
-  if (email) {
-    await sendEmail({ to: email, subject: msg.subject, body: msg.body });
-    delivered = true;
+  if (emails.length) {
+    const results = await Promise.allSettled(
+      emails.map((to) => sendEmail({ to, subject: msg.subject, body: msg.body })),
+    );
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") delivered = true;
+      else logger.error("ops alert email failed", { to: emails[i], err: r.reason });
+    });
   }
   if (phone) {
     await sendSms({ to: phone, body: `${msg.subject}\n${msg.body}` }, channel);
     delivered = true;
   }
   if (!delivered) {
-    logger.info("ops alert (no OPS_ALERT_* configured — logging only)", {
+    logger.info("ops alert (no active admins / OPS_ALERT_* configured — logging only)", {
       subject: msg.subject,
       body: msg.body,
     });
