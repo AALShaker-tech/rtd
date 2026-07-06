@@ -4,7 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput } from "@/components/ui/Field";
-import { createStaffUser, toggleStaffActive } from "@/server/actions/users.actions";
+import {
+  createStaffUser,
+  toggleStaffActive,
+  resetStaffPassword,
+} from "@/server/actions/users.actions";
 import { formatDateTime } from "@/lib/utils";
 
 interface StaffRow {
@@ -13,6 +17,7 @@ interface StaffRow {
   email: string;
   phone: string | null;
   isActive: boolean;
+  mustSetPassword: boolean;
   createdAt: string;
   count: number;
 }
@@ -29,11 +34,51 @@ export function StaffManager({
   countLabel: string;
 }) {
   const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const router = useRouter();
   const [form, setForm] = useState({ fullName: "", email: "", phone: "" });
   const [error, setError] = useState<string | undefined>();
   const [notice, setNotice] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [rowMsg, setRowMsg] = useState<{ ok: boolean; text: string } | undefined>();
+  const [pendingId, setPendingId] = useState<string | undefined>();
+
+  async function doReset(s: StaffRow) {
+    // A reset of an already-active account invalidates their current password
+    // until they set a new one — confirm before doing that. Resending an
+    // activation link to a pending account is harmless, so skip the prompt.
+    if (!s.mustSetPassword) {
+      const msg = ar
+        ? `سيتم إبطال كلمة مرور ${s.email} الحالية حتى يعيّن كلمة مرور جديدة. المتابعة؟`
+        : `This invalidates ${s.email}'s current password until they set a new one. Continue?`;
+      if (!window.confirm(msg)) return;
+    }
+    setPendingId(s.id);
+    setRowMsg(undefined);
+    const res = await resetStaffPassword(s.id);
+    setPendingId(undefined);
+    if (!res.ok) return setRowMsg({ ok: false, text: res.error });
+    setRowMsg({
+      ok: res.emailed,
+      text: res.emailed
+        ? ar
+          ? `أُرسل رابط إلى ${s.email}`
+          : `Link sent to ${s.email}`
+        : ar
+          ? "تعذّر إرسال البريد."
+          : "Couldn't send the email.",
+    });
+    router.refresh();
+  }
+
+  async function doToggle(s: StaffRow) {
+    setPendingId(s.id);
+    setRowMsg(undefined);
+    const res = await toggleStaffActive(s.id, !s.isActive);
+    setPendingId(undefined);
+    if (!res.ok) return setRowMsg({ ok: false, text: res.error });
+    router.refresh();
+  }
 
   async function add() {
     setBusy(true);
@@ -59,6 +104,12 @@ export function StaffManager({
     <div className="space-y-6">
       <h1 className="font-serif text-2xl font-semibold text-charcoal">{title}</h1>
 
+      {rowMsg && (
+        <p className={`text-sm ${rowMsg.ok ? "text-emerald-700" : "text-red-600"}`}>
+          {rowMsg.text}
+        </p>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="luxe-card overflow-hidden">
           <table className="w-full text-sm">
@@ -67,7 +118,8 @@ export function StaffManager({
                 <th className="px-4 py-3 text-start">{pick(t.fields.fullName)}</th>
                 <th className="px-4 py-3 text-start">{pick(t.auth.email)}</th>
                 <th className="px-4 py-3 text-start">{countLabel}</th>
-                <th className="px-4 py-3 text-start"></th>
+                <th className="px-4 py-3 text-start">{ar ? "الحالة" : "Status"}</th>
+                <th className="px-4 py-3 text-end"></th>
               </tr>
             </thead>
             <tbody>
@@ -79,30 +131,42 @@ export function StaffManager({
                   </td>
                   <td className="px-4 py-3 text-charcoal/70">{s.email}</td>
                   <td className="px-4 py-3 font-medium text-charcoal">{s.count}</td>
-                  <td className="px-4 py-3 text-end">
-                    <button
-                      onClick={async () => {
-                        const res = await toggleStaffActive(s.id, !s.isActive);
-                        if (!res.ok) return setError(res.error);
-                        setError(undefined);
-                        router.refresh();
-                      }}
-                      className={`badge ${s.isActive ? "bg-emerald-50 text-emerald-700" : "bg-charcoal/5 text-charcoal/40"}`}
-                    >
-                      {s.isActive
-                        ? locale === "ar"
-                          ? "نشط"
-                          : "Active"
-                        : locale === "ar"
-                          ? "موقوف"
-                          : "Inactive"}
-                    </button>
+                  <td className="px-4 py-3">
+                    <StatusBadge s={s} ar={ar} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => doReset(s)}
+                        disabled={pendingId === s.id}
+                        className="rounded-md border border-charcoal/15 px-2.5 py-1 text-xs text-charcoal/70 hover:bg-ivory-warm disabled:opacity-50"
+                      >
+                        {s.mustSetPassword
+                          ? ar
+                            ? "إعادة إرسال"
+                            : "Resend"
+                          : ar
+                            ? "إعادة تعيين"
+                            : "Reset"}
+                      </button>
+                      <button
+                        onClick={() => doToggle(s)}
+                        disabled={pendingId === s.id}
+                        className={`rounded-md px-2.5 py-1 text-xs disabled:opacity-50 ${
+                          s.isActive
+                            ? "border border-red-200 text-red-600 hover:bg-red-50"
+                            : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {s.isActive ? (ar ? "تعطيل" : "Deactivate") : ar ? "تفعيل" : "Activate"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {staff.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-sm text-charcoal/40">
+                  <td colSpan={5} className="py-8 text-center text-sm text-charcoal/40">
                     —
                   </td>
                 </tr>
@@ -150,4 +214,14 @@ export function StaffManager({
       </div>
     </div>
   );
+}
+
+function StatusBadge({ s, ar }: { s: StaffRow; ar: boolean }) {
+  // Pending (awaiting first-time activation) takes precedence over active/inactive.
+  const { cls, label } = s.mustSetPassword
+    ? { cls: "bg-amber-50 text-amber-700", label: ar ? "بانتظار التفعيل" : "Pending" }
+    : s.isActive
+      ? { cls: "bg-emerald-50 text-emerald-700", label: ar ? "نشط" : "Active" }
+      : { cls: "bg-charcoal/5 text-charcoal/40", label: ar ? "موقوف" : "Inactive" };
+  return <span className={`badge ${cls}`}>{label}</span>;
 }

@@ -19,6 +19,7 @@ export default async function EmployeesPage() {
         email: e.email,
         phone: e.phone,
         isActive: e.isActive,
+        mustSetPassword: e.mustSetPassword,
         createdAt: e.createdAt.toISOString(),
         count: e._count.assignedAsEmployee,
       }))}

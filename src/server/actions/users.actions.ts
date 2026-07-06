@@ -81,3 +81,37 @@ export async function toggleStaffActive(userId: string, isActive: boolean) {
   revalidatePath("/admin/admins");
   return { ok: true as const };
 }
+
+/**
+ * Send a password setup/reset link to a staff account: for a pending account
+ * this re-sends activation; for an active one it forces a reset (their current
+ * password stops working until they set a new one via the emailed link).
+ */
+export async function resetStaffPassword(userId: string) {
+  const session = await getSession();
+  if (!session || !isAdmin(session.role)) return { ok: false as const, error: "Unauthorized" };
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, role: true },
+  });
+  if (!target) return { ok: false as const, error: "User not found" };
+  // Only a superadmin may reset admin-level accounts.
+  if (isAdmin(target.role) && !isSuperAdmin(session.role)) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+
+  await prisma.user.update({ where: { id: target.id }, data: { mustSetPassword: true } });
+  const { emailed } = await sendAccountSetupLink({ id: target.id, email: target.email });
+
+  await logAudit({
+    action: "USER_PASSWORD_RESET",
+    entity: "User",
+    entityId: target.id,
+    actorId: session.userId,
+  });
+  revalidatePath("/admin/employees");
+  revalidatePath("/admin/drivers");
+  revalidatePath("/admin/admins");
+  return { ok: true as const, emailed };
+}

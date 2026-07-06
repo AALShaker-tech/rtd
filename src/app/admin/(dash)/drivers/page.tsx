@@ -19,6 +19,7 @@ export default async function DriversPage() {
         email: d.email,
         phone: d.phone,
         isActive: d.isActive,
+        mustSetPassword: d.mustSetPassword,
         createdAt: d.createdAt.toISOString(),
         count: d._count.driverTasks,
       }))}
