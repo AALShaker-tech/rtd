@@ -10,7 +10,7 @@ export function AdminsTitle({ staff }: { staff: Parameters<typeof StaffManager>[
       title={pick(t.admin.admins)}
       role="ADMIN"
       staff={staff}
-      countLabel={pick(t.admin.actions)}
+      countLabel={pick(t.admin.process)}
     />
   );
 }

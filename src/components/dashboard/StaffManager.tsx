@@ -119,7 +119,7 @@ export function StaffManager({
                 <th className="px-4 py-3 text-start">{pick(t.auth.email)}</th>
                 <th className="px-4 py-3 text-start">{countLabel}</th>
                 <th className="px-4 py-3 text-start">{ar ? "الحالة" : "Status"}</th>
-                <th className="px-4 py-3 text-end"></th>
+                <th className="px-4 py-3 text-end">{pick(t.admin.actions)}</th>
               </tr>
             </thead>
             <tbody>

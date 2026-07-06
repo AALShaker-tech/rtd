@@ -182,8 +182,14 @@ export const dict = {
     terminals: { en: "Terminals (comma-separated)", ar: "الصالات (مفصولة بفواصل)" },
     servicePrices: { en: "Service prices (per city)", ar: "أسعار الخدمات (لكل مدينة)" },
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
-    airportLounges: { en: "Airport lounges (enable & price per airport)", ar: "صالات المطار (فعّل وحدّد السعر لكل مطار)" },
-    noLounges: { en: "No lounges yet — add them in the Lounges tab first.", ar: "لا توجد صالات بعد — أضفها من تبويب الصالات أولًا." },
+    airportLounges: {
+      en: "Airport lounges (enable & price per airport)",
+      ar: "صالات المطار (فعّل وحدّد السعر لكل مطار)",
+    },
+    noLounges: {
+      en: "No lounges yet — add them in the Lounges tab first.",
+      ar: "لا توجد صالات بعد — أضفها من تبويب الصالات أولًا.",
+    },
     overridePlaceholder: { en: "0", ar: "0" },
     enabled: { en: "Enabled", ar: "مفعّل" },
     selectCity: {
@@ -447,6 +453,7 @@ export const dict = {
     drivers: { en: "Drivers", ar: "السائقون" },
     admins: { en: "Admins", ar: "المسؤولون" },
     actions: { en: "Actions", ar: "الإجراءات" },
+    process: { en: "Process", ar: "العمليات" },
     settings: { en: "Settings", ar: "الإعدادات" },
     whatsappSettings: { en: "WhatsApp", ar: "واتساب" },
     testEmail: { en: "Test email", ar: "بريد تجريبي" },
