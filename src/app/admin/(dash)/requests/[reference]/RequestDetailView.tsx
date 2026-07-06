@@ -322,6 +322,7 @@ function DeletePanel({ request }: { request: RequestData }) {
   const { t, pick } = useI18n();
   const router = useRouter();
   const [confirm, setConfirm] = useState("");
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -334,6 +335,7 @@ function DeletePanel({ request }: { request: RequestData }) {
     const res = await adminDeleteRequest(request.id);
     if (!res.ok) {
       setBusy(false);
+      setAsking(false);
       setError(res.error);
       return;
     }
@@ -348,18 +350,43 @@ function DeletePanel({ request }: { request: RequestData }) {
       <p className="mb-3 text-xs text-charcoal/60">{pick(t.admin.deleteRequestWarning)}</p>
       <TextInput
         value={confirm}
+        disabled={busy || asking}
         onChange={(e) => setConfirm(e.target.value)}
         placeholder={pick(t.admin.deleteRequestConfirm)}
         className="mb-2"
       />
       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
-      <button
-        disabled={busy || !ready}
-        onClick={remove}
-        className="btn w-full bg-red-600 py-2 text-xs text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        {pick(t.admin.deleteRequestPermanently)}
-      </button>
+
+      {asking ? (
+        // Final confirmation step — the superadmin must explicitly confirm.
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3">
+          <p className="mb-3 text-xs font-medium text-red-700">{pick(t.admin.deleteRequestConfirmPrompt)}</p>
+          <div className="flex gap-2">
+            <button
+              disabled={busy}
+              onClick={() => setAsking(false)}
+              className="btn-outline flex-1 py-2 text-xs disabled:opacity-50"
+            >
+              {pick(t.common.cancel)}
+            </button>
+            <button
+              disabled={busy}
+              onClick={remove}
+              className="btn flex-1 bg-red-600 py-2 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {pick(t.admin.deleteRequestConfirmYes)}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          disabled={!ready}
+          onClick={() => { setError(undefined); setAsking(true); }}
+          className="btn w-full bg-red-600 py-2 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {pick(t.admin.deleteRequestPermanently)}
+        </button>
+      )}
     </div>
   );
 }

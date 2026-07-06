@@ -491,6 +491,14 @@ export const dict = {
       en: "Type the reference number to confirm",
       ar: "اكتب الرقم المرجعي للتأكيد",
     },
+    deleteRequestConfirmPrompt: {
+      en: "Are you absolutely sure? This will permanently delete this request and all of its data. This action cannot be undone.",
+      ar: "هل أنت متأكد تمامًا؟ سيؤدي هذا إلى حذف هذا الطلب وجميع بياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+    },
+    deleteRequestConfirmYes: {
+      en: "Yes, delete permanently",
+      ar: "نعم، احذف نهائيًا",
+    },
     filters: { en: "Filters", ar: "عوامل التصفية" },
     customer: { en: "Customer", ar: "العميل" },
     journey: { en: "Journey", ar: "الرحلة" },
