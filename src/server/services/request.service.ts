@@ -485,6 +485,46 @@ export async function setPaymentStatus(requestId: string, paymentStatus: "UNPAID
   });
 }
 
+/**
+ * Permanently delete a request and all of its dependent records. This is a
+ * destructive, non-recoverable operation reserved for superadmins. Every
+ * child row (journey steps, driver tasks, status history, internal notes,
+ * price history, flight snapshots) is removed via `onDelete: Cascade`. The
+ * orphaned customer is cleaned up when no other request references it.
+ * AuditLog rows survive (their `requestId` is set to null) so the deletion
+ * itself remains traceable.
+ */
+export async function deleteRequest(requestId: string, actorId?: string) {
+  const request = await prisma.request.findUnique({
+    where: { id: requestId },
+    select: { id: true, referenceNumber: true, customerId: true },
+  });
+  if (!request) throw new Error("Request not found");
+
+  await prisma.$transaction(async (tx) => {
+    // Cascades remove journeySteps, driverTasks, statusHistory, internalNotes,
+    // priceHistory and flightSnapshots; auditLogs are detached (requestId null).
+    await tx.request.delete({ where: { id: requestId } });
+
+    // Remove the customer only if this was their last request.
+    const remaining = await tx.request.count({ where: { customerId: request.customerId } });
+    if (remaining === 0) {
+      await tx.customer.delete({ where: { id: request.customerId } });
+    }
+  });
+
+  await logAudit({
+    action: "REQUEST_DELETED",
+    entity: "Request",
+    entityId: request.id,
+    actorId,
+    // Intentionally no requestId — the request no longer exists.
+    metadata: { referenceNumber: request.referenceNumber },
+  });
+
+  return { referenceNumber: request.referenceNumber };
+}
+
 export async function addInternalNote(requestId: string, body: string, authorId?: string) {
   const note = await prisma.internalNote.create({
     data: { requestId, body, authorId: authorId ?? null },

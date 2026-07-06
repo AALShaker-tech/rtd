@@ -481,6 +481,24 @@ export const dict = {
     markCompleted: { en: "Mark completed", ar: "إكمال الطلب" },
     cancelRequest: { en: "Cancel request", ar: "إلغاء الطلب" },
     cancelReason: { en: "Cancellation reason", ar: "سبب الإلغاء" },
+    deleteRequest: { en: "Delete request", ar: "حذف الطلب" },
+    deleteRequestPermanently: { en: "Delete permanently", ar: "حذف نهائي" },
+    deleteRequestWarning: {
+      en: "This permanently deletes the request and all of its data. This cannot be undone.",
+      ar: "سيؤدي هذا إلى حذف الطلب وجميع بياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+    },
+    deleteRequestConfirm: {
+      en: "Type the reference number to confirm",
+      ar: "اكتب الرقم المرجعي للتأكيد",
+    },
+    deleteRequestConfirmPrompt: {
+      en: "Are you absolutely sure? This will permanently delete this request and all of its data. This action cannot be undone.",
+      ar: "هل أنت متأكد تمامًا؟ سيؤدي هذا إلى حذف هذا الطلب وجميع بياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+    },
+    deleteRequestConfirmYes: {
+      en: "Yes, delete permanently",
+      ar: "نعم، احذف نهائيًا",
+    },
     filters: { en: "Filters", ar: "عوامل التصفية" },
     customer: { en: "Customer", ar: "العميل" },
     journey: { en: "Journey", ar: "الرحلة" },

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/roles";
 import { serialize } from "@/lib/utils";
 import { RequestDetailView } from "./RequestDetailView";
 
@@ -35,10 +37,20 @@ export default async function RequestDetailPage({
   });
   if (!request) notFound();
 
-  const [employees, drivers] = await Promise.all([
+  const [session, employees, drivers] = await Promise.all([
+    getSession(),
     prisma.user.findMany({ where: { role: "EMPLOYEE", isActive: true }, select: { id: true, fullName: true } }),
     prisma.user.findMany({ where: { role: "DRIVER", isActive: true }, select: { id: true, fullName: true } }),
   ]);
 
-  return <RequestDetailView request={serialize(request)} employees={employees} drivers={drivers} />;
+  const canDelete = session ? isSuperAdmin(session.role) : false;
+
+  return (
+    <RequestDetailView
+      request={serialize(request)}
+      employees={employees}
+      drivers={drivers}
+      canDelete={canDelete}
+    />
+  );
 }
