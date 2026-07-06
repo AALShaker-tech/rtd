@@ -179,7 +179,7 @@ export const dict = {
     terminals: { en: "Terminals (comma-separated)", ar: "الصالات (مفصولة بفواصل)" },
     servicePrices: { en: "Service prices (per city)", ar: "أسعار الخدمات (لكل مدينة)" },
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
-    overridePlaceholder: { en: "global", ar: "افتراضي" },
+    overridePlaceholder: { en: "0", ar: "0" },
     enabled: { en: "Enabled", ar: "مفعّل" },
     selectCity: {
       en: "Select a city to edit, or add a new one.",
@@ -187,8 +187,8 @@ export const dict = {
     },
     cityDetails: { en: "City details", ar: "بيانات المدينة" },
     overrideHint: {
-      en: "Leave a price empty to use the global default. The city multiplier still applies.",
-      ar: "اترك السعر فارغًا لاستخدام الافتراضي. يبقى معامل المدينة ساريًا.",
+      en: "Set each service's price for this city. An empty price counts as 0 (not offered).",
+      ar: "حدّد سعر كل خدمة في هذه المدينة. السعر الفارغ يُحتسب صفرًا (غير متاح).",
     },
   },
   pricing: {
@@ -207,8 +207,7 @@ export const dict = {
     reason: { en: "Reason", ar: "السبب" },
     priceHistory: { en: "Price history", ar: "سجل الأسعار" },
     servicePricing: { en: "Service prices", ar: "أسعار الخدمات" },
-    pricesNav: { en: "Prices", ar: "الأسعار" },
-    vehiclePricing: { en: "Vehicle Class", ar: "فئه السيارة" },
+    vehiclePricing: { en: "Vehicle Class", ar: "فئة السيارة" },
     loungePricing: { en: "Lounge prices", ar: "أسعار الصالات" },
     destinationPricing: { en: "Destination pricing", ar: "تسعير الوجهات" },
     basePrice: { en: "Base price", ar: "السعر الأساسي" },

@@ -159,6 +159,37 @@ async function main() {
     }
   }
 
+  // ── Per-city prices ──
+  // Prices live on the city (one price per city). Seed each city from the
+  // built-in defaults so a fresh database has working prices; the admin edits
+  // them per city afterwards. Upsert-by-unique keeps re-seeding idempotent and
+  // never clobbers an edited price on update.
+  for (const c of CITIES) {
+    for (const [stepType, basePrice] of Object.entries(DEFAULT_SERVICE_PRICES)) {
+      await prisma.cityServicePricing.upsert({
+        where: { cityCode_stepType: { cityCode: c.code, stepType } },
+        update: {},
+        create: { cityCode: c.code, stepType, price: basePrice },
+      });
+    }
+    for (const [stepType, byClass] of Object.entries(DEFAULT_SERVICE_CLASS_PRICES)) {
+      for (const [category, price] of Object.entries(byClass)) {
+        await prisma.cityServiceClassPrice.upsert({
+          where: { cityCode_stepType_category: { cityCode: c.code, stepType, category } },
+          update: {},
+          create: { cityCode: c.code, stepType, category, price },
+        });
+      }
+    }
+    for (const [loungeType, price] of Object.entries(DEFAULT_LOUNGE_PRICES)) {
+      await prisma.cityLoungePricing.upsert({
+        where: { cityCode_loungeType: { cityCode: c.code, loungeType } },
+        update: {},
+        create: { cityCode: c.code, loungeType, price },
+      });
+    }
+  }
+
   // ── Static weekly flight schedule (from CSV) ──
   const scheduleRows = parseFlightSchedule();
   // Airlines (unique by code)

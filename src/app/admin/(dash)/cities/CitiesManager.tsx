@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { LOUNGE_TYPES, DEFAULT_SERVICE_PRICES, DEFAULT_LOUNGE_PRICES } from "@/lib/domain";
+import { LOUNGE_TYPES } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
@@ -231,7 +231,7 @@ function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCod
             <PriceRow
               key={s.code}
               label={label}
-              fallback={DEFAULT_SERVICE_PRICES[s.code] ?? 0}
+              fallback={0}
               price={row?.price ?? null}
               enabled={row?.enabled ?? true}
               onSave={(price, enabled) => setCityServicePrice(cityCode, s.code, price, enabled)}
@@ -256,7 +256,7 @@ function LoungePrices({ cityCode, rows }: { cityCode: string; rows: LoungeRow[] 
             <PriceRow
               key={l.value}
               label={l.name[locale]}
-              fallback={DEFAULT_LOUNGE_PRICES[l.value]}
+              fallback={0}
               price={row?.price ?? null}
               enabled={row?.enabled ?? true}
               onSave={(price, enabled) => setCityLoungePrice(cityCode, l.value, price, enabled)}
@@ -325,7 +325,7 @@ function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label:
             <input
               type="number" min={0} step={10}
               value={vals[v.category] ?? ""}
-              placeholder={locale === "ar" ? "عام" : "global"}
+              placeholder="0"
               onChange={(e) => setVals((p) => ({ ...p, [v.category]: e.target.value }))}
               className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
             />
