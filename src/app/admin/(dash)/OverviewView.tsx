@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { getCity, vehicleLabel, type CarCategory, type RequestStatus } from "@/lib/domain";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/utils";
+import { OnlinePresence } from "./OnlinePresence";
 
 interface Props {
   metrics: {
@@ -27,13 +28,6 @@ interface Props {
   }[];
   online: { id: string; fullName: string; role: string; lastSeenAt: string }[];
 }
-
-const ROLE_LABEL: Record<string, { en: string; ar: string }> = {
-  SUPERADMIN: { en: "Superadmin", ar: "مسؤول أعلى" },
-  ADMIN: { en: "Admin", ar: "مسؤول" },
-  EMPLOYEE: { en: "Employee", ar: "موظف" },
-  DRIVER: { en: "Driver", ar: "سائق" },
-};
 
 export function OverviewView({ metrics, byCity, byCategory, recent, online }: Props) {
   const { t, pick, locale } = useI18n();
@@ -85,33 +79,7 @@ export function OverviewView({ metrics, byCity, byCategory, recent, online }: Pr
         ))}
       </div>
 
-      <div className="luxe-card p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          <h3 className="font-serif text-lg font-semibold text-charcoal">
-            {pick(t.admin.whoOnline)}
-          </h3>
-          <span className="text-sm text-charcoal/40">({online.length})</span>
-        </div>
-        {online.length === 0 ? (
-          <p className="text-sm text-charcoal/40">{pick(t.admin.noOneOnline)}</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {online.map((u) => (
-              <li
-                key={u.id}
-                className="flex items-center gap-2 rounded-full bg-ivory-warm px-3 py-1.5 text-sm"
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                <span className="font-medium text-charcoal">{u.fullName}</span>
-                <span className="text-xs text-charcoal/40">
-                  {ROLE_LABEL[u.role]?.[locale] ?? u.role}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <OnlinePresence initial={online} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="luxe-card p-5">
