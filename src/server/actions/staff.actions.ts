@@ -8,6 +8,7 @@ import {
   assignDriver,
   assignEmployee,
   changeStatus,
+  deleteRequest,
 } from "@/server/services/request.service";
 import { logAudit } from "@/server/services/audit.service";
 import type { DriverTaskStatus, RequestStatus, UserRole } from "@prisma/client";
@@ -57,6 +58,21 @@ export async function adminCancelRequest(requestId: string, reason: string) {
   const s = await requireRole(["ADMIN"]);
   await changeStatus({ requestId, toStatus: "CANCELLED", actorId: s.userId, reason });
   revalidatePath(`/admin/requests/${requestId}`);
+  return { ok: true as const };
+}
+
+/**
+ * Permanently delete a request. Reserved for superadmins only — this is
+ * irreversible and removes all associated records.
+ */
+export async function adminDeleteRequest(requestId: string) {
+  const s = await requireRole(["SUPERADMIN"]);
+  try {
+    await deleteRequest(requestId, s.userId);
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Failed to delete request" };
+  }
+  revalidatePath("/admin/requests");
   return { ok: true as const };
 }
 

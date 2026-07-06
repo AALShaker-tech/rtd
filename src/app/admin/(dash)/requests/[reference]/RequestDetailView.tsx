@@ -16,6 +16,7 @@ import {
   adminAssignEmployee,
   adminCancelRequest,
   adminChangeStatus,
+  adminDeleteRequest,
 } from "@/server/actions/staff.actions";
 import { adminChangeRequestPrice, adminSetPaymentStatus } from "@/server/actions/pricing.actions";
 import { TextInput, Select as DSelect } from "@/components/ui/Field";
@@ -58,10 +59,12 @@ export function RequestDetailView({
   request,
   employees,
   drivers,
+  canDelete = false,
 }: {
   request: RequestData;
   employees: { id: string; fullName: string }[];
   drivers: { id: string; fullName: string }[];
+  canDelete?: boolean;
 }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
@@ -306,8 +309,57 @@ export function RequestDetailView({
               </button>
             </Panel>
           )}
+
+          {/* Permanent delete — superadmin only */}
+          {canDelete && <DeletePanel request={request} />}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DeletePanel({ request }: { request: RequestData }) {
+  const { t, pick } = useI18n();
+  const router = useRouter();
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const ready = confirm.trim().toUpperCase() === request.referenceNumber.toUpperCase();
+
+  async function remove() {
+    if (!ready) return;
+    setError(undefined);
+    setBusy(true);
+    const res = await adminDeleteRequest(request.id);
+    if (!res.ok) {
+      setBusy(false);
+      setError(res.error);
+      return;
+    }
+    // The request no longer exists — leave the detail page.
+    router.replace("/admin/requests");
+    router.refresh();
+  }
+
+  return (
+    <div className="luxe-card border border-red-200 p-4">
+      <h4 className="mb-2 text-sm font-semibold text-red-600">{pick(t.admin.deleteRequest)}</h4>
+      <p className="mb-3 text-xs text-charcoal/60">{pick(t.admin.deleteRequestWarning)}</p>
+      <TextInput
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        placeholder={pick(t.admin.deleteRequestConfirm)}
+        className="mb-2"
+      />
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <button
+        disabled={busy || !ready}
+        onClick={remove}
+        className="btn w-full bg-red-600 py-2 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {pick(t.admin.deleteRequestPermanently)}
+      </button>
     </div>
   );
 }
