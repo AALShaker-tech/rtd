@@ -456,7 +456,7 @@ export const dict = {
     },
     sendTestEmail: { en: "Send test email", ar: "إرسال بريد تجريبي" },
     testEmailSent: { en: "Sent to", ar: "أُرسل إلى" },
-    services: { en: "Services", ar: "الخدمات" },
+    services: { en: "Journey Steps", ar: "خطوات الرحلة" },
     vehicles: { en: "Car Categories", ar: "فئات السيارات" },
     totalRequests: { en: "Total requests", ar: "إجمالي الطلبات" },
     newRequests: { en: "New requests", ar: "طلبات جديدة" },

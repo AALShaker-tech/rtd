@@ -68,7 +68,7 @@ export function ServicesManager({ services }: { services: ServiceRow[] }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-semibold text-charcoal">{ar ? "الخدمات" : "Services"}</h1>
+          <h1 className="font-serif text-2xl font-semibold text-charcoal">{ar ? "خطوات الرحلة" : "Journey Steps"}</h1>
           <p className="mt-1 text-sm text-charcoal/55">
             {ar
               ? "الخدمات التي يبنى منها العميل رحلته، وترتيبها وسلوكها."
@@ -77,7 +77,7 @@ export function ServicesManager({ services }: { services: ServiceRow[] }) {
         </div>
         {!creating && (
           <button onClick={() => setCreating(true)} className="btn-gold px-4 py-2 text-xs">
-            + {ar ? "خدمة جديدة" : "New service"}
+            + {ar ? "خطوة جديدة" : "New step"}
           </button>
         )}
       </div>
@@ -146,7 +146,7 @@ function ServiceEditor({
         <span className="flex items-center gap-3">
           <span className="grid h-6 w-6 place-items-center rounded bg-charcoal/5 text-[0.65rem] font-bold text-charcoal/60">{f.sortOrder}</span>
           <span>
-            <span className="font-medium text-charcoal">{isNew ? (ar ? "خدمة جديدة" : "New service") : (ar ? f.nameAr : f.nameEn)}</span>
+            <span className="font-medium text-charcoal">{isNew ? (ar ? "خطوة جديدة" : "New step") : (ar ? f.nameAr : f.nameEn)}</span>
             {!isNew && <span className="ms-2 font-mono text-[0.7rem] text-charcoal/40">{f.code}</span>}
           </span>
         </span>
