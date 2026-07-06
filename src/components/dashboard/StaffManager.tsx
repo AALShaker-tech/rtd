@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput } from "@/components/ui/Field";
@@ -9,8 +9,11 @@ import {
   toggleStaffActive,
   resetStaffPassword,
 } from "@/server/actions/users.actions";
+import { getOnlineUsers } from "@/server/actions/presence.actions";
 import { formatDateTime } from "@/lib/utils";
 import { isOnline } from "@/lib/presence";
+
+const PRESENCE_POLL_MS = 30_000;
 
 interface StaffRow {
   id: string;
@@ -44,6 +47,29 @@ export function StaffManager({
   const [busy, setBusy] = useState(false);
   const [rowMsg, setRowMsg] = useState<{ ok: boolean; text: string } | undefined>();
   const [pendingId, setPendingId] = useState<string | undefined>();
+  // Live presence: seed from the server snapshot, then refresh periodically.
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(
+    () => new Set(staff.filter((s) => isOnline(s.lastSeenAt)).map((s) => s.id)),
+  );
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const res = await getOnlineUsers();
+        if (active) setOnlineIds(new Set(res.map((u) => u.id)));
+      } catch {
+        // transient — keep the last known set until the next poll
+      }
+    }
+    const id = setInterval(load, PRESENCE_POLL_MS);
+    const kick = setTimeout(load, 2_000);
+    return () => {
+      active = false;
+      clearInterval(id);
+      clearTimeout(kick);
+    };
+  }, []);
 
   async function doReset(s: StaffRow) {
     // A reset of an already-active account invalidates their current password
@@ -129,7 +155,7 @@ export function StaffManager({
                 <tr key={s.id} className="border-b border-charcoal/5">
                   <td className="px-4 py-3">
                     <p className="flex items-center gap-2 font-medium text-charcoal">
-                      {isOnline(s.lastSeenAt) && (
+                      {onlineIds.has(s.id) && (
                         <span
                           className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                           title={ar ? "متصل الآن" : "Online now"}
