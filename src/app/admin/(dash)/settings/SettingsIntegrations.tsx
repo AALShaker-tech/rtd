@@ -102,6 +102,11 @@ function ConfigForm({ settings, ar }: { settings: AdminSettings; ar: boolean }) 
             placeholder="ops@ratbli.sa"
           />
         </FieldWrap>
+        <p className="text-xs text-charcoal/40">
+          {ar
+            ? "تصل تنبيهات الطلبات الجديدة إلى جميع المسؤولين النشطين تلقائيًا. هذا البريد اختياري ويُضاف كمستلم إضافي."
+            : "New-request alerts go to all active admins automatically. This address is optional and added as an extra recipient."}
+        </p>
       </Section>
 
       <Section title={ar ? "البريد الإلكتروني" : "Email"}>
