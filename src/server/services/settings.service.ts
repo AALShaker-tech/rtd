@@ -120,18 +120,19 @@ export async function getActiveAdminEmails(): Promise<string[]> {
 
 /**
  * Who to alert about new requests. Every active admin gets the alert; the
- * superadmin-configured `ops.alertEmail` (if set) is added as an extra recipient
- * — e.g. a shared ops mailbox that is not a staff login. Addresses are deduped
+ * superadmin-configured `ops.alertEmail` (if set) adds extra recipients — e.g.
+ * shared ops mailboxes that are not staff logins. That field may hold several
+ * addresses separated by commas, semicolons, or whitespace. Addresses are deduped
  * case-insensitively. The phone target stays env-only for now.
  */
 export async function getOpsTargets(): Promise<{ emails: string[]; phone: string }> {
   const s = await resolveSettings();
-  const configured = s["ops.alertEmail"] || "";
+  const configured = splitEmails(s["ops.alertEmail"] || "");
   const adminEmails = await getActiveAdminEmails();
 
   const seen = new Set<string>();
   const emails: string[] = [];
-  for (const raw of [configured, ...adminEmails]) {
+  for (const raw of [...configured, ...adminEmails]) {
     const email = raw.trim();
     if (!email) continue;
     const key = email.toLowerCase();
@@ -140,6 +141,14 @@ export async function getOpsTargets(): Promise<{ emails: string[]; phone: string
     emails.push(email);
   }
   return { emails, phone: process.env.OPS_ALERT_PHONE || "" };
+}
+
+/** Split a free-text field into individual email addresses (comma/semicolon/whitespace-separated). */
+export function splitEmails(value: string): string[] {
+  return value
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
 }
 
 /** Values for the admin form. Secrets are surfaced only as a boolean "isSet". */
