@@ -30,17 +30,28 @@ export function StaffManager({
 }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
-  const [form, setForm] = useState({ fullName: "", email: "", phone: "", password: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", phone: "" });
   const [error, setError] = useState<string | undefined>();
+  const [notice, setNotice] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
   async function add() {
     setBusy(true);
     setError(undefined);
+    setNotice(undefined);
     const res = await createStaffUser({ ...form, role });
     setBusy(false);
     if (!res.ok) return setError(res.error);
-    setForm({ fullName: "", email: "", phone: "", password: "" });
+    setForm({ fullName: "", email: "", phone: "" });
+    setNotice(
+      res.emailed
+        ? locale === "ar"
+          ? "تم الإنشاء — أُرسل رابط التفعيل إلى البريد."
+          : "Created — an activation link was emailed."
+        : locale === "ar"
+          ? "تم الإنشاء، لكن تعذّر إرسال البريد. يمكن للمستخدم طلب رابط من صفحة تعيين كلمة المرور."
+          : "Created, but the email couldn't be sent. The user can request a link from the set-password page.",
+    );
     router.refresh();
   }
 
@@ -118,20 +129,19 @@ export function StaffManager({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </FieldWrap>
-            <FieldWrap label={pick(t.fields.phone)}>
+            <FieldWrap label={`${pick(t.fields.phone)} (${pick(t.common.optional)})`}>
               <TextInput
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
             </FieldWrap>
-            <FieldWrap label={pick(t.auth.password)}>
-              <TextInput
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-              />
-            </FieldWrap>
+            <p className="text-xs text-charcoal/40">
+              {locale === "ar"
+                ? "سيصل المستخدم رابط تفعيل لتعيين كلمة المرور بنفسه."
+                : "The user receives an activation link to set their own password."}
+            </p>
             {error && <p className="text-xs text-red-600">{error}</p>}
+            {notice && <p className="text-xs text-emerald-700">{notice}</p>}
             <button onClick={add} disabled={busy} className="btn-gold w-full">
               {pick(t.common.save)}
             </button>

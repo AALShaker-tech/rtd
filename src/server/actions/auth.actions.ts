@@ -5,12 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
 import { isAdmin } from "@/lib/roles";
-import { generateSetupToken, SETUP_TOKEN_TTL_MS } from "@/lib/setup-token";
 import { loginSchema } from "@/lib/validation/schemas";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/request-context";
-import { logger } from "@/lib/logger";
-import { sendEmail } from "@/server/services/notify.service";
+import { sendAccountSetupLink } from "@/server/services/account-setup.service";
 import { findUserBySetupToken } from "@/server/services/setup.service";
 
 /** Where each role lands after authenticating. */
@@ -76,31 +74,9 @@ export async function requestSetupLink(_prev: unknown, formData: FormData) {
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (user && user.isActive && user.mustSetPassword) {
-    const { raw, hash } = generateSetupToken();
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        setupTokenHash: hash,
-        setupTokenExpiresAt: new Date(Date.now() + SETUP_TOKEN_TTL_MS),
-      },
-    });
-
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
-    const link = `${base}/admin/set-password?token=${raw}`;
-    const minutes = Math.round(SETUP_TOKEN_TTL_MS / 60000);
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: "Set up your RTD account | تفعيل حسابك في RTD",
-        body:
-          `Use this one-time link to set your password (valid for ${minutes} minutes):\n${link}\n\n` +
-          `If you didn't request this, you can ignore this email.\n\n` +
-          `استخدم هذا الرابط لمرة واحدة لتعيين كلمة المرور (صالح لمدة ${minutes} دقيقة):\n${link}`,
-      });
-    } catch (e) {
-      // Never surface delivery errors to the caller (would leak eligibility).
-      logger.error("setup link email failed", { err: e });
-    }
+    // Email delivery errors are swallowed inside the helper so we can't leak
+    // whether the account exists / is eligible.
+    await sendAccountSetupLink({ id: user.id, email: user.email });
   }
 
   return { sent: true as const };
