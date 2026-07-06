@@ -454,6 +454,8 @@ export const dict = {
     admins: { en: "Admins", ar: "المسؤولون" },
     actions: { en: "Actions", ar: "الإجراءات" },
     process: { en: "Process", ar: "العمليات" },
+    whoOnline: { en: "Who's online", ar: "المتصلون الآن" },
+    noOneOnline: { en: "No one is online right now.", ar: "لا يوجد أحد متصل الآن." },
     settings: { en: "Settings", ar: "الإعدادات" },
     whatsappSettings: { en: "WhatsApp", ar: "واتساب" },
     testEmail: { en: "Test email", ar: "بريد تجريبي" },

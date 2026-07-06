@@ -114,6 +114,9 @@ model User {
   // emailed to the account owner; cleared once the password is set.
   setupTokenHash      String?
   setupTokenExpiresAt DateTime?
+  // Presence: refreshed while the user's dashboard is open (via the polled
+  // notifications action). "Online" = seen within the last couple of minutes.
+  lastSeenAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

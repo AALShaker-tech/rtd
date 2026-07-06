@@ -20,6 +20,19 @@ export async function getOpsNotifications(): Promise<{
   const session = await getSession();
   if (!session) return { items: [], serverTime };
 
+  // Presence heartbeat: mark the caller active. Throttled (only writes when the
+  // last beat is >20s old) and never allowed to break the notifications response.
+  const staleBefore = new Date(Date.now() - 20_000);
+  await prisma.user
+    .updateMany({
+      where: {
+        id: session.userId,
+        OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: staleBefore } }],
+      },
+      data: { lastSeenAt: new Date() },
+    })
+    .catch(() => {});
+
   if (isAdmin(session.role)) {
     const reqs = await prisma.request.findMany({
       where: { status: { in: ["REQUEST_RECEIVED", "UNDER_REVIEW"] } },

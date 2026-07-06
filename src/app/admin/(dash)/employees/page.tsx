@@ -20,6 +20,7 @@ export default async function EmployeesPage() {
         phone: e.phone,
         isActive: e.isActive,
         mustSetPassword: e.mustSetPassword,
+        lastSeenAt: e.lastSeenAt?.toISOString() ?? null,
         createdAt: e.createdAt.toISOString(),
         count: e._count.assignedAsEmployee,
       }))}

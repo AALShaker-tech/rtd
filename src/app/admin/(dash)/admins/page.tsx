@@ -25,6 +25,7 @@ export default async function AdminsPage() {
         phone: a.phone,
         isActive: a.isActive,
         mustSetPassword: a.mustSetPassword,
+        lastSeenAt: a.lastSeenAt?.toISOString() ?? null,
         createdAt: a.createdAt.toISOString(),
         count: a._count.auditLogs,
       }))}

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ONLINE_WINDOW_MS } from "@/lib/presence";
 import { OverviewView } from "./OverviewView";
 
 export const dynamic = "force-dynamic";
@@ -21,21 +22,35 @@ export default async function AdminOverview() {
     byCityRaw,
     byCategoryRaw,
     recent,
+    onlineUsers,
   ] = await Promise.all([
     prisma.request.count(),
     prisma.request.count({ where: { status: "REQUEST_RECEIVED" } }),
     prisma.request.count({ where: { status: "CONFIRMED" } }),
     prisma.request.count({ where: { status: "COMPLETED" } }),
     prisma.request.count({ where: { status: "CANCELLED" } }),
-    prisma.request.count({ where: { assignedEmployeeId: null, status: { notIn: ["CANCELLED", "COMPLETED"] } } }),
+    prisma.request.count({
+      where: { assignedEmployeeId: null, status: { notIn: ["CANCELLED", "COMPLETED"] } },
+    }),
     prisma.customer.count({ where: { OR: [{ phoneVerified: false }, { emailVerified: false }] } }),
-    prisma.journeyStep.count({ where: { scheduledAt: { gte: startOfToday, lt: endOfToday }, skipped: false } }),
-    prisma.journeyStep.groupBy({ by: ["city"], _count: true, where: { city: { not: null }, skipped: false } }),
+    prisma.journeyStep.count({
+      where: { scheduledAt: { gte: startOfToday, lt: endOfToday }, skipped: false },
+    }),
+    prisma.journeyStep.groupBy({
+      by: ["city"],
+      _count: true,
+      where: { city: { not: null }, skipped: false },
+    }),
     prisma.request.groupBy({ by: ["carCategory"], _count: true }),
     prisma.request.findMany({
       take: 6,
       orderBy: { createdAt: "desc" },
       include: { customer: { select: { fullName: true } } },
+    }),
+    prisma.user.findMany({
+      where: { isActive: true, lastSeenAt: { gt: new Date(Date.now() - ONLINE_WINDOW_MS) } },
+      orderBy: { lastSeenAt: "desc" },
+      select: { id: true, fullName: true, role: true, lastSeenAt: true },
     }),
   ]);
 
@@ -58,6 +73,12 @@ export default async function AdminOverview() {
         name: r.customer.fullName,
         status: r.status,
         createdAt: r.createdAt,
+      }))}
+      online={onlineUsers.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        role: u.role,
+        lastSeenAt: u.lastSeenAt!.toISOString(),
       }))}
     />
   );

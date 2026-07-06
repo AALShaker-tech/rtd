@@ -19,21 +19,58 @@ interface Props {
   };
   byCity: { city: string; count: number }[];
   byCategory: { category: CarCategory; count: number }[];
-  recent: { referenceNumber: string; name: string; status: RequestStatus; createdAt: Date | string }[];
+  recent: {
+    referenceNumber: string;
+    name: string;
+    status: RequestStatus;
+    createdAt: Date | string;
+  }[];
+  online: { id: string; fullName: string; role: string; lastSeenAt: string }[];
 }
 
-export function OverviewView({ metrics, byCity, byCategory, recent }: Props) {
+const ROLE_LABEL: Record<string, { en: string; ar: string }> = {
+  SUPERADMIN: { en: "Superadmin", ar: "مسؤول أعلى" },
+  ADMIN: { en: "Admin", ar: "مسؤول" },
+  EMPLOYEE: { en: "Employee", ar: "موظف" },
+  DRIVER: { en: "Driver", ar: "سائق" },
+};
+
+export function OverviewView({ metrics, byCity, byCategory, recent, online }: Props) {
   const { t, pick, locale } = useI18n();
 
   const cards = [
-    { label: pick(t.admin.totalRequests), value: metrics.total, accent: "from-charcoal to-charcoal-800" },
-    { label: pick(t.admin.newRequests), value: metrics.received, accent: "from-blue-500 to-blue-600" },
+    {
+      label: pick(t.admin.totalRequests),
+      value: metrics.total,
+      accent: "from-charcoal to-charcoal-800",
+    },
+    {
+      label: pick(t.admin.newRequests),
+      value: metrics.received,
+      accent: "from-blue-500 to-blue-600",
+    },
     { label: pick(t.admin.confirmed), value: metrics.confirmed, accent: "from-gold to-gold-dark" },
-    { label: pick(t.admin.completed), value: metrics.completed, accent: "from-emerald-500 to-emerald-600" },
+    {
+      label: pick(t.admin.completed),
+      value: metrics.completed,
+      accent: "from-emerald-500 to-emerald-600",
+    },
     { label: pick(t.admin.cancelled), value: metrics.cancelled, accent: "from-red-400 to-red-500" },
-    { label: pick(t.admin.unassigned), value: metrics.unassigned, accent: "from-purple-500 to-purple-600" },
-    { label: pick(t.admin.pendingVerification), value: metrics.pendingVerification, accent: "from-amber-400 to-amber-500" },
-    { label: pick(t.admin.upcomingToday), value: metrics.upcomingToday, accent: "from-teal-500 to-teal-600" },
+    {
+      label: pick(t.admin.unassigned),
+      value: metrics.unassigned,
+      accent: "from-purple-500 to-purple-600",
+    },
+    {
+      label: pick(t.admin.pendingVerification),
+      value: metrics.pendingVerification,
+      accent: "from-amber-400 to-amber-500",
+    },
+    {
+      label: pick(t.admin.upcomingToday),
+      value: metrics.upcomingToday,
+      accent: "from-teal-500 to-teal-600",
+    },
   ];
 
   return (
@@ -48,18 +85,62 @@ export function OverviewView({ metrics, byCity, byCategory, recent }: Props) {
         ))}
       </div>
 
+      <div className="luxe-card p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+          <h3 className="font-serif text-lg font-semibold text-charcoal">
+            {pick(t.admin.whoOnline)}
+          </h3>
+          <span className="text-sm text-charcoal/40">({online.length})</span>
+        </div>
+        {online.length === 0 ? (
+          <p className="text-sm text-charcoal/40">{pick(t.admin.noOneOnline)}</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {online.map((u) => (
+              <li
+                key={u.id}
+                className="flex items-center gap-2 rounded-full bg-ivory-warm px-3 py-1.5 text-sm"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                <span className="font-medium text-charcoal">{u.fullName}</span>
+                <span className="text-xs text-charcoal/40">
+                  {ROLE_LABEL[u.role]?.[locale] ?? u.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="luxe-card p-5">
-          <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">{pick(t.admin.byCity)}</h3>
-          <DistList items={byCity.map((c) => ({ label: getCity(c.city)?.name[locale] ?? c.city, count: c.count }))} />
+          <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">
+            {pick(t.admin.byCity)}
+          </h3>
+          <DistList
+            items={byCity.map((c) => ({
+              label: getCity(c.city)?.name[locale] ?? c.city,
+              count: c.count,
+            }))}
+          />
         </div>
         <div className="luxe-card p-5">
-          <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">{pick(t.admin.byCategory)}</h3>
-          <DistList items={byCategory.map((c) => ({ label: vehicleLabel(c.category, locale), count: c.count }))} />
+          <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">
+            {pick(t.admin.byCategory)}
+          </h3>
+          <DistList
+            items={byCategory.map((c) => ({
+              label: vehicleLabel(c.category, locale),
+              count: c.count,
+            }))}
+          />
         </div>
         <div className="luxe-card p-5 lg:col-span-1">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.admin.requests)}</h3>
+            <h3 className="font-serif text-lg font-semibold text-charcoal">
+              {pick(t.admin.requests)}
+            </h3>
             <Link href="/admin/requests" className="text-xs text-gold-dark hover:underline">
               {pick(t.common.all)} →
             </Link>
@@ -72,14 +153,20 @@ export function OverviewView({ metrics, byCity, byCategory, recent }: Props) {
                   className="flex items-center justify-between rounded-lg px-2 py-2 hover:bg-ivory-warm"
                 >
                   <div>
-                    <p className="font-mono text-xs font-semibold text-charcoal">{r.referenceNumber}</p>
+                    <p className="font-mono text-xs font-semibold text-charcoal">
+                      {r.referenceNumber}
+                    </p>
                     <p className="text-xs text-charcoal/50">{r.name}</p>
                   </div>
                   <StatusBadge status={r.status} />
                 </Link>
               </li>
             ))}
-            {recent.length === 0 && <li className="py-4 text-center text-sm text-charcoal/40">{pick(t.admin.noRequests)}</li>}
+            {recent.length === 0 && (
+              <li className="py-4 text-center text-sm text-charcoal/40">
+                {pick(t.admin.noRequests)}
+              </li>
+            )}
           </ul>
         </div>
       </div>
@@ -99,7 +186,10 @@ function DistList({ items }: { items: { label: string; count: number }[] }) {
             <span className="font-medium text-charcoal">{i.count}</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-charcoal/5">
-            <div className="h-full rounded-full bg-gold-gradient" style={{ width: `${(i.count / max) * 100}%` }} />
+            <div
+              className="h-full rounded-full bg-gold-gradient"
+              style={{ width: `${(i.count / max) * 100}%` }}
+            />
           </div>
         </li>
       ))}

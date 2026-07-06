@@ -10,6 +10,7 @@ import {
   resetStaffPassword,
 } from "@/server/actions/users.actions";
 import { formatDateTime } from "@/lib/utils";
+import { isOnline } from "@/lib/presence";
 
 interface StaffRow {
   id: string;
@@ -18,6 +19,7 @@ interface StaffRow {
   phone: string | null;
   isActive: boolean;
   mustSetPassword: boolean;
+  lastSeenAt: string | null;
   createdAt: string;
   count: number;
 }
@@ -126,7 +128,15 @@ export function StaffManager({
               {staff.map((s) => (
                 <tr key={s.id} className="border-b border-charcoal/5">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-charcoal">{s.fullName}</p>
+                    <p className="flex items-center gap-2 font-medium text-charcoal">
+                      {isOnline(s.lastSeenAt) && (
+                        <span
+                          className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                          title={ar ? "متصل الآن" : "Online now"}
+                        />
+                      )}
+                      {s.fullName}
+                    </p>
                     <p className="text-xs text-charcoal/40">{s.phone ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3 text-charcoal/70">{s.email}</td>
