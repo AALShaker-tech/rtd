@@ -105,13 +105,14 @@ export async function resolveEmailConfig(): Promise<EmailConfig> {
 }
 
 /**
- * Emails of every active admin account (SUPERADMIN + ADMIN, `isActive`). These
- * are the people who should be alerted about new requests. Deduped and lowercased
- * by the caller alongside any manually configured ops address.
+ * Emails of every active ADMIN account (`isActive`). These are the people who
+ * should be alerted about new requests. Superadmins are intentionally excluded.
+ * Deduped and lowercased by the caller alongside any manually configured ops
+ * address.
  */
 export async function getActiveAdminEmails(): Promise<string[]> {
   const admins = await prisma.user.findMany({
-    where: { isActive: true, role: { in: ["SUPERADMIN", "ADMIN"] } },
+    where: { isActive: true, role: "ADMIN" },
     select: { email: true },
   });
   return admins.map((u: { email: string }) => u.email).filter(Boolean);

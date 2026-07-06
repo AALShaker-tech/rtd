@@ -172,7 +172,7 @@ Verification is optional at submission — unverified contacts are clearly marke
 
 **Ops alerts:** when a customer submits a request, the operations team is alerted
 via `sendOpsAlert` (same provider abstraction). The email goes to **every active
-admin** (SUPERADMIN + ADMIN accounts); the superadmin-editable *New-request alert
+admin** (ADMIN accounts; superadmins excluded); the superadmin-editable *New-request alert
 email* (`OPS_ALERT_EMAIL`) is added as an optional extra recipient — e.g. a shared
 ops mailbox that isn't a staff login. Each address is emailed independently, so a
 single bad address never blocks the rest. Set `OPS_ALERT_PHONE` (with

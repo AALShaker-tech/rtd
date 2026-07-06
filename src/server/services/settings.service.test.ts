@@ -75,12 +75,12 @@ describe("getOpsTargets", () => {
     expect(emails).toEqual(["Admin@Ratbli.sa"]);
   });
 
-  it("only queries active admins (SUPERADMIN + ADMIN)", async () => {
+  it("only queries active ADMINs (superadmins excluded)", async () => {
     findMany.mockResolvedValue([]);
     userFindMany.mockResolvedValue([]);
     await getOpsTargets();
     expect(userFindMany).toHaveBeenCalledWith({
-      where: { isActive: true, role: { in: ["SUPERADMIN", "ADMIN"] } },
+      where: { isActive: true, role: "ADMIN" },
       select: { email: true },
     });
   });
