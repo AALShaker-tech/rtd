@@ -98,79 +98,62 @@ describe("getCityCatalog — vehicle (per-city) availability", () => {
   });
 });
 
-describe("getCityCatalog — lounge (enable/disable) reflection", () => {
-  // LON is an international city → default lounges are MEET_ASSIST & FAST_TRACK.
-  it("offers the country default lounges when nothing is configured", async () => {
-    cityFindMany.mockResolvedValue([city({ code: "LON", loungePricing: [] })]);
-    serviceFindMany.mockResolvedValue([]);
-
-    const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).toEqual(
-      expect.arrayContaining(["MEET_ASSIST", "FAST_TRACK"]),
-    );
-  });
-
-  it("resolves default lounges from the DB country, not the static city list", async () => {
-    // DMM is not in the static domain CITIES; before the fix it fell through to
-    // the international defaults regardless of the DB country. A Saudi city must
-    // offer Executive Office / Marhaba.
-    cityFindMany.mockResolvedValue([city({ code: "DMM", country: "SA", loungePricing: [] })]);
-    serviceFindMany.mockResolvedValue([]);
-
-    const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).toEqual(
-      expect.arrayContaining(["EXECUTIVE_OFFICE", "MARHABA"]),
-    );
-    expect(catalog.cities[0].lounges).not.toContain("MEET_ASSIST");
-  });
-
-  it("removes a disabled default lounge (disable actually sticks)", async () => {
-    cityFindMany.mockResolvedValue([
-      city({ code: "LON", loungePricing: [{ loungeType: "MEET_ASSIST", enabled: false }] }),
-    ]);
-    serviceFindMany.mockResolvedValue([]);
-
-    const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).not.toContain("MEET_ASSIST");
-    expect(catalog.cities[0].lounges).toContain("FAST_TRACK");
-  });
-
-  it("does not resurrect a disabled lounge that was explicitly added then turned off", async () => {
-    // The reported case: Marhaba offered for a destination, then disabled.
-    cityFindMany.mockResolvedValue([
-      city({ code: "IST", country: "TR", loungePricing: [{ loungeType: "MARHABA", enabled: false }] }),
-    ]);
-    serviceFindMany.mockResolvedValue([]);
-
-    const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).not.toContain("MARHABA");
-  });
-
-  it("adds an explicitly enabled non-default lounge on top of the defaults", async () => {
-    cityFindMany.mockResolvedValue([
-      city({ code: "LON", loungePricing: [{ loungeType: "MARHABA", enabled: true }] }),
-    ]);
-    serviceFindMany.mockResolvedValue([]);
-
-    const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).toEqual(
-      expect.arrayContaining(["MARHABA", "MEET_ASSIST", "FAST_TRACK"]),
-    );
-  });
-
-  it("can disable every lounge for a city (empty list, no fallback to defaults)", async () => {
+describe("getCityCatalog — airport lounges", () => {
+  it("exposes an airport's enabled lounges with name + per-airport price", async () => {
     cityFindMany.mockResolvedValue([
       city({
         code: "LON",
-        loungePricing: [
-          { loungeType: "MEET_ASSIST", enabled: false },
-          { loungeType: "FAST_TRACK", enabled: false },
+        airports: [
+          {
+            code: "LHR", nameEn: "Heathrow", nameAr: "هيثرو", terminals: [],
+            lounges: [
+              { loungeId: "MEET_ASSIST", price: 180, lounge: { active: true, nameEn: "Meet & Assist", nameAr: "الاستقبال", descriptionEn: "desc", descriptionAr: "وصف" } },
+            ],
+          },
         ],
       }),
     ]);
     serviceFindMany.mockResolvedValue([]);
 
     const catalog = await getCityCatalog();
-    expect(catalog.cities[0].lounges).toEqual([]);
+    const lounges = catalog.cities[0].airports[0].lounges;
+    expect(lounges).toHaveLength(1);
+    expect(lounges[0]).toMatchObject({ id: "MEET_ASSIST", price: 180, nameEn: "Meet & Assist" });
+  });
+
+  it("keeps each airport's lounges separate (multi-airport city)", async () => {
+    cityFindMany.mockResolvedValue([
+      city({
+        code: "LON",
+        airports: [
+          { code: "LHR", nameEn: "Heathrow", nameAr: "هيثرو", terminals: [], lounges: [
+            { loungeId: "FAST_TRACK", price: 200, lounge: { active: true, nameEn: "Fast Track", nameAr: "سريع", descriptionEn: "", descriptionAr: "" } },
+          ] },
+          { code: "LGW", nameEn: "Gatwick", nameAr: "غاتويك", terminals: [], lounges: [] },
+        ],
+      }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].airports[0].lounges.map((l) => l.id)).toEqual(["FAST_TRACK"]);
+    expect(catalog.cities[0].airports[1].lounges).toEqual([]);
+  });
+
+  it("hides a lounge whose catalog entry has been deactivated", async () => {
+    cityFindMany.mockResolvedValue([
+      city({
+        code: "LON",
+        airports: [
+          { code: "LHR", nameEn: "Heathrow", nameAr: "هيثرو", terminals: [], lounges: [
+            { loungeId: "OLD", price: 100, lounge: { active: false, nameEn: "Old", nameAr: "قديم", descriptionEn: "", descriptionAr: "" } },
+          ] },
+        ],
+      }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].airports[0].lounges).toEqual([]);
   });
 });

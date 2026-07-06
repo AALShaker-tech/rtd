@@ -4,10 +4,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   FALLBACK_CATALOG,
   catalogCityName,
-  catalogLoungeOptions,
+  catalogAirportLounges,
+  catalogCityForAirport,
   destinationCities,
   type Catalog,
   type CatalogCity,
+  type CatalogAirportLounge,
 } from "@/lib/catalog";
 import { fetchCityCatalog } from "@/server/actions/city.actions";
 import type { Locale } from "@/lib/domain";
@@ -19,7 +21,10 @@ interface CatalogCtx {
   destinations: CatalogCity[];
   cityName: (code: string | null | undefined, locale: Locale) => string;
   city: (code: string | null | undefined) => CatalogCity | undefined;
-  loungeOptions: (code: string | null | undefined) => { value: string; name: { en: string; ar: string } }[];
+  /** Enabled lounges (with price) offered at a specific airport. */
+  airportLounges: (airportCode: string | null | undefined) => CatalogAirportLounge[];
+  /** The city that owns an airport code. */
+  cityForAirport: (airportCode: string | null | undefined) => CatalogCity | undefined;
 }
 
 const Ctx = createContext<CatalogCtx | null>(null);
@@ -60,7 +65,8 @@ export function CatalogProvider({
     destinations: destinationCities(catalog),
     cityName: (code, locale) => catalogCityName(catalog, code, locale),
     city: (code) => catalog.cities.find((c) => c.code === code),
-    loungeOptions: (code) => catalogLoungeOptions(catalog, code),
+    airportLounges: (airportCode) => catalogAirportLounges(catalog, airportCode),
+    cityForAirport: (airportCode) => catalogCityForAirport(catalog, airportCode),
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

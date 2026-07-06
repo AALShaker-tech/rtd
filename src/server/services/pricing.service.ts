@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/lib/pricing";
+import { type PricingConfig } from "@/lib/pricing";
 
 /**
  * Build the authoritative pricing config from the database, falling back to the
@@ -13,45 +13,34 @@ import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/lib/pricing";
  * LoungePricing (+ their per-city overrides).
  */
 export async function getPricingConfig(): Promise<PricingConfig> {
-  const [services, lounges, classPrices, cityServices, cityLounges, cityClassPrices] =
-    await Promise.all([
-      prisma.servicePricing.findMany({ where: { active: true } }),
-      prisma.loungePricing.findMany({ where: { active: true } }),
-      prisma.serviceClassPrice.findMany(),
-      prisma.cityServicePricing.findMany({ where: { enabled: true, price: { not: null } } }),
-      prisma.cityLoungePricing.findMany({ where: { enabled: true, price: { not: null } } }),
-      prisma.cityServiceClassPrice.findMany(),
-    ]);
+  const [cityServices, cityClassPrices, airportLounges] = await Promise.all([
+    prisma.cityServicePricing.findMany({ where: { enabled: true, price: { not: null } } }),
+    prisma.cityServiceClassPrice.findMany(),
+    prisma.airportLounge.findMany({ where: { enabled: true } }),
+  ]);
 
   const config: PricingConfig = {
-    services: { ...DEFAULT_PRICING_CONFIG.services },
-    lounges: { ...DEFAULT_PRICING_CONFIG.lounges },
-    serviceClassPrices: structuredClone(DEFAULT_PRICING_CONFIG.serviceClassPrices),
+    services: {},
+    lounges: {},
+    serviceClassPrices: {},
     cityServicePrices: {},
     cityLoungePrices: {},
     cityServiceClassPrices: {},
+    airportLoungePrices: {},
   };
 
-  for (const s of services) config.services[s.stepType] = s.basePrice;
-  for (const l of lounges) config.lounges[l.loungeType] = l.price;
-
-  // Global per-class car prices.
-  for (const p of classPrices) {
-    (config.serviceClassPrices[p.stepType] ??= {})[p.category] = p.price;
-  }
-
-  // Per-city assistance/lounge overrides.
+  // Assistance/base price per city.
   for (const cs of cityServices) {
     (config.cityServicePrices![cs.cityCode] ??= {})[cs.stepType] = cs.price as number;
   }
-  for (const cl of cityLounges) {
-    (config.cityLoungePrices![cl.cityCode] ??= {})[cl.loungeType] = cl.price as number;
-  }
-
-  // Per-city per-class car overrides.
+  // Car per-class price per city.
   for (const cp of cityClassPrices) {
     ((config.cityServiceClassPrices![cp.cityCode] ??= {})[cp.stepType] ??= {})[cp.category] =
       cp.price;
+  }
+  // Lounge price per airport.
+  for (const al of airportLounges) {
+    (config.airportLoungePrices![al.airportCode] ??= {})[al.loungeId] = al.price;
   }
 
   return config;

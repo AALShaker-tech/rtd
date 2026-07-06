@@ -1,11 +1,10 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { loungeValuesForCountry } from "@/lib/domain";
 import type { Catalog } from "@/lib/catalog";
 
 /**
- * Build the city catalog from the DB (active cities only). Lounge availability
- * comes from CityLoungePricing rows when present, otherwise the country default.
+ * Build the city catalog from the DB (active cities only). Lounges are attached
+ * to airports: each airport exposes the lounges enabled for it (with price).
  */
 export async function getCityCatalog(): Promise<Catalog> {
   const [cities, globalServices] = await Promise.all([
@@ -13,8 +12,12 @@ export async function getCityCatalog(): Promise<Catalog> {
       where: { active: true },
       orderBy: [{ isOrigin: "desc" }, { nameEn: "asc" }],
       include: {
-        airports: { orderBy: { id: "asc" } }, // natural (seed) order → primary airport first
-        loungePricing: true,
+        // natural (seed) order → primary airport first; include each airport's
+        // enabled lounges joined to the active catalog entry for name/description.
+        airports: {
+          orderBy: { id: "asc" },
+          include: { lounges: { where: { enabled: true }, include: { lounge: true } } },
+        },
         servicePricing: true,
         vehiclePricing: true,
       },
@@ -28,23 +31,6 @@ export async function getCityCatalog(): Promise<Catalog> {
 
   return {
     cities: cities.map((c) => {
-      // Available lounges = the city's default set (by country) plus any lounge
-      // the admin explicitly enabled, minus any the admin explicitly disabled.
-      // Treating the CityLoungePricing rows as overrides (not a replacement
-      // allowlist) means a disable actually sticks — the previous fallback
-      // resurrected the defaults whenever nothing was left explicitly enabled,
-      // so disabling a default lounge (e.g. Marhaba) appeared to do nothing.
-      const disabledLounges = new Set(
-        c.loungePricing.filter((l) => !l.enabled).map((l) => l.loungeType),
-      );
-      const enabledLounges = c.loungePricing.filter((l) => l.enabled).map((l) => l.loungeType);
-      // Resolve defaults from the DB city's country (not the static city list),
-      // so admin-added cities get the right set — e.g. a new Saudi city offers
-      // Executive Office / Marhaba rather than the international defaults.
-      const defaultLounges = loungeValuesForCountry(c.country);
-      const lounges = [...new Set([...defaultLounges, ...enabledLounges])].filter(
-        (v) => !disabledLounges.has(v),
-      );
       const disabledSteps = [
         ...new Set([
           ...c.servicePricing.filter((s) => !s.enabled).map((s) => s.stepType),
@@ -58,8 +44,23 @@ export async function getCityCatalog(): Promise<Catalog> {
         nameAr: c.nameAr,
         country: c.country,
         isOrigin: c.isOrigin,
-        airports: c.airports.map((a) => ({ code: a.code, nameEn: a.nameEn, nameAr: a.nameAr, terminals: a.terminals })),
-        lounges,
+        airports: c.airports.map((a) => ({
+          code: a.code,
+          nameEn: a.nameEn,
+          nameAr: a.nameAr,
+          terminals: a.terminals,
+          // Only lounges whose catalog entry is still active are offered.
+          lounges: a.lounges
+            .filter((al) => al.lounge.active)
+            .map((al) => ({
+              id: al.loungeId,
+              nameEn: al.lounge.nameEn,
+              nameAr: al.lounge.nameAr,
+              descriptionEn: al.lounge.descriptionEn,
+              descriptionAr: al.lounge.descriptionAr,
+              price: al.price,
+            })),
+        })),
         disabledSteps,
         disabledVehicles,
       };
@@ -85,7 +86,7 @@ export async function listCitiesAdmin() {
   return prisma.city.findMany({
     orderBy: [{ isOrigin: "desc" }, { nameEn: "asc" }],
     include: {
-      airports: { orderBy: { code: "asc" } },
+      airports: { orderBy: { code: "asc" }, include: { lounges: true } },
       servicePricing: true,
       loungePricing: true,
       vehiclePricing: true,

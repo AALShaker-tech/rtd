@@ -6,16 +6,25 @@
 
 import {
   CITIES,
-  LOUNGE_TYPES,
-  loungeOptionsForCity,
   type Locale,
 } from "@/lib/domain";
+
+export interface CatalogAirportLounge {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  price: number;
+}
 
 export interface CatalogAirport {
   code: string;
   nameEn: string;
   nameAr: string;
   terminals: string[];
+  /** Enabled lounges offered at this airport, with their per-airport price. */
+  lounges: CatalogAirportLounge[];
 }
 
 export interface CatalogCity {
@@ -25,8 +34,6 @@ export interface CatalogCity {
   country: string;
   isOrigin: boolean;
   airports: CatalogAirport[];
-  /** Enabled lounge/airport-service option values for this city. */
-  lounges: string[];
   /** Journey step types disabled for this city. */
   disabledSteps: string[];
   /** Vehicle categories disabled for this city. */
@@ -45,8 +52,7 @@ export const FALLBACK_CATALOG: Catalog = {
     nameAr: c.name.ar,
     country: c.country,
     isOrigin: !!c.isOrigin,
-    airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals })),
-    lounges: loungeOptionsForCity(c.code).map((l) => l.value),
+    airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals, lounges: [] })),
     disabledSteps: [],
     disabledVehicles: [],
   })),
@@ -67,14 +73,20 @@ export function catalogCityName(catalog: Catalog, code: string | null | undefine
   return dc ? dc.name[locale] : code;
 }
 
-/** Lounge option {value,name} list for a city, using catalog availability. */
-export function catalogLoungeOptions(catalog: Catalog, code: string | null | undefined) {
-  const c = catalogCity(catalog, code);
-  // When the city is in the catalog, trust its resolved lounge list exactly —
-  // even an empty one (the admin disabled them all). Only fall back to the
-  // country defaults when the city isn't in the catalog (e.g. not yet loaded).
-  const values = c ? c.lounges : loungeOptionsForCity(code).map((l) => l.value);
-  return LOUNGE_TYPES.filter((l) => values.includes(l.value));
+/** Enabled lounges (with price) offered at a specific airport. */
+export function catalogAirportLounges(catalog: Catalog, airportCode: string | null | undefined): CatalogAirportLounge[] {
+  if (!airportCode) return [];
+  for (const c of catalog.cities) {
+    const a = c.airports.find((x) => x.code === airportCode);
+    if (a) return a.lounges;
+  }
+  return [];
+}
+
+/** Find the city that owns an airport code. */
+export function catalogCityForAirport(catalog: Catalog, airportCode: string | null | undefined): CatalogCity | undefined {
+  if (!airportCode) return undefined;
+  return catalog.cities.find((c) => c.airports.some((a) => a.code === airportCode));
 }
 
 /** Vehicle categories disabled for a city (empty when the city isn't loaded). */

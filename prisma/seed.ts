@@ -14,6 +14,7 @@ import {
   DEFAULT_SERVICE_PRICES,
   DEFAULT_SERVICE_CLASS_PRICES,
   DRIVER_TASK_STEPS,
+  LOUNGE_TYPES,
   PACKAGES,
   STEPS,
   VEHICLES,
@@ -156,6 +157,63 @@ async function main() {
           utcOffsetMinutes: meta?.offsetMin ?? 0,
         },
       });
+    }
+  }
+
+  // ── Per-city prices ──
+  // Prices live on the city (one price per city). Seed each city from the
+  // built-in defaults so a fresh database has working prices; the admin edits
+  // them per city afterwards. Upsert-by-unique keeps re-seeding idempotent and
+  // never clobbers an edited price on update.
+  for (const c of CITIES) {
+    for (const [stepType, basePrice] of Object.entries(DEFAULT_SERVICE_PRICES)) {
+      await prisma.cityServicePricing.upsert({
+        where: { cityCode_stepType: { cityCode: c.code, stepType } },
+        update: {},
+        create: { cityCode: c.code, stepType, price: basePrice },
+      });
+    }
+    for (const [stepType, byClass] of Object.entries(DEFAULT_SERVICE_CLASS_PRICES)) {
+      for (const [category, price] of Object.entries(byClass)) {
+        await prisma.cityServiceClassPrice.upsert({
+          where: { cityCode_stepType_category: { cityCode: c.code, stepType, category } },
+          update: {},
+          create: { cityCode: c.code, stepType, category, price },
+        });
+      }
+    }
+    for (const [loungeType, price] of Object.entries(DEFAULT_LOUNGE_PRICES)) {
+      await prisma.cityLoungePricing.upsert({
+        where: { cityCode_loungeType: { cityCode: c.code, loungeType } },
+        update: {},
+        create: { cityCode: c.code, loungeType, price },
+      });
+    }
+  }
+
+  // ── Lounges (catalog) + per-airport availability ──
+  // Seed the built-in lounges with id = the old code so historical requests
+  // that stored a loungeType still resolve. Then enable the country-appropriate
+  // lounges at each airport with the default price.
+  for (const [i, l] of LOUNGE_TYPES.entries()) {
+    await prisma.lounge.upsert({
+      where: { id: l.value },
+      update: {},
+      create: { id: l.value, nameEn: l.name.en, nameAr: l.name.ar, sortOrder: i + 1 },
+    });
+  }
+  const SAUDI_LOUNGE_IDS = ["EXECUTIVE_OFFICE", "MARHABA"];
+  const INTL_LOUNGE_IDS = ["MEET_ASSIST", "FAST_TRACK"];
+  for (const c of CITIES) {
+    const loungeIds = c.country === "SA" ? SAUDI_LOUNGE_IDS : INTL_LOUNGE_IDS;
+    for (const a of c.airports) {
+      for (const loungeId of loungeIds) {
+        await prisma.airportLounge.upsert({
+          where: { airportCode_loungeId: { airportCode: a.code, loungeId } },
+          update: {},
+          create: { airportCode: a.code, loungeId, enabled: true, price: DEFAULT_LOUNGE_PRICES[loungeId] ?? 0 },
+        });
+      }
     }
   }
 

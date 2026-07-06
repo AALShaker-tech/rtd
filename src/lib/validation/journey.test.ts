@@ -94,18 +94,18 @@ describe("validateStep — required fields", () => {
   });
 });
 
-describe("validateStep — lounge / city rules", () => {
-  it("errors when a Saudi lounge is chosen for an international airport", () => {
+describe("validateStep — lounge selection", () => {
+  it("warns when an assistance step has no lounge selected", () => {
     const r = validateStep(
-      step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", date: "2026-06-10", city: "LON", loungeType: "EXECUTIVE_OFFICE" }),
+      step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", date: "2026-06-10", city: "LON" }),
       NOW,
     );
-    expect(hasError(r.errors, "loungeType")).toBe(true);
+    expect(r.warnings.some((w) => w.field === "loungeType")).toBe(true);
   });
 
-  it("accepts an international lounge for an international airport", () => {
+  it("accepts any lounge chosen (availability is enforced per airport in the UI)", () => {
     const r = validateStep(
-      step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", date: "2026-06-10", city: "LON", loungeType: "MEET_ASSIST" }),
+      step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", date: "2026-06-10", city: "LON", airport: "LHR", loungeType: "MEET_ASSIST" }),
       NOW,
     );
     expect(hasError(r.errors, "loungeType")).toBe(false);

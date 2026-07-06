@@ -84,6 +84,9 @@ export const dict = {
       },
     ],
   },
+  lounges: {
+    navTitle: { en: "Lounges", ar: "الصالات" },
+  },
   packages: {
     title: { en: "Curated Packages", ar: "باقات منتقاة" },
     subtitle: {
@@ -179,7 +182,9 @@ export const dict = {
     terminals: { en: "Terminals (comma-separated)", ar: "الصالات (مفصولة بفواصل)" },
     servicePrices: { en: "Service prices (per city)", ar: "أسعار الخدمات (لكل مدينة)" },
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
-    overridePlaceholder: { en: "global", ar: "افتراضي" },
+    airportLounges: { en: "Airport lounges (enable & price per airport)", ar: "صالات المطار (فعّل وحدّد السعر لكل مطار)" },
+    noLounges: { en: "No lounges yet — add them in the Lounges tab first.", ar: "لا توجد صالات بعد — أضفها من تبويب الصالات أولًا." },
+    overridePlaceholder: { en: "0", ar: "0" },
     enabled: { en: "Enabled", ar: "مفعّل" },
     selectCity: {
       en: "Select a city to edit, or add a new one.",
@@ -187,8 +192,8 @@ export const dict = {
     },
     cityDetails: { en: "City details", ar: "بيانات المدينة" },
     overrideHint: {
-      en: "Leave a price empty to use the global default. The city multiplier still applies.",
-      ar: "اترك السعر فارغًا لاستخدام الافتراضي. يبقى معامل المدينة ساريًا.",
+      en: "Set each service's price for this city. An empty price counts as 0 (not offered).",
+      ar: "حدّد سعر كل خدمة في هذه المدينة. السعر الفارغ يُحتسب صفرًا (غير متاح).",
     },
   },
   pricing: {
@@ -207,8 +212,7 @@ export const dict = {
     reason: { en: "Reason", ar: "السبب" },
     priceHistory: { en: "Price history", ar: "سجل الأسعار" },
     servicePricing: { en: "Service prices", ar: "أسعار الخدمات" },
-    pricesNav: { en: "Prices", ar: "الأسعار" },
-    vehiclePricing: { en: "Vehicle Class", ar: "فئه السيارة" },
+    vehiclePricing: { en: "Vehicle Class", ar: "فئة السيارة" },
     loungePricing: { en: "Lounge prices", ar: "أسعار الصالات" },
     destinationPricing: { en: "Destination pricing", ar: "تسعير الوجهات" },
     basePrice: { en: "Base price", ar: "السعر الأساسي" },
@@ -452,7 +456,7 @@ export const dict = {
     },
     sendTestEmail: { en: "Send test email", ar: "إرسال بريد تجريبي" },
     testEmailSent: { en: "Sent to", ar: "أُرسل إلى" },
-    services: { en: "Services", ar: "الخدمات" },
+    services: { en: "Journey Steps", ar: "خطوات الرحلة" },
     vehicles: { en: "Car Categories", ar: "فئات السيارات" },
     totalRequests: { en: "Total requests", ar: "إجمالي الطلبات" },
     newRequests: { en: "New requests", ar: "طلبات جديدة" },

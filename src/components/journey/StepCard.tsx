@@ -72,22 +72,57 @@ export function StepCard({
 
   return (
     <div className="grid gap-5">
-      {/* Lounge / assistance options — limited by the airport's country */}
-      {f.assistance && (
-        <div className="grid gap-2.5">
-          <p className="text-sm font-medium text-charcoal/70">{pick(t.fields.loungeType)}</p>
-          {catalog.loungeOptions(step.city).map((o) => {
-            const on = step.loungeType === o.value;
-            return (
-              <button key={o.value} onClick={() => onChange({ loungeType: o.value })} className={`sel-card flex items-center justify-between ${on ? "sel-card-on" : ""}`}>
-                <span className="font-medium text-charcoal">{pick(o.name)}</span>
-                <span className={`text-sm font-semibold ${on ? "text-gold-dark" : "text-charcoal/50"}`}>{formatPrice(priceFor({ loungeType: o.value }), locale)}</span>
-              </button>
-            );
-          })}
-          <p className="text-center text-xs text-charcoal/40">{pick(t.builder.loungeHint)}</p>
-        </div>
-      )}
+      {/* Lounge / assistance options — the lounges enabled at the chosen airport */}
+      {f.assistance && (() => {
+        const cityAirports = catalog.city(step.city)?.airports ?? [];
+        // Use the selected airport, or auto-use the only one the city has.
+        const activeAirport = step.airport ?? (cityAirports.length === 1 ? cityAirports[0].code : undefined);
+        const airportLounges = activeAirport ? catalog.airportLounges(activeAirport) : [];
+        return (
+          <div className="grid gap-2.5">
+            <p className="text-sm font-medium text-charcoal/70">{pick(t.fields.loungeType)}</p>
+
+            {/* Airport picker when the city has more than one airport. */}
+            {cityAirports.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {cityAirports.map((a) => {
+                  const on = activeAirport === a.code;
+                  return (
+                    <button
+                      key={a.code}
+                      onClick={() => onChange({ airport: a.code, loungeType: undefined })}
+                      className={`badge border px-3 py-1.5 ${on ? "border-gold bg-gold-50 text-gold-dark" : "border-charcoal/15 text-charcoal/60 hover:border-gold/40"}`}
+                    >
+                      {a.code} · {ar ? a.nameAr : a.nameEn}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {!activeAirport ? (
+              <p className="text-center text-xs text-charcoal/45">{ar ? "اختر المطار لعرض الصالات." : "Select the airport to see its lounges."}</p>
+            ) : airportLounges.length === 0 ? (
+              <p className="text-center text-xs text-charcoal/45">{ar ? "لا توجد صالات متاحة في هذا المطار." : "No lounges available at this airport."}</p>
+            ) : (
+              airportLounges.map((o) => {
+                const on = step.loungeType === o.id;
+                const desc = ar ? o.descriptionAr : o.descriptionEn;
+                return (
+                  <button key={o.id} onClick={() => onChange({ loungeType: o.id, airport: activeAirport })} className={`sel-card flex items-start justify-between gap-3 ${on ? "sel-card-on" : ""}`}>
+                    <span className="min-w-0">
+                      <span className="block font-medium text-charcoal">{ar ? o.nameAr : o.nameEn}</span>
+                      {desc && <span className="mt-0.5 block text-xs leading-relaxed text-charcoal/50">{desc}</span>}
+                    </span>
+                    <span className={`shrink-0 text-sm font-semibold ${on ? "text-gold-dark" : "text-charcoal/50"}`}>{formatPrice(priceFor({ loungeType: o.id, airport: activeAirport }), locale)}</span>
+                  </button>
+                );
+              })
+            )}
+            <p className="text-center text-xs text-charcoal/40">{pick(t.builder.loungeHint)}</p>
+          </div>
+        );
+      })()}
 
       {/* Vehicle picker */}
       {((f.transfer && hasCar) || f.chauffeur) && (

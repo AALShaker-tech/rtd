@@ -9,7 +9,9 @@
  *   - Chauffeur:     that per-class price × days × daily-usage tier (kept for now)
  *   - Lounge/assist: the lounge price (if chosen) else the service's base price
  *   - Skipped:       0
- * Per-city prices override the global price for the same key.
+ * Every price lives on the city (one price per city). Each priced step has a
+ * city (Riyadh steps → RUH, destination steps → the destination), and the price
+ * is that city's amount for the service/class. Unset → 0.
  */
 
 import {
@@ -29,8 +31,10 @@ export interface PricingConfig {
   serviceClassPrices: Record<string, Record<string, number>>; // stepType → class → price (car)
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
-  cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
+  cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price (legacy, unused)
   cityServiceClassPrices?: Record<string, Record<string, Record<string, number>>>; // city → stepType → class → price
+  // Lounges are priced per airport: airportCode → loungeId → price.
+  airportLoungePrices?: Record<string, Record<string, number>>;
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
@@ -41,6 +45,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   cityServicePrices: {},
   cityLoungePrices: {},
   cityServiceClassPrices: {},
+  airportLoungePrices: {},
 };
 
 export interface StepPriceBreakdown {
@@ -51,8 +56,8 @@ export interface StepPriceBreakdown {
 }
 
 /**
- * The per-class price for a car step: per-city override → global → built-in
- * default → the plain service base as a last resort.
+ * The per-class price for a car step: the city's amount for this
+ * (service × class). Unset → 0 (one price per city; no global fallback).
  */
 function carClassPrice(
   config: PricingConfig,
@@ -61,24 +66,14 @@ function carClassPrice(
   category: string | null | undefined,
 ): number {
   const cat = category ?? "VIP";
-  const cityPrice = cityCode
-    ? config.cityServiceClassPrices?.[cityCode]?.[stepType]?.[cat]
-    : undefined;
-  return (
-    cityPrice ??
-    config.serviceClassPrices?.[stepType]?.[cat] ??
-    DEFAULT_SERVICE_CLASS_PRICES[stepType]?.[cat] ??
-    config.services[stepType] ??
-    DEFAULT_SERVICE_PRICES[stepType as StepType] ??
-    0
-  );
+  return (cityCode ? config.cityServiceClassPrices?.[cityCode]?.[stepType]?.[cat] : undefined) ?? 0;
 }
 
 /** Compute the price breakdown for a single journey step. */
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "def" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days" | "dailyUsage"
+    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "days" | "dailyUsage"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
@@ -102,15 +97,13 @@ export function computeStepPrice(
     return { basePrice: price, computedPrice: Math.round(price) };
   }
 
-  // Lounge / assistance — lounge price overrides the base when one is selected
-  // (per-city price takes precedence over the global price).
-  const loungePrice = step.loungeType
-    ? (step.city ? config.cityLoungePrices?.[step.city]?.[step.loungeType] : undefined) ??
-      config.lounges[step.loungeType]
+  // Lounge / assistance — the lounge's per-airport price when a lounge is
+  // selected, otherwise the city's base price for the service. Unset → 0.
+  const loungePrice = step.loungeType && step.airport
+    ? config.airportLoungePrices?.[step.airport]?.[step.loungeType]
     : undefined;
-  const cityBase = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
-  const base = cityBase ?? config.services[step.stepType] ?? 0;
-  const price = loungePrice ?? base;
+  const base = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
+  const price = loungePrice ?? base ?? 0;
   return { basePrice: price, computedPrice: Math.round(price) };
 }
 

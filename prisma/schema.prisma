@@ -445,6 +445,34 @@ model Airport {
   country  String?
   timezone String? // IANA, e.g. Asia/Riyadh
   utcOffsetMinutes Int @default(0) // offset for the schedule window (June 2026)
+  lounges  AirportLounge[]
+}
+
+/// Admin-managed lounge / airport-assistance product (name + description of its
+/// services and requirements). Offered at specific airports via AirportLounge.
+model Lounge {
+  id            String   @id @default(cuid())
+  nameEn        String
+  nameAr        String
+  descriptionEn String   @default("")
+  descriptionAr String   @default("")
+  sortOrder     Int      @default(0)
+  active        Boolean  @default(true)
+  airports      AirportLounge[]
+}
+
+/// A lounge offered at a specific airport, with its per-airport price. The admin
+/// enables lounges and sets prices in the city page's airport section.
+model AirportLounge {
+  id          String  @id @default(cuid())
+  airportCode String
+  airport     Airport @relation(fields: [airportCode], references: [code], onDelete: Cascade)
+  loungeId    String
+  lounge      Lounge  @relation(fields: [loungeId], references: [id], onDelete: Cascade)
+  enabled     Boolean @default(true)
+  price       Int     @default(0)
+
+  @@unique([airportCode, loungeId])
 }
 
 /// Airlines referenced by the static weekly flight schedule.
