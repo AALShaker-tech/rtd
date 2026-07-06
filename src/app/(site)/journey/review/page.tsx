@@ -128,6 +128,9 @@ export default function ReviewPage() {
             const overCap = on && step.passengers != null && step.passengers > cap;
             const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
             const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category));
+            const stepAirports = catalog.city(step.city)?.airports ?? [];
+            const stepAirport = step.airport ?? (stepAirports.length === 1 ? stepAirports[0].code : undefined);
+            const stepLounges = stepAirport ? catalog.airportLounges(stepAirport) : [];
 
             return (
               <div key={step.stepType} className={`luxe-card p-5 ${on ? "" : "opacity-60"} ${overCap ? "ring-1 ring-red-300" : ""}`}>
@@ -137,7 +140,7 @@ export default function ReviewPage() {
                       if (on) { update({ skipped: true }); return; }
                       // Adding an assistance step → ensure a selected option (recommended default).
                       const patch: Parameters<typeof store.updateStep>[1] = { skipped: false };
-                      if (f.assistance && !step.loungeType) patch.loungeType = catalog.loungeOptions(step.city)[0]?.value;
+                      if (f.assistance && !step.loungeType && stepLounges[0]) { patch.loungeType = stepLounges[0].id; patch.airport = stepAirport; }
                       update(patch);
                     }}
                     className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-base ${on ? "border-emerald-300 bg-emerald-50 text-emerald-600" : "border-charcoal/15 bg-white text-charcoal/40"}`}
@@ -170,11 +173,11 @@ export default function ReviewPage() {
                 )}
                 {on && f.assistance && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {catalog.loungeOptions(step.city).map((o) => {
-                      const sel = step.loungeType === o.value;
+                    {stepLounges.map((o) => {
+                      const sel = step.loungeType === o.id;
                       return (
-                        <button key={o.value} onClick={() => update({ loungeType: o.value })} className={`pill ${sel ? "pill-on" : ""}`}>
-                          {pick(o.name)} · {formatPrice(computeStepPrice({ ...step, loungeType: o.value }, config).computedPrice, locale)}
+                        <button key={o.id} onClick={() => update({ loungeType: o.id, airport: stepAirport })} className={`pill ${sel ? "pill-on" : ""}`}>
+                          {ar ? o.nameAr : o.nameEn} · {formatPrice(computeStepPrice({ ...step, loungeType: o.id, airport: stepAirport }, config).computedPrice, locale)}
                         </button>
                       );
                     })}

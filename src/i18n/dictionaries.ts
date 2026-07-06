@@ -84,6 +84,9 @@ export const dict = {
       },
     ],
   },
+  lounges: {
+    navTitle: { en: "Lounges", ar: "الصالات" },
+  },
   packages: {
     title: { en: "Curated Packages", ar: "باقات منتقاة" },
     subtitle: {
@@ -179,6 +182,8 @@ export const dict = {
     terminals: { en: "Terminals (comma-separated)", ar: "الصالات (مفصولة بفواصل)" },
     servicePrices: { en: "Service prices (per city)", ar: "أسعار الخدمات (لكل مدينة)" },
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
+    airportLounges: { en: "Airport lounges (enable & price per airport)", ar: "صالات المطار (فعّل وحدّد السعر لكل مطار)" },
+    noLounges: { en: "No lounges yet — add them in the Lounges tab first.", ar: "لا توجد صالات بعد — أضفها من تبويب الصالات أولًا." },
     overridePlaceholder: { en: "0", ar: "0" },
     enabled: { en: "Enabled", ar: "مفعّل" },
     selectCity: {

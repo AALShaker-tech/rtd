@@ -3,19 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { LOUNGE_TYPES } from "@/lib/domain";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
   setCityActive,
-  setCityLoungePrice,
   setCityServicePrice,
   setCityServiceClassPrice,
   setCityVehicleEnabled,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
+import { setAirportLounge } from "@/server/actions/lounge.actions";
 
-interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number }
+interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number }
+interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
 interface VehicleRow { category: string; enabled: boolean }
@@ -31,8 +31,9 @@ const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: 
 
 interface VehicleOption { category: string; nameEn: string }
 interface StepOption { code: string; nameEn: string; nameAr: string; isCar: boolean }
+interface LoungeOption { id: string; nameEn: string; nameAr: string }
 
-export function CitiesManager({ cities, vehicles, steps }: { cities: CityRow[]; vehicles: VehicleOption[]; steps: StepOption[] }) {
+export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[] }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(cities[0]?.code ?? null);
@@ -71,7 +72,7 @@ export function CitiesManager({ cities, vehicles, steps }: { cities: CityRow[]; 
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -81,7 +82,7 @@ export function CitiesManager({ cities, vehicles, steps }: { cities: CityRow[]; 
   );
 }
 
-function CityEditor({ city, vehicles, steps, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; isNew: boolean; onSaved: () => void }) {
+function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -156,17 +157,16 @@ function CityEditor({ city, vehicles, steps, isNew, onSaved }: { city: CityRow; 
         <p className="text-sm text-charcoal/50">{locale === "ar" ? "احفظ المدينة أولًا لإضافة المطارات والأسعار." : "Save the city first to add airports and prices."}</p>
       ) : (
         <>
-          <AirportEditor cityCode={city.code} airports={city.airports} />
+          <AirportEditor cityCode={city.code} airports={city.airports} lounges={lounges} />
           <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} steps={steps} />
           <VehicleAvailability cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
-          <LoungePrices cityCode={city.code} rows={city.loungePricing} />
         </>
       )}
     </div>
   );
 }
 
-function AirportEditor({ cityCode, airports }: { cityCode: string; airports: AirportRow[] }) {
+function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airports: AirportRow[]; lounges: LoungeOption[] }) {
   const { t, pick } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({ code: "", nameEn: "", nameAr: "", terminals: "", timezone: "", utcOffsetMinutes: "0" });
@@ -201,6 +201,20 @@ function AirportEditor({ cityCode, airports }: { cityCode: string; airports: Air
         <FieldWrap label="UTC offset (min)"><TextInput type="number" value={form.utcOffsetMinutes} onChange={(e) => setForm({ ...form, utcOffsetMinutes: e.target.value })} /></FieldWrap>
       </div>
       <button onClick={save} disabled={busy || !form.code} className="btn-dark mt-3 px-4 py-2 text-xs">{pick(t.cities.addAirport)}</button>
+
+      {/* Per-airport lounges: enable the ones offered here and set each price. */}
+      {airports.length > 0 && (
+        <div className="mt-5 space-y-4 border-t border-charcoal/10 pt-4">
+          <p className="text-sm font-medium text-charcoal/80">{pick(t.cities.airportLounges)}</p>
+          {lounges.length === 0 ? (
+            <p className="text-xs text-charcoal/45">{pick(t.cities.noLounges)}</p>
+          ) : (
+            airports.map((a) => (
+              <AirportLounges key={a.code} airport={a} lounges={lounges} />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -243,27 +257,59 @@ function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCod
   );
 }
 
-function LoungePrices({ cityCode, rows }: { cityCode: string; rows: LoungeRow[] }) {
-  const { t, pick, locale } = useI18n();
+/** Per-airport lounge availability + price. All active lounges are listed; the
+ *  admin enables the ones offered at this airport and sets each price. */
+function AirportLounges({ airport, lounges }: { airport: AirportRow; lounges: LoungeOption[] }) {
+  const { locale } = useI18n();
+  const ar = locale === "ar";
   return (
-    <div className="luxe-card p-5">
-      <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.cities.loungePrices)}</h3>
-      <p className="mb-3 text-xs text-charcoal/45">{pick(t.cities.overrideHint)}</p>
-      <div className="grid gap-2">
-        {LOUNGE_TYPES.map((l) => {
-          const row = rows.find((r) => r.loungeType === l.value);
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <p className="mb-2 text-sm font-medium text-charcoal/80">{airport.code} · {ar ? airport.nameAr : airport.nameEn}</p>
+      <div className="grid gap-1.5">
+        {lounges.map((l) => {
+          const row = airport.lounges.find((r) => r.loungeId === l.id);
           return (
-            <PriceRow
-              key={l.value}
-              label={l.name[locale]}
-              fallback={0}
-              price={row?.price ?? null}
-              enabled={row?.enabled ?? true}
-              onSave={(price, enabled) => setCityLoungePrice(cityCode, l.value, price, enabled)}
+            <AirportLoungeRowEditor
+              key={l.id}
+              airportCode={airport.code}
+              loungeId={l.id}
+              label={ar ? l.nameAr : l.nameEn}
+              enabled={row?.enabled ?? false}
+              price={row?.price ?? 0}
             />
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function AirportLoungeRowEditor({ airportCode, loungeId, label, enabled, price }: { airportCode: string; loungeId: string; label: string; enabled: boolean; price: number }) {
+  const { t, pick, locale } = useI18n();
+  const router = useRouter();
+  const [on, setOn] = useState(enabled);
+  const [val, setVal] = useState(String(price));
+  const [busy, setBusy] = useState(false);
+
+  async function save(nextOn: boolean) {
+    setBusy(true);
+    await setAirportLounge({ airportCode, loungeId, enabled: nextOn, price: parseInt(val) || 0 });
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-charcoal/80">
+        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => { setOn(e.target.checked); }} />
+        <span className="truncate">{label}</span>
+      </label>
+      <input
+        type="number" min={0} step={10} value={val} onChange={(e) => setVal(e.target.value)}
+        placeholder={locale === "ar" ? "السعر" : "price"}
+        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+      />
+      <button onClick={() => save(on)} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
     </div>
   );
 }

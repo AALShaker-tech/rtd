@@ -33,9 +33,10 @@ const CFG: PricingConfig = {
     RUH: { DEPARTURE_ASSIST_RIYADH: 320 },
     LON: { ARRIVAL_ASSIST_DESTINATION: 420 },
   },
-  cityLoungePrices: {
-    RUH: { EXECUTIVE_OFFICE: 320 },
-    LON: { MEET_ASSIST: 180 },
+  // Lounges are priced per airport (airportCode → loungeId → price).
+  airportLoungePrices: {
+    RUHT: { EXECUTIVE_OFFICE: 320 },
+    LHR: { MEET_ASSIST: 180 },
   },
 };
 
@@ -105,10 +106,10 @@ describe("computeStepPrice — chauffeur (per-class × days × usage tier)", () 
   });
 });
 
-describe("computeStepPrice — assistance / lounge (per-city)", () => {
-  it("uses the city's lounge price when a lounge is chosen", () => {
+describe("computeStepPrice — assistance / lounge (lounge per airport)", () => {
+  it("uses the lounge's per-airport price when a lounge is chosen", () => {
     expect(
-      computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", loungeType: "EXECUTIVE_OFFICE" }), CFG).computedPrice,
+      computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", airport: "RUHT", loungeType: "EXECUTIVE_OFFICE" }), CFG).computedPrice,
     ).toBe(320);
   });
 
@@ -118,15 +119,15 @@ describe("computeStepPrice — assistance / lounge (per-city)", () => {
     ).toBe(320);
   });
 
-  it("prices the lounge from the destination city", () => {
+  it("prices the lounge from the chosen airport", () => {
     expect(
-      computeStepPrice(step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", loungeType: "MEET_ASSIST", city: "LON" }), CFG).computedPrice,
+      computeStepPrice(step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", loungeType: "MEET_ASSIST", city: "LON", airport: "LHR" }), CFG).computedPrice,
     ).toBe(180);
   });
 
-  it("is 0 when the city has no price for the assistance service", () => {
+  it("is 0 when the airport has no price for the chosen lounge and the city has no base", () => {
     expect(
-      computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", city: "DXB" }), CFG).computedPrice,
+      computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", city: "DXB", airport: "DXBT", loungeType: "EXECUTIVE_OFFICE" }), CFG).computedPrice,
     ).toBe(0);
   });
 });

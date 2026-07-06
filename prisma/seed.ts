@@ -14,6 +14,7 @@ import {
   DEFAULT_SERVICE_PRICES,
   DEFAULT_SERVICE_CLASS_PRICES,
   DRIVER_TASK_STEPS,
+  LOUNGE_TYPES,
   PACKAGES,
   STEPS,
   VEHICLES,
@@ -187,6 +188,32 @@ async function main() {
         update: {},
         create: { cityCode: c.code, loungeType, price },
       });
+    }
+  }
+
+  // ── Lounges (catalog) + per-airport availability ──
+  // Seed the built-in lounges with id = the old code so historical requests
+  // that stored a loungeType still resolve. Then enable the country-appropriate
+  // lounges at each airport with the default price.
+  for (const [i, l] of LOUNGE_TYPES.entries()) {
+    await prisma.lounge.upsert({
+      where: { id: l.value },
+      update: {},
+      create: { id: l.value, nameEn: l.name.en, nameAr: l.name.ar, sortOrder: i + 1 },
+    });
+  }
+  const SAUDI_LOUNGE_IDS = ["EXECUTIVE_OFFICE", "MARHABA"];
+  const INTL_LOUNGE_IDS = ["MEET_ASSIST", "FAST_TRACK"];
+  for (const c of CITIES) {
+    const loungeIds = c.country === "SA" ? SAUDI_LOUNGE_IDS : INTL_LOUNGE_IDS;
+    for (const a of c.airports) {
+      for (const loungeId of loungeIds) {
+        await prisma.airportLounge.upsert({
+          where: { airportCode_loungeId: { airportCode: a.code, loungeId } },
+          update: {},
+          create: { airportCode: a.code, loungeId, enabled: true, price: DEFAULT_LOUNGE_PRICES[loungeId] ?? 0 },
+        });
+      }
     }
   }
 

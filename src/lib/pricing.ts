@@ -31,8 +31,10 @@ export interface PricingConfig {
   serviceClassPrices: Record<string, Record<string, number>>; // stepType → class → price (car)
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
-  cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price
+  cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price (legacy, unused)
   cityServiceClassPrices?: Record<string, Record<string, Record<string, number>>>; // city → stepType → class → price
+  // Lounges are priced per airport: airportCode → loungeId → price.
+  airportLoungePrices?: Record<string, Record<string, number>>;
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
@@ -43,6 +45,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   cityServicePrices: {},
   cityLoungePrices: {},
   cityServiceClassPrices: {},
+  airportLoungePrices: {},
 };
 
 export interface StepPriceBreakdown {
@@ -70,7 +73,7 @@ function carClassPrice(
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "def" | "serviceType" | "skipped" | "city" | "loungeType" | "carCategory" | "days" | "dailyUsage"
+    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "days" | "dailyUsage"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
@@ -94,10 +97,10 @@ export function computeStepPrice(
     return { basePrice: price, computedPrice: Math.round(price) };
   }
 
-  // Lounge / assistance — the city's lounge price when a lounge is selected,
-  // otherwise the city's base price for the service. Unset → 0.
-  const loungePrice = step.loungeType && step.city
-    ? config.cityLoungePrices?.[step.city]?.[step.loungeType]
+  // Lounge / assistance — the lounge's per-airport price when a lounge is
+  // selected, otherwise the city's base price for the service. Unset → 0.
+  const loungePrice = step.loungeType && step.airport
+    ? config.airportLoungePrices?.[step.airport]?.[step.loungeType]
     : undefined;
   const base = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
   const price = loungePrice ?? base ?? 0;

@@ -11,7 +11,6 @@
 import {
   getStep,
   getVehicle,
-  isLoungeValidForCity,
   serviceHasCar,
   type CarCategory,
   type StepType,
@@ -171,17 +170,8 @@ export function validateStep(
       ),
     );
   }
-  // Lounge option must match the airport's country (Saudi vs international).
-  if (f.assistance && step.loungeType && !isLoungeValidForCity(step.loungeType, step.city)) {
-    errors.push(
-      issue(
-        "error",
-        "This assistance option isn't available at the selected airport. Please choose a valid option.",
-        "خيار المساعدة هذا غير متاح في المطار المحدد. الرجاء اختيار خيار صحيح.",
-        "loungeType",
-      ),
-    );
-  }
+  // Lounges are offered per airport now; the customer only ever sees the valid
+  // ones for the chosen airport, so no static country check here.
 
   // Transfer specifics
   if (f.transfer && hasCar) {
