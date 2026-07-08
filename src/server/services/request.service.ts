@@ -4,6 +4,7 @@ import { buildReferenceNumber, combineDateTime } from "@/lib/utils";
 import { getStep, serviceHasCar } from "@/lib/domain";
 import { toStepDef } from "@/lib/steps";
 import { computeStepPrice } from "@/lib/pricing";
+import { hasCityPricing } from "@/lib/availability";
 import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
 import { getPricingConfig } from "./pricing.service";
@@ -92,6 +93,9 @@ export async function createRequest(input: CreateRequestInput) {
   const stepMap = await getStepMap();
   // Authoritative server-side pricing — never trust the client estimate.
   const pricingConfig = await getPricingConfig();
+  // Only enforce price-driven availability when pricing actually loaded; if the
+  // config is the empty fallback, don't drop everything (fail open).
+  const priceKnown = hasCityPricing(pricingConfig);
   const steps = input.steps
     .map((s) => ({
       ...s,
@@ -101,7 +105,7 @@ export async function createRequest(input: CreateRequestInput) {
     // (0 / unset) is not actually offered — treat it as skipped so it can never
     // be booked, priced, or spawn a driver task, even from a stale client.
     .map((s) =>
-      s.skipped || s.serviceType === "SKIP" || computeStepPrice({ ...s, skipped: false }, pricingConfig).computedPrice > 0
+      !priceKnown || s.skipped || s.serviceType === "SKIP" || computeStepPrice({ ...s, skipped: false }, pricingConfig).computedPrice > 0
         ? s
         : { ...s, skipped: true, serviceType: "SKIP" as const },
     );

@@ -12,6 +12,20 @@
 import type { PricingConfig } from "@/lib/pricing";
 import type { StepDef } from "@/lib/domain";
 
+/**
+ * Whether the config actually carries per-city pricing (i.e. it was loaded from
+ * the database, not the built-in fallback used when a fetch fails). Price-driven
+ * hiding must only run when this is true — otherwise a failed pricing/catalog
+ * fetch (empty fallback config) would hide every step and leave the customer
+ * with an empty flow. When false, callers fall back to showing steps.
+ */
+export function hasCityPricing(config: PricingConfig): boolean {
+  return (
+    Object.keys(config.cityServiceClassPrices ?? {}).length > 0 ||
+    Object.keys(config.cityServicePrices ?? {}).length > 0
+  );
+}
+
 /** Vehicle classes that carry a real (> 0) price for a car/chauffeur step in a city. */
 export function pricedVehicleClasses(
   config: PricingConfig,

@@ -10,7 +10,7 @@ import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { useStepCatalog } from "@/components/steps/StepCatalogProvider";
 import { stepSideFromOrder } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
-import { isStepOffered } from "@/lib/availability";
+import { hasCityPricing, isStepOffered } from "@/lib/availability";
 import { hasReturnTiming } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES } from "@/lib/phone";
@@ -51,11 +51,15 @@ export default function JourneyPage() {
   const disabledInDestination = new Set(catalog.city(destination)?.disabledSteps ?? []);
   const cityLoungePrices = (code: string | null | undefined) =>
     (catalog.city(code)?.airports ?? []).flatMap((a) => a.lounges.map((l) => l.price));
+  // Only hide unpriced steps when pricing actually loaded. If the pricing/catalog
+  // fetch fell back to empty defaults, keep showing steps (fail open) rather than
+  // leaving the customer with an empty flow.
+  const priceKnown = hasCityPricing(config);
   const flowSteps = catalogSteps.filter((def) => {
     const cityCode = def.cityScope === "RIYADH" ? "RUH" : destination;
     const disabled = def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination;
     if (disabled.has(def.type)) return false;
-    return isStepOffered(def, cityCode, config, cityLoungePrices(cityCode));
+    return priceKnown ? isStepOffered(def, cityCode, config, cityLoungePrices(cityCode)) : true;
   });
 
   const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
