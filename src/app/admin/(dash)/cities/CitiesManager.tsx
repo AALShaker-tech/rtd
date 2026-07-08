@@ -245,10 +245,10 @@ function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCod
             <PriceRow
               key={s.code}
               label={label}
-              fallback={0}
               price={row?.price ?? null}
-              enabled={row?.enabled ?? true}
-              onSave={(price, enabled) => setCityServicePrice(cityCode, s.code, price, enabled)}
+              // Price is the single control — a set price offers the service and
+              // (re)enables it; a blank price hides it (enabled follows price).
+              onSave={(price) => setCityServicePrice(cityCode, s.code, price, price != null)}
             />
           );
         })}
@@ -314,16 +314,27 @@ function AirportLoungeRowEditor({ airportCode, loungeId, label, enabled, price }
   );
 }
 
-function PriceRow({ label, fallback, price, enabled, onSave }: { label: string; fallback?: number; price: number | null; enabled: boolean; onSave: (price: number | null, enabled: boolean) => Promise<unknown> }) {
+/** Small live indicator of whether a service is offered (has a price) or hidden. */
+function OfferedPill({ offered }: { offered: boolean }) {
+  const { t, pick } = useI18n();
+  return (
+    <span className={`badge shrink-0 ${offered ? "bg-emerald-50 text-emerald-700" : "bg-charcoal/5 text-charcoal/45"}`}>
+      <span className={`me-1 inline-block h-1.5 w-1.5 rounded-full ${offered ? "bg-emerald-500" : "bg-charcoal/25"}`} />
+      {offered ? pick(t.cities.shown) : pick(t.cities.hidden)}
+    </span>
+  );
+}
+
+function PriceRow({ label, price, onSave }: { label: string; price: number | null; onSave: (price: number | null) => Promise<unknown> }) {
   const { t, pick } = useI18n();
   const router = useRouter();
   const [val, setVal] = useState(price != null ? String(price) : "");
-  const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);
+  const offered = val.trim() !== "" && Number(val) > 0;
 
   async function save() {
     setBusy(true);
-    await onSave(val.trim() === "" ? null : parseInt(val) || 0, on);
+    await onSave(val.trim() === "" ? null : parseInt(val) || 0);
     setBusy(false);
     router.refresh();
   }
@@ -331,14 +342,13 @@ function PriceRow({ label, fallback, price, enabled, onSave }: { label: string; 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-charcoal/10 px-3 py-2">
       <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
+      <OfferedPill offered={offered} />
       <input
         type="number" min={0} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder={fallback != null ? `${fallback}` : pick(t.cities.overridePlaceholder)}
+        placeholder="—"
+        title={pick(t.cities.blankHides)}
         className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
       />
-      <label className="flex items-center gap-1 text-xs text-charcoal/60">
-        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => setOn(e.target.checked)} />{pick(t.cities.enabled)}
-      </label>
       <button onClick={save} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
     </div>
   );
@@ -361,9 +371,15 @@ function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label:
     router.refresh();
   }
 
+  // A car service is offered when at least one vehicle class carries a price.
+  const offered = vehicles.some((v) => (vals[v.category] ?? "").trim() !== "" && Number(vals[v.category]) > 0);
+
   return (
     <div className="rounded-lg border border-charcoal/10 px-3 py-2">
-      <p className="mb-1.5 text-sm font-medium text-charcoal/80">{label}</p>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-medium text-charcoal/80">{label}</p>
+        <OfferedPill offered={offered} />
+      </div>
       <div className="grid gap-1.5">
         {vehicles.map((v) => (
           <div key={v.category} className="flex items-center gap-2">
@@ -371,7 +387,8 @@ function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label:
             <input
               type="number" min={0} step={10}
               value={vals[v.category] ?? ""}
-              placeholder="0"
+              placeholder="—"
+              title={pick(t.cities.blankHides)}
               onChange={(e) => setVals((p) => ({ ...p, [v.category]: e.target.value }))}
               className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
             />

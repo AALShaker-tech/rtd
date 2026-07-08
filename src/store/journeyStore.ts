@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import {
   DEFAULT_CHAUFFEUR_USAGE,
   getStep,
@@ -167,9 +168,17 @@ function sortByOrder(steps: JourneyStepInput[]): JourneyStepInput[] {
 
 const NOW = () => Date.now();
 
-// In-memory only (no persist): the customer booking draft is session-scoped and
-// cleared on a full page reload. Client-side navigation between steps keeps it.
-export const useJourneyStore = create<JourneyState>()((set, get) => ({
+// How long an unfinished booking draft may sit before we treat it as stale.
+// Overridable via env; defaults to 24h so a customer can resume within a day.
+const DRAFT_TTL_MS = Number(process.env.NEXT_PUBLIC_DRAFT_TTL_MS ?? 24 * 60 * 60 * 1000);
+
+// Persisted to localStorage as a *draft* so a customer can resume an unfinished
+// booking after a reload or a later visit (the database stays the source of
+// truth on submission). A draft older than DRAFT_TTL_MS is dropped on rehydrate
+// and the `draftExpired` notice is raised so the builder can offer a clean start.
+export const useJourneyStore = create<JourneyState>()(
+  persist(
+    (set, get) => ({
       ...freshDraft(),
 
       setDestination: (code) =>
@@ -240,7 +249,40 @@ export const useJourneyStore = create<JourneyState>()((set, get) => ({
 
       reset: () => set({ ...freshDraft() }),
     }),
-  );
+    {
+      name: "rtd-journey-draft",
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      // Don't hydrate during SSR; the builder triggers rehydration on mount so
+      // the server and first client render always match (no hydration flash).
+      skipHydration: true,
+      // Persist draft data only — never the action functions or the transient
+      // `draftExpired` flag (that's recomputed from `lastTouched` on rehydrate).
+      partialize: (s) => ({
+        selectedPackage: s.selectedPackage,
+        destination: s.destination,
+        steps: s.steps,
+        customer: s.customer,
+        tripInfo: s.tripInfo,
+        phoneVerified: s.phoneVerified,
+        emailVerified: s.emailVerified,
+        lastTouched: s.lastTouched,
+      }),
+      // Drop a stale draft on rehydrate and raise the expiry notice; otherwise
+      // restore it verbatim over the fresh in-memory defaults.
+      merge: (persisted, current) => {
+        const p = persisted as Partial<JourneyDraftData> | undefined;
+        const stale =
+          !p ||
+          typeof p.lastTouched !== "number" ||
+          Date.now() - p.lastTouched > DRAFT_TTL_MS;
+        return stale
+          ? { ...current, ...freshDraft(), draftExpired: !!p }
+          : { ...current, ...p, draftExpired: false };
+      },
+    },
+  ),
+);
 
 /** All available steps in canonical order (for the builder catalogue). */
 export const ALL_STEPS = STEPS;

@@ -10,6 +10,7 @@ import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { useStepCatalog } from "@/components/steps/StepCatalogProvider";
 import { stepSideFromOrder } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
+import { isStepOffered } from "@/lib/availability";
 import { hasReturnTiming } from "@/lib/service-timing";
 import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { COUNTRY_CODES } from "@/lib/phone";
@@ -42,23 +43,40 @@ export default function JourneyPage() {
   const { capacityByCategory } = useVehicles();
   const { steps: catalogSteps } = useStepCatalog();
 
-  // Services the admin has kept enabled for this journey. A service is hidden
-  // when it's disabled globally (Pricing page) or for its governing city (Cities
-  // page): Riyadh-side steps follow RUH, destination-side steps follow the
-  // chosen destination. Falls back to all services if nothing resolves.
+  // Services shown for this journey. A step is hidden when it's disabled globally
+  // (Pricing page) or for its governing city (Cities page) — Riyadh-side steps
+  // follow RUH, destination-side steps follow the chosen destination — OR when it
+  // has no effective price for that city (0 / unset never reaches the customer).
   const disabledInRiyadh = new Set(catalog.city("RUH")?.disabledSteps ?? []);
   const disabledInDestination = new Set(catalog.city(destination)?.disabledSteps ?? []);
-  const enabledSteps = catalogSteps.filter((def) =>
-    (def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination).has(def.type)
-      ? false
-      : true,
-  );
-  const flowSteps = enabledSteps.length ? enabledSteps : catalogSteps;
+  const cityLoungePrices = (code: string | null | undefined) =>
+    (catalog.city(code)?.airports ?? []).flatMap((a) => a.lounges.map((l) => l.price));
+  const flowSteps = catalogSteps.filter((def) => {
+    const cityCode = def.cityScope === "RIYADH" ? "RUH" : destination;
+    const disabled = def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination;
+    if (disabled.has(def.type)) return false;
+    return isStepOffered(def, cityCode, config, cityLoungePrices(cityCode));
+  });
 
   const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
     destination ? (tripInfo.departureDate ? "flow" : "tripinfo") : "destination",
   );
   const [idx, setIdx] = useState(0);
+
+  // The draft persists to localStorage but is not hydrated during SSR (so the
+  // server and first client render match). Rehydrate on mount, then resume at
+  // the correct stage for whatever draft was restored.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    Promise.resolve(useJourneyStore.persist.rehydrate()).then(() => setHydrated(true));
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    const { destination: d, tripInfo: ti } = useJourneyStore.getState();
+    setStage(d ? (ti.departureDate ? "flow" : "tripinfo") : "destination");
+    setIdx(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
 
   // If the persisted draft expired while away, snap back to a clean first step.
   useEffect(() => {
@@ -135,6 +153,21 @@ export default function JourneyPage() {
     return <TripInfoStage onBack={() => setStage("destination")} onContinue={startFlow} />;
   }
 
+  // ─────────── No services priced for this destination yet ───────────
+  if (flowSteps.length === 0) {
+    return (
+      <div className="luxe-container max-w-xl py-16 text-center md:py-24">
+        {expiredBanner}
+        <div className="gold-rule mx-auto mb-5" />
+        <h1 className="text-2xl font-semibold text-charcoal md:text-3xl">{pick(t.builder.noServicesTitle)}</h1>
+        <p className="mx-auto mt-3 max-w-md text-sm text-charcoal/60">{pick(t.builder.noServicesBody)}</p>
+        <div className="mt-8 flex justify-center gap-3">
+          <button onClick={() => setStage("destination")} className="btn-gold">{pick(t.builder.chooseDestination)}</button>
+        </div>
+      </div>
+    );
+  }
+
   // ─────────── Step-by-step flow ───────────
   const def = flowSteps[Math.min(idx, flowSteps.length - 1)];
   const step = steps.find((s) => s.stepType === def.type);
@@ -157,7 +190,9 @@ export default function JourneyPage() {
     stepValidation.errors.some((e) => e.field === "passengers") || needsService || collectReturnTiming;
 
   return (
-    <div className="luxe-container max-w-6xl py-8 md:py-12">
+    // Extra bottom padding below `lg` so the last Add/Skip buttons clear the
+    // fixed running-total bar (which is only shown on mobile/tablet).
+    <div className="luxe-container max-w-6xl pt-8 pb-28 md:pt-12 lg:pb-12">
       {expiredBanner}
       {/* Single integrated summary card: route · auto-filled trip info · actions */}
       <TripSummaryBar onChangeDestination={() => setStage("destination")} onStartNew={startNewBooking} />

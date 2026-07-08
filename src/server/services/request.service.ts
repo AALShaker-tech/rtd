@@ -90,10 +90,21 @@ export async function createRequest(input: CreateRequestInput) {
   // Resolve each step's behavior from the admin-managed catalog (authoritative);
   // never trust the client-attached def.
   const stepMap = await getStepMap();
-  const steps = input.steps.map((s) => ({
-    ...s,
-    def: stepMap[s.stepType] ? toStepDef(stepMap[s.stepType]) : getStep(s.stepType),
-  }));
+  // Authoritative server-side pricing — never trust the client estimate.
+  const pricingConfig = await getPricingConfig();
+  const steps = input.steps
+    .map((s) => ({
+      ...s,
+      def: stepMap[s.stepType] ? toStepDef(stepMap[s.stepType]) : getStep(s.stepType),
+    }))
+    // Price-driven availability: a non-skipped service with no effective price
+    // (0 / unset) is not actually offered — treat it as skipped so it can never
+    // be booked, priced, or spawn a driver task, even from a stale client.
+    .map((s) =>
+      s.skipped || s.serviceType === "SKIP" || computeStepPrice({ ...s, skipped: false }, pricingConfig).computedPrice > 0
+        ? s
+        : { ...s, skipped: true, serviceType: "SKIP" as const },
+    );
 
   // Trip-level passenger/bag counts come from the Trip Information step.
   // Vehicle category is derived from the first transfer that has a car.
@@ -112,8 +123,6 @@ export async function createRequest(input: CreateRequestInput) {
     ? await isTargetVerified(input.customer.email, "EMAIL")
     : false;
 
-  // Authoritative server-side pricing — never trust the client estimate.
-  const pricingConfig = await getPricingConfig();
   const stepBreakdowns = new Map(
     steps.map((s) => [s.stepType, computeStepPrice(s, pricingConfig)]),
   );
