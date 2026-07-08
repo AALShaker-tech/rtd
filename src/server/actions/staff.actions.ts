@@ -76,6 +76,32 @@ export async function adminDeleteRequest(requestId: string) {
   return { ok: true as const };
 }
 
+/**
+ * Permanently delete several requests at once (bulk clear). Reserved for
+ * superadmins — irreversible. Each request is removed via the same service used
+ * for single deletes, so cascades, orphaned-customer cleanup and audit logging
+ * all apply per request. Returns how many were deleted; a failure on one
+ * request does not abort the rest.
+ */
+export async function adminDeleteRequests(requestIds: string[]) {
+  const s = await requireRole(["SUPERADMIN"]);
+  const ids = Array.from(new Set(requestIds.filter((id) => typeof id === "string" && id)));
+  if (ids.length === 0) return { ok: false as const, error: "No requests selected" };
+
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      await deleteRequest(id, s.userId);
+      deleted++;
+    } catch {
+      // Already gone or failed — skip it and continue with the rest.
+    }
+  }
+
+  revalidatePath("/admin/requests");
+  return { ok: true as const, deleted };
+}
+
 // ── Employee ──
 export async function employeeMarkContacted(requestId: string) {
   const s = await requireRole(["EMPLOYEE", "ADMIN"]);
