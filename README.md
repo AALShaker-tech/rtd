@@ -220,6 +220,14 @@ Deployed on **Railway** using its native **Railpack** builder (`npm run build`
 Required env in the deploy target: `DATABASE_URL`, `AUTH_SECRET` (a long random
 value), `NEXT_PUBLIC_APP_URL`. See `.env.example` for the full list.
 
+**Environments.** `NEXT_PUBLIC_APP_ENV` (`production` | `preparation` |
+`development`) tells the app which deployment it is. Non-production deployments
+show a **banner**, are hidden from search engines, and report their name at
+`/api/health` — so a **preparation** (staging) environment is visibly and
+technically distinct from production. To stand up an isolated preparation
+environment that mirrors production and has its own URL, follow the step-by-step
+guide in [`docs/RAILWAY_PREPARATION_ENVIRONMENT.md`](docs/RAILWAY_PREPARATION_ENVIRONMENT.md).
+
 > Note: no Dockerfile is used — Railway auto-detects a Dockerfile and would
 > override Railpack, so the app is deployed via Railpack to match the working
 > setup. A container image can be reintroduced if moving to a container platform.
