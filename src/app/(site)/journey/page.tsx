@@ -190,7 +190,9 @@ export default function JourneyPage() {
     stepValidation.errors.some((e) => e.field === "passengers") || needsService || collectReturnTiming;
 
   return (
-    <div className="luxe-container max-w-6xl py-8 md:py-12">
+    // Extra bottom padding below `lg` so the last Add/Skip buttons clear the
+    // fixed running-total bar (which is only shown on mobile/tablet).
+    <div className="luxe-container max-w-6xl pt-8 pb-28 md:pt-12 lg:pb-12">
       {expiredBanner}
       {/* Single integrated summary card: route · auto-filled trip info · actions */}
       <TripSummaryBar onChangeDestination={() => setStage("destination")} onStartNew={startNewBooking} />
