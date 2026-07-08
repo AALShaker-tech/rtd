@@ -43,22 +43,20 @@ export default function JourneyPage() {
   const { capacityByCategory } = useVehicles();
   const { steps: catalogSteps } = useStepCatalog();
 
-  // Services shown for this journey. A step is hidden when it's disabled globally
-  // (Pricing page) or for its governing city (Cities page) — Riyadh-side steps
-  // follow RUH, destination-side steps follow the chosen destination — OR when it
-  // has no effective price for that city (0 / unset never reaches the customer).
-  const disabledInRiyadh = new Set(catalog.city("RUH")?.disabledSteps ?? []);
-  const disabledInDestination = new Set(catalog.city(destination)?.disabledSteps ?? []);
+  // Service visibility is driven purely by price — the single admin control: a
+  // step shows when it has a real price for its city (Riyadh-side steps follow
+  // RUH, destination-side steps follow the chosen destination). The legacy
+  // per-service enable/active flags (catalog.disabledSteps) are intentionally
+  // NOT honored here: they're no longer settable in the admin now that price is
+  // the control, and a stale flag was wrongly hiding fully-priced services.
+  // Retiring a service entirely is still done on the Services tab — it's dropped
+  // from the catalog, so it never reaches here. When pricing didn't load (empty
+  // fallback config) we fail open and show steps rather than an empty flow.
   const cityLoungePrices = (code: string | null | undefined) =>
     (catalog.city(code)?.airports ?? []).flatMap((a) => a.lounges.map((l) => l.price));
-  // Only hide unpriced steps when pricing actually loaded. If the pricing/catalog
-  // fetch fell back to empty defaults, keep showing steps (fail open) rather than
-  // leaving the customer with an empty flow.
   const priceKnown = hasCityPricing(config);
   const flowSteps = catalogSteps.filter((def) => {
     const cityCode = def.cityScope === "RIYADH" ? "RUH" : destination;
-    const disabled = def.cityScope === "RIYADH" ? disabledInRiyadh : disabledInDestination;
-    if (disabled.has(def.type)) return false;
     return priceKnown ? isStepOffered(def, cityCode, config, cityLoungePrices(cityCode)) : true;
   });
 
