@@ -94,6 +94,29 @@ export async function setCityActive(code: string, active: boolean) {
   return { ok: true as const };
 }
 
+/**
+ * Permanently delete a city and everything scoped to it. Every child row —
+ * airports (and their lounges), per-city service/lounge/vehicle pricing and
+ * per-class price overrides — is removed via `onDelete: Cascade`. Requests are
+ * unaffected: they store city names as plain strings, not a City foreign key.
+ * The origin city (the journey's starting point) cannot be deleted.
+ */
+export async function deleteCity(code: string) {
+  const s = await requireAdmin();
+  const city = await prisma.city.findUnique({ where: { code }, select: { isOrigin: true } });
+  if (!city) return { ok: false as const, error: "City not found" };
+  if (city.isOrigin) return { ok: false as const, error: "The origin city cannot be deleted" };
+  await prisma.city.delete({ where: { code } });
+  await logAudit({
+    action: "CITY_DELETED",
+    entity: "City",
+    entityId: code,
+    actorId: s.userId,
+  });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
 const airportSchema = z.object({
   code: z
     .string()
