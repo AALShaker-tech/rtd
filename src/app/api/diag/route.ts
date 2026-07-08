@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getCityCatalog } from "@/server/services/city.service";
 import { getPricingConfig } from "@/server/services/pricing.service";
 import { getStepCatalog } from "@/server/services/step.service";
@@ -52,6 +53,25 @@ export async function GET() {
       vehicleCatalog: vehiclesR.ok ? { ok: true, count: vehiclesR.value.length } : { ok: false, error: vehiclesR.error },
     },
   };
+
+  // Where does a "disabled" step come from? Split the two sources so the fix is
+  // unambiguous: a globally-disabled service (Pricing tab → ServicePricing.active
+  // = false) hides it everywhere; a per-city disable (CityServicePricing.enabled
+  // = false) hides it only in that city.
+  const disableSources = await run(async () => {
+    const [globalRows, cityRows] = await Promise.all([
+      prisma.servicePricing.findMany({ select: { stepType: true, active: true } }),
+      prisma.cityServicePricing.findMany({ where: { enabled: false }, select: { cityCode: true, stepType: true } }),
+    ]);
+    const perCity: Record<string, string[]> = {};
+    for (const r of cityRows) (perCity[r.cityCode] ??= []).push(r.stepType);
+    return {
+      globallyDisabledSteps: globalRows.filter((r) => !r.active).map((r) => r.stepType),
+      globalServiceActive: Object.fromEntries(globalRows.map((r) => [r.stepType, r.active])),
+      perCityDisabledSteps: perCity,
+    };
+  });
+  out.disableSources = disableSources.ok ? disableSources.value : { error: disableSources.error };
 
   // Per-destination breakdown of what the builder would show.
   if (catalogR.ok && pricingR.ok && stepsR.ok) {
