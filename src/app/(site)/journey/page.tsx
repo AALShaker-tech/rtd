@@ -60,6 +60,21 @@ export default function JourneyPage() {
   );
   const [idx, setIdx] = useState(0);
 
+  // The draft persists to localStorage but is not hydrated during SSR (so the
+  // server and first client render match). Rehydrate on mount, then resume at
+  // the correct stage for whatever draft was restored.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    Promise.resolve(useJourneyStore.persist.rehydrate()).then(() => setHydrated(true));
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    const { destination: d, tripInfo: ti } = useJourneyStore.getState();
+    setStage(d ? (ti.departureDate ? "flow" : "tripinfo") : "destination");
+    setIdx(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
   // If the persisted draft expired while away, snap back to a clean first step.
   useEffect(() => {
     if (draftExpired) {
