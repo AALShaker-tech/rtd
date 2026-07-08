@@ -172,15 +172,14 @@ a custom domain here too — optional.)
 
 1. Make sure you're on the **preparation** environment.
 2. Preparation deploys from a Git branch, the same way production does. On the
-   app service → **Settings → Source**, check which branch preparation tracks.
-   A common setup:
+   app service → **Settings → Source**, set the branch preparation tracks. This
+   project uses a dedicated, long-lived branch for it:
    - **production** deploys from `main`,
-   - **preparation** deploys from a branch like
-     `claude/railway-prep-environment-2txvy7` (this branch) or a long-lived
-     `staging` branch.
+   - **preparation** deploys from **`staging`**.
 
-   Set preparation to deploy from whichever branch holds the changes you want to
-   preview. See "Day-to-day workflow" below for the recommended flow.
+   Set the preparation app service's deploy branch to **`staging`**. Every push
+   to `staging` then auto-deploys to the preparation URL. See "Day-to-day
+   workflow" below for how changes flow from `staging` to `main`.
 
 3. Trigger a deploy (push to that branch, or click **Deploy**). Railway runs the
    same steps as production, defined in [`railway.json`](../railway.json):
@@ -224,37 +223,45 @@ a custom domain here too — optional.)
 ## Day-to-day workflow (how you'll actually use this)
 
 The goal: build and view changes in preparation first, and only move them to
-production once you're happy.
+production once you're happy. Two long-lived branches drive this:
 
-1. **Make changes on a branch** (not directly on `main`). This repository's
-   changes for you live on `claude/railway-prep-environment-2txvy7`.
-2. **Point preparation at that branch** (Part E, step 2). Every push
-   auto-deploys to the preparation URL, where you can click through and review.
-3. **When you're satisfied**, merge the branch into `main` via a pull request.
-   Production deploys from `main`, so merging is what promotes the change to the
-   live site.
-4. Production and preparation never share a database, so testing in preparation —
+- **`main`** → deploys to **production** (the live site).
+- **`staging`** → deploys to **preparation** (the safe preview site).
+
+The flow for any change:
+
+1. **Put the change on `staging`.** For a small tweak you can commit straight to
+   `staging`; for anything bigger, work on a short feature branch and merge it
+   into `staging` first. Do **not** commit directly to `main`.
+2. **Push `staging`.** Railway auto-deploys it to the preparation URL, where you
+   click through and review it against real behaviour — safely, because
+   preparation has its own database.
+3. **When you're satisfied, promote it to production** by merging `staging` into
+   `main` (open a pull request `staging → main` and merge it). Production deploys
+   from `main`, so the merge is what makes the change go live.
+4. Production and preparation never share a database, so testing on `staging` —
    even destructive tests, resets, or bad data — cannot harm real customers.
 
 ```
- you push  ─▶  preparation branch  ─▶  auto-deploys  ─▶  preparation URL  (review here)
-                        │
-                  merge to main
-                        │
-                        ▼
-                  production  ─▶  auto-deploys  ─▶  production URL  (live)
+ commit / merge  ─▶  staging branch  ─▶  auto-deploys  ─▶  preparation URL  (review here)
+                          │
+                    PR: staging → main   (when you're happy)
+                          │
+                          ▼
+                        main  ─▶  auto-deploys  ─▶  production URL  (live)
 ```
 
 ---
 
 ## Keeping preparation matched to production
 
-Over time production changes (new merges to `main`). To keep preparation a
-faithful copy:
+Because changes flow `staging → main`, the two branches can drift if a hotfix
+ever lands on `main` directly. To keep `staging` a faithful copy of production:
 
-- **Code:** periodically update your preparation branch from `main`
-  (`git merge origin/main` or rebase), or point preparation directly at `main`
-  when you just want to preview exactly what's live.
+- **Code:** after anything merges into `main`, bring it back into `staging`
+  (`git checkout staging && git merge origin/main && git push`). Keeping
+  `staging` fast-forwarded from `main` means preparation always previews on top
+  of exactly what's live.
 - **Variables:** if you add or change a variable in production, mirror it in
   preparation (remember to keep the preparation-specific overrides from Part C —
   its own `DATABASE_URL`, `console` providers, blank ops alerts).
