@@ -188,7 +188,7 @@ export const dict = {
     airportCode: { en: "Airport code", ar: "رمز المطار" },
     timezone: { en: "Timezone", ar: "المنطقة الزمنية" },
     terminals: { en: "Terminals (comma-separated)", ar: "الصالات (مفصولة بفواصل)" },
-    servicePrices: { en: "Service prices (per city)", ar: "أسعار الخدمات (لكل مدينة)" },
+    servicePrices: { en: "Trip step prices (per city)", ar: "أسعار خطوات الرحلة (لكل مدينة)" },
     loungePrices: { en: "Airport service / lounge prices", ar: "أسعار خدمات المطار / الصالات" },
     airportLounges: {
       en: "Airport lounges (enable & price per airport)",

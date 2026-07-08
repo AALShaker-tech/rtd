@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isStepOffered, pricedVehicleClasses } from "@/lib/availability";
+import { hasCityPricing, isStepOffered, pricedVehicleClasses } from "@/lib/availability";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/lib/pricing";
 import { getStep } from "@/lib/domain";
 
@@ -18,6 +18,17 @@ describe("pricedVehicleClasses", () => {
   });
   it("is empty when the city has no class prices", () => {
     expect(pricedVehicleClasses(cfg({}), "LON", "HOME_TO_RIYADH_AIRPORT")).toEqual([]);
+  });
+});
+
+describe("hasCityPricing", () => {
+  it("is false for the empty fallback config", () => {
+    expect(hasCityPricing(DEFAULT_PRICING_CONFIG)).toBe(false);
+    expect(hasCityPricing(cfg({ cityServiceClassPrices: {}, cityServicePrices: {} }))).toBe(false);
+  });
+  it("is true once any per-city price is present", () => {
+    expect(hasCityPricing(cfg({ cityServiceClassPrices: { RUH: { HOME_TO_RIYADH_AIRPORT: { VIP: 350 } } } }))).toBe(true);
+    expect(hasCityPricing(cfg({ cityServicePrices: { RUH: { DEPARTURE_ASSIST_RIYADH: 320 } } }))).toBe(true);
   });
 });
 

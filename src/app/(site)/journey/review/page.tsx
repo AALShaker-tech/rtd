@@ -10,7 +10,7 @@ import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
-import { pricedVehicleClasses } from "@/lib/availability";
+import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
 import { validateJourney } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
 import { logger } from "@/lib/logger";
@@ -22,6 +22,8 @@ export default function ReviewPage() {
   const ar = locale === "ar";
   const store = useJourneyStore();
   const { config } = usePricing();
+  // Fail open on option filtering when pricing didn't load (empty fallback config).
+  const priceKnown = hasCityPricing(config);
   const catalog = useCatalog();
   const { vehicles, capacityByCategory, vehicle } = useVehicles();
   const [submitting, setSubmitting] = useState(false);
@@ -129,10 +131,10 @@ export default function ReviewPage() {
             const overCap = on && step.passengers != null && step.passengers > cap;
             const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
             const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
-            const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category) && priced.has(v.category));
+            const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category) && (!priceKnown || priced.has(v.category)));
             const stepAirports = catalog.city(step.city)?.airports ?? [];
             const stepAirport = step.airport ?? (stepAirports.length === 1 ? stepAirports[0].code : undefined);
-            const stepLounges = (stepAirport ? catalog.airportLounges(stepAirport) : []).filter((l) => l.price > 0);
+            const stepLounges = (stepAirport ? catalog.airportLounges(stepAirport) : []).filter((l) => !priceKnown || l.price > 0);
 
             return (
               <div key={step.stepType} className={`luxe-card p-5 ${on ? "" : "opacity-60"} ${overCap ? "ring-1 ring-red-300" : ""}`}>
