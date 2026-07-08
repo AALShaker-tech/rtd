@@ -89,8 +89,10 @@ export async function GET() {
         const disabledDest = disabled(city.code);
         const rows = defs.map((def) => {
           const cityCode = def.cityScope === "RIYADH" ? "RUH" : city.code;
+          // `disabled` is reported for info only — visibility is now price-driven
+          // and no longer gated on the legacy enable/active flags.
           const isDisabled = (def.cityScope === "RIYADH" ? disabledRUH : disabledDest).has(def.type);
-          const offered = isDisabled ? false : priceKnown ? isStepOffered(def, cityCode, config, cityLoungePrices(cityCode)) : true;
+          const offered = priceKnown ? isStepOffered(def, cityCode, config, cityLoungePrices(cityCode)) : true;
           return {
             step: def.type,
             scope: def.cityScope,
