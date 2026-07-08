@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, RequestStatus } from "@prisma/client";
+import { getSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/roles";
 import { RequestsView } from "./RequestsView";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +38,8 @@ export default async function RequestsListPage({
     }
   }
 
-  const [requests, employees, drivers] = await Promise.all([
+  const [session, requests, employees, drivers] = await Promise.all([
+    getSession(),
     prisma.request.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -52,12 +55,16 @@ export default async function RequestsListPage({
     prisma.user.findMany({ where: { role: "DRIVER", isActive: true }, select: { id: true, fullName: true } }),
   ]);
 
+  const canDelete = session ? isSuperAdmin(session.role) : false;
+
   return (
     <RequestsView
       employees={employees}
       drivers={drivers}
       filters={sp}
+      canDelete={canDelete}
       requests={requests.map((r) => ({
+        id: r.id,
         referenceNumber: r.referenceNumber,
         name: r.customer.fullName,
         phone: r.customer.phone,

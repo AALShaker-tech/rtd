@@ -18,8 +18,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Select, TextInput } from "@/components/ui/Field";
 import { formatDateTime } from "@/lib/utils";
 import { formatPrice } from "@/lib/pricing";
+import { adminDeleteRequests } from "@/server/actions/staff.actions";
 
 interface RequestRow {
+  id: string;
   referenceNumber: string;
   name: string;
   phone: string;
@@ -38,15 +40,50 @@ export function RequestsView({
   employees,
   drivers,
   filters,
+  canDelete = false,
 }: {
   requests: RequestRow[];
   employees: { id: string; fullName: string }[];
   drivers: { id: string; fullName: string }[];
   filters: Record<string, string | undefined>;
+  canDelete?: boolean;
 }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [q, setQ] = useState(filters.q ?? "");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const allSelected = requests.length > 0 && selected.size === requests.length;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) => (prev.size === requests.length ? new Set() : new Set(requests.map((r) => r.id))));
+  }
+
+  async function deleteSelected() {
+    if (selected.size === 0) return;
+    const count = selected.size;
+    if (!window.confirm(pick(t.admin.bulkDeleteConfirm).replace("{n}", String(count)))) return;
+    setDeleting(true);
+    const res = await adminDeleteRequests(Array.from(selected));
+    setDeleting(false);
+    if (!res.ok) {
+      window.alert(res.error);
+      return;
+    }
+    setSelected(new Set());
+    window.alert(pick(t.admin.bulkDeleteDone).replace("{n}", String(res.deleted)));
+    router.refresh();
+  }
 
   function apply(patch: Record<string, string | undefined>) {
     const next = { ...filters, ...patch };
@@ -57,9 +94,23 @@ export function RequestsView({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="font-serif text-2xl font-semibold text-charcoal">{pick(t.admin.requests)}</h1>
-        <span className="text-sm text-charcoal/40">{requests.length}</span>
+        <div className="flex items-center gap-3">
+          {canDelete && selected.size > 0 && (
+            <>
+              <span className="text-sm text-charcoal/60">{pick(t.admin.selectedCount).replace("{n}", String(selected.size))}</span>
+              <button
+                onClick={deleteSelected}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {pick(t.admin.deleteSelected)}
+              </button>
+            </>
+          )}
+          <span className="text-sm text-charcoal/40">{requests.length}</span>
+        </div>
       </div>
 
       {/* Filters */}
@@ -128,6 +179,17 @@ export function RequestsView({
           <table className="w-full text-sm">
             <thead className="border-b border-charcoal/5 bg-ivory-warm text-start text-xs uppercase tracking-wide text-charcoal/50">
               <tr>
+                {canDelete && (
+                  <th className="w-10 px-4 py-3 text-start">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-gold"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      aria-label={pick(t.admin.selectAll)}
+                    />
+                  </th>
+                )}
                 <Th>{pick(t.success.reference)}</Th>
                 <Th>{pick(t.admin.customer)}</Th>
                 <Th>{pick(t.fields.city)}</Th>
@@ -143,8 +205,19 @@ export function RequestsView({
                 <tr
                   key={r.referenceNumber}
                   onClick={() => router.push(`/admin/requests/${r.referenceNumber}`)}
-                  className="cursor-pointer border-b border-charcoal/5 transition hover:bg-ivory-warm"
+                  className={`cursor-pointer border-b border-charcoal/5 transition hover:bg-ivory-warm ${selected.has(r.id) ? "bg-red-50/50" : ""}`}
                 >
+                  {canDelete && (
+                    <td className="px-4 py-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-gold"
+                        checked={selected.has(r.id)}
+                        onChange={() => toggle(r.id)}
+                        aria-label={r.referenceNumber}
+                      />
+                    </td>
+                  )}
                   <Td><span className="font-mono text-xs font-semibold text-charcoal">{r.referenceNumber}</span></Td>
                   <Td>
                     <p className="font-medium text-charcoal">{r.name}</p>
@@ -163,7 +236,7 @@ export function RequestsView({
               ))}
               {requests.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-sm text-charcoal/40">{pick(t.admin.noRequests)}</td>
+                  <td colSpan={canDelete ? 9 : 8} className="py-10 text-center text-sm text-charcoal/40">{pick(t.admin.noRequests)}</td>
                 </tr>
               )}
             </tbody>
