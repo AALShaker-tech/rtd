@@ -23,6 +23,7 @@ async function requireAdmin() {
 const citySchema = z.object({
   code: z
     .string()
+    .trim()
     .min(2)
     .max(8)
     .transform((v) => v.toUpperCase()),
@@ -30,6 +31,7 @@ const citySchema = z.object({
   nameAr: z.string().min(1),
   country: z
     .string()
+    .trim()
     .min(2)
     .max(2)
     .transform((v) => v.toUpperCase()),
@@ -120,10 +122,11 @@ export async function deleteCity(code: string) {
 const airportSchema = z.object({
   code: z
     .string()
+    .trim()
     .min(3)
     .max(4)
     .transform((v) => v.toUpperCase()),
-  cityCode: z.string().transform((v) => v.toUpperCase()),
+  cityCode: z.string().trim().transform((v) => v.toUpperCase()),
   nameEn: z.string().min(1),
   nameAr: z.string().min(1),
   terminals: z.array(z.string()).default([]),
