@@ -12,6 +12,7 @@ import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
+import { pricedVehicleClasses } from "@/lib/availability";
 import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
 import { formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
@@ -54,9 +55,11 @@ export function StepCard({
   const result = validateStep(step, new Date(), capacityByCategory);
   const errFor = (field: string) => result.errors.find((e) => e.field === field)?.[ar ? "messageAr" : "messageEn"];
 
-  // Only the vehicle classes offered in this step's city (admin per-city toggle).
+  // Only the vehicle classes offered in this step's city: not disabled by the
+  // admin (per-city toggle) and carrying a real (> 0) price for this service.
   const disabledForCity = new Set(catalog.city(step.city)?.disabledVehicles ?? []);
-  const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category));
+  const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
+  const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category) && priced.has(v.category));
   const selVeh = step.carCategory ?? defaultVehicleCategory(cityVehicles);
   const capacityIssue = validateVehicleCapacity(
     step.carCategory,
@@ -77,7 +80,8 @@ export function StepCard({
         const cityAirports = catalog.city(step.city)?.airports ?? [];
         // Use the selected airport, or auto-use the only one the city has.
         const activeAirport = step.airport ?? (cityAirports.length === 1 ? cityAirports[0].code : undefined);
-        const airportLounges = activeAirport ? catalog.airportLounges(activeAirport) : [];
+        // Only lounges that carry a real price — a 0-priced option is never offered.
+        const airportLounges = (activeAirport ? catalog.airportLounges(activeAirport) : []).filter((l) => l.price > 0);
         return (
           <div className="grid gap-2.5">
             <p className="text-sm font-medium text-charcoal/70">{pick(t.fields.loungeType)}</p>

@@ -140,6 +140,14 @@ export const dict = {
       en: "Your previous draft expired. Please start again.",
       ar: "انتهت صلاحية المسودة السابقة. يرجى البدء من جديد.",
     },
+    noServicesTitle: {
+      en: "No services available yet",
+      ar: "لا توجد خدمات متاحة بعد",
+    },
+    noServicesBody: {
+      en: "We haven't published pricing for this destination yet. Please choose another destination or contact us to arrange your journey.",
+      ar: "لم يتم نشر أسعار هذه الوجهة بعد. يرجى اختيار وجهة أخرى أو التواصل معنا لترتيب رحلتك.",
+    },
     selectServicePrompt: {
       en: "Please select a service or skip this step.",
       ar: "يرجى اختيار خدمة أو تخطي هذه الخطوة.",
