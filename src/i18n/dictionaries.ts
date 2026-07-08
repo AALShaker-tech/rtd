@@ -212,6 +212,11 @@ export const dict = {
     shown: { en: "Shown", ar: "ظاهرة" },
     hidden: { en: "Hidden", ar: "مخفية" },
     blankHides: { en: "Blank = hidden", ar: "فارغ = مخفية" },
+    deleteCity: { en: "Delete city", ar: "حذف المدينة" },
+    deleteCityConfirm: {
+      en: "Permanently delete this city and all of its airports and per-city prices? This cannot be undone.",
+      ar: "حذف هذه المدينة نهائيًا مع كل مطاراتها وأسعارها الخاصة؟ لا يمكن التراجع عن هذا الإجراء.",
+    },
   },
   pricing: {
     estimatedTotal: { en: "Estimated Total", ar: "الإجمالي التقديري" },

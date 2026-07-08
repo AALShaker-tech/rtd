@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import {
+  deleteCity,
   setCityActive,
   setCityServicePrice,
   setCityServiceClassPrice,
@@ -72,7 +73,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} onDeleted={() => { setSelected(null); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -82,7 +83,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
   );
 }
 
-function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void }) {
+function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void; onDeleted: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -107,6 +108,15 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved }: { city: 
     setBusy(false);
     if (!res.ok) return setError(res.error);
     onSaved();
+  }
+
+  async function removeCity() {
+    if (!window.confirm(pick(t.cities.deleteCityConfirm))) return;
+    setBusy(true); setError(undefined);
+    const res = await deleteCity(city.code);
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    onDeleted();
   }
 
   return (
@@ -147,6 +157,9 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved }: { city: 
                 {city.active ? (locale === "ar" ? "تعطيل" : "Disable") : (locale === "ar" ? "تفعيل" : "Enable")}
               </button>
             </span>
+          )}
+          {!isNew && !city.isOrigin && (
+            <button onClick={removeCity} disabled={busy} className="btn-ghost px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">{pick(t.cities.deleteCity)}</button>
           )}
           {error && <span className="text-xs text-red-600">{error}</span>}
           <button onClick={saveCity} disabled={busy} className="btn-gold ms-auto px-5 py-2 text-xs">{pick(t.pricing.save)}</button>
