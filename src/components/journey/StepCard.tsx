@@ -13,9 +13,10 @@ import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
-import { validateStep, validateVehicleCapacity } from "@/lib/validation/journey";
-import { formatDateOnly } from "@/lib/utils";
+import { validateStep, validateVehicleCapacity, totalVehicleCapacity } from "@/lib/validation/journey";
+import { cn, formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
+import type { CarCategory } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -64,11 +65,16 @@ export function StepCard({
   const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
   const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category) && (!priceKnown || priced.has(v.category)));
   const selVeh = step.carCategory ?? defaultVehicleCategory(cityVehicles);
-  const capacityIssue = validateVehicleCapacity(
-    step.carCategory,
-    step.passengers,
-    step.carCategory ? capacityByCategory[step.carCategory] : undefined,
-  );
+  // Transfer steps get the full multi-vehicle capacity panel below (which
+  // accounts for any added vehicles); only the chauffeur — always a single car —
+  // uses this inline single-vehicle capacity message.
+  const capacityIssue = f.chauffeur
+    ? validateVehicleCapacity(
+        step.carCategory,
+        step.passengers,
+        step.carCategory ? capacityByCategory[step.carCategory] : undefined,
+      )
+    : null;
 
   // Single source of truth for the price of any option/state. Force `skipped:false`
   // so prices are visible while the customer is still deciding (the step starts
@@ -139,7 +145,9 @@ export function StepCard({
           <div className="grid gap-2.5 sm:grid-cols-3">
             {cityVehicles.map((v) => {
               const sel = selVeh === v.category;
-              const unit = priceFor({ carCategory: v.category as typeof step.carCategory, days: f.chauffeur ? 1 : step.days });
+              // Show the per-class price for the PRIMARY vehicle alone — never
+              // fold in any added vehicles (those are priced separately below).
+              const unit = priceFor({ carCategory: v.category as typeof step.carCategory, additionalVehicles: [], days: f.chauffeur ? 1 : step.days });
               return (
                 <button key={v.category} onClick={() => onChange({ carCategory: v.category as typeof step.carCategory })} className={`sel-card ${sel ? "sel-card-on" : ""}`}>
                   <span className="block font-semibold text-charcoal">{vehicleName(v, locale)}</span>
@@ -154,6 +162,82 @@ export function StepCard({
           </div>
         </div>
       )}
+
+      {/* Additional vehicles — for transfers, when one car can't carry the whole
+          party. The customer keeps their chosen vehicle and adds others of ANY
+          class; we never silently switch their selection. */}
+      {f.transfer && hasCar && (() => {
+        const extras = step.additionalVehicles ?? [];
+        const totalCap = totalVehicleCapacity(step.carCategory, extras, capacityByCategory);
+        const pax = step.passengers ?? 0;
+        const short = totalCap != null && pax > totalCap;
+        // A helpful default for a newly added vehicle: the largest offered class.
+        const biggest = [...cityVehicles].sort(
+          (a, b) => (capacityByCategory[b.category] ?? 0) - (capacityByCategory[a.category] ?? 0),
+        )[0];
+        const addVehicle = () =>
+          onChange({ additionalVehicles: [...extras, { carCategory: (biggest?.category ?? selVeh) as CarCategory }] });
+        const removeVehicle = (i: number) =>
+          onChange({ additionalVehicles: extras.filter((_, idx) => idx !== i) });
+        const setVehicleCat = (i: number, cat: CarCategory) =>
+          onChange({ additionalVehicles: extras.map((v, idx) => (idx === i ? { ...v, carCategory: cat } : v)) });
+
+        return (
+          <div className="grid gap-3 rounded-2xl border border-charcoal/10 bg-ivory-warm/50 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-charcoal/70">{pick(t.builder.additionalVehicles)}</p>
+              {totalCap != null && (
+                <span className={cn(
+                  "badge",
+                  short ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700",
+                )}>
+                  {pick(t.builder.totalCapacity)}: {totalCap} {pick(t.builder.vehicleSeats)}
+                </span>
+              )}
+            </div>
+
+            {short && (
+              <p className="rounded-xl bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
+                {pick(t.builder.capacityShortfall)}
+              </p>
+            )}
+
+            {extras.map((v, i) => (
+              <div key={i} className="rounded-xl border border-charcoal/10 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-charcoal/60">#{i + 2}</span>
+                  <button type="button" onClick={() => removeVehicle(i)} className="text-xs font-medium text-red-600 hover:underline">
+                    {pick(t.builder.removeVehicle)}
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {cityVehicles.map((cv) => {
+                    const sel = v.carCategory === cv.category;
+                    return (
+                      <button
+                        key={cv.category}
+                        type="button"
+                        onClick={() => setVehicleCat(i, cv.category as CarCategory)}
+                        className={cn("sel-card text-center", sel && "sel-card-on")}
+                      >
+                        <span className="block font-semibold text-charcoal">{vehicleName(cv, locale)}</span>
+                        <span className="block text-[0.7rem] text-charcoal/40">{ar ? `حتى ${cv.maxPassengers}` : `Up to ${cv.maxPassengers}`}</span>
+                        <span className={cn("mt-1 block text-sm font-semibold", sel ? "text-gold-dark" : "text-charcoal/60")}>
+                          {formatPrice(priceFor({ carCategory: cv.category as typeof step.carCategory, additionalVehicles: [] }), locale)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <button type="button" onClick={addVehicle} className="btn-outline w-full py-2 text-xs">
+              + {pick(t.builder.addVehicle)}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Chauffeur — start date + number of days + daily usage (end date auto) */}
       {f.chauffeur && (

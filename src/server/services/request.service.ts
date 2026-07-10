@@ -210,6 +210,7 @@ export async function createRequest(input: CreateRequestInput) {
           carCategory: s.carCategory ?? null,
           passengers: s.passengers ?? null,
           bags: s.bags ?? null,
+          additionalVehicles: s.additionalVehicles?.length ? (s.additionalVehicles as object[]) : undefined,
           days: s.days ?? null,
           dailyHours: s.dailyHours ?? null,
           dailyUsage: s.dailyUsage ?? null,

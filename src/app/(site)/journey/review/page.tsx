@@ -11,7 +11,7 @@ import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
-import { validateJourney } from "@/lib/validation/journey";
+import { validateJourney, totalVehicleCapacity } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
 import { logger } from "@/lib/logger";
 import { formatDateOnly, formatDateTime } from "@/lib/utils";
@@ -127,8 +127,9 @@ export default function ReviewPage() {
             const price = computeStepPrice(step, config).computedPrice;
             const f = def?.features ?? { transfer: false, assistance: false, flight: false, hotel: false, home: false, chauffeur: false };
             const update = (patch: Parameters<typeof store.updateStep>[1]) => store.updateStep(step.stepType, patch);
-            const cap = step.carCategory ? (capacityByCategory[step.carCategory] ?? Infinity) : Infinity;
-            const overCap = on && step.passengers != null && step.passengers > cap;
+            const totalCap = totalVehicleCapacity(step.carCategory, step.additionalVehicles, capacityByCategory);
+            const overCap = on && step.passengers != null && totalCap != null && step.passengers > totalCap;
+            const extraVehicles = step.additionalVehicles ?? [];
             const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
             const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
             const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category) && (!priceKnown || priced.has(v.category)));
@@ -169,7 +170,7 @@ export default function ReviewPage() {
                       const sel = (step.carCategory ?? defaultVehicleCategory(stepVehicles)) === v.category;
                       return (
                         <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill ${sel ? "pill-on" : ""}`}>
-                          {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat }, config).computedPrice, locale)}
+                          {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat, additionalVehicles: [] }, config).computedPrice, locale)}
                         </button>
                       );
                     })}
@@ -197,11 +198,14 @@ export default function ReviewPage() {
                     </div>
                   </div>
                 )}
+                {on && (f.transfer || f.chauffeur) && extraVehicles.length > 0 && (
+                  <p className="mt-2 text-xs text-charcoal/55">
+                    {pick(t.builder.additionalVehicles)}: {extraVehicles.map((v) => vehicle(v.carCategory)?.[ar ? "nameAr" : "nameEn"] ?? v.carCategory).join("، ")}
+                  </p>
+                )}
                 {overCap && (
                   <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                    {ar
-                      ? `فئة ${vehicle(step.carCategory)?.nameAr ?? ""} تدعم حتى ${cap} ركاب فقط. الرجاء تقليل عدد الركاب أو اختيار فئة أكبر.`
-                      : `${vehicle(step.carCategory)?.nameEn ?? ""} supports up to ${cap} passengers. Please reduce passengers or pick a larger class.`}
+                    {pick(t.builder.capacityShortfall)}
                   </p>
                 )}
               </div>

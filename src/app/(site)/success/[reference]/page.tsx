@@ -56,6 +56,9 @@ export default async function SuccessPage({ params }: { params: Promise<{ refere
     carCategory: s.carCategory ?? undefined,
     passengers: s.passengers ?? undefined,
     bags: s.bags ?? undefined,
+    additionalVehicles: Array.isArray(s.additionalVehicles)
+      ? (s.additionalVehicles as unknown as JourneyStepInput["additionalVehicles"])
+      : undefined,
     notes: s.notes ?? undefined,
   }));
 

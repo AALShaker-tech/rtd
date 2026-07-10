@@ -227,9 +227,13 @@ model JourneyStep {
   homeAddress    String?
 
   serviceType ServiceType @default(CAR_ONLY)
-  carCategory String? // vehicle class code (see VehicleCategory.category)
+  carCategory String? // primary vehicle class code (see VehicleCategory.category)
   passengers  Int?
   bags        Int?
+  // Extra vehicles booked alongside the primary one when a single car can't
+  // carry the whole party: [{ carCategory, passengers, bags }]. Null/empty for
+  // the common single-vehicle case.
+  additionalVehicles Json?
 
   // chauffeur specifics
   days       Int?

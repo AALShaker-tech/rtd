@@ -43,6 +43,18 @@ export const journeyStepSchema = z.object({
   carCategory: carCategoryEnum.optional(),
   passengers: z.number().int().min(0).max(50).optional(),
   bags: z.number().int().min(0).max(99).optional(),
+  // Extra vehicles beyond the primary one (any class), when one car can't carry
+  // the whole party. Capped defensively; the server re-prices every vehicle.
+  additionalVehicles: z
+    .array(
+      z.object({
+        carCategory: carCategoryEnum,
+        passengers: z.number().int().min(0).max(50).optional(),
+        bags: z.number().int().min(0).max(99).optional(),
+      }),
+    )
+    .max(8)
+    .optional(),
   days: z.number().int().min(0).max(60).optional(),
   dailyHours: z.number().int().min(0).max(24).optional(),
   dailyUsage: z.enum(["SEVEN_HOURS", "EIGHT_HOURS", "FULL_DAY"]).optional(),

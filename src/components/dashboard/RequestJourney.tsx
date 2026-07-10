@@ -4,6 +4,12 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { CHAUFFEUR_USAGE, SERVICE_TYPES, getCity, stepLabel, vehicleLabel } from "@/lib/domain";
 import { formatDateTime } from "@/lib/utils";
 
+export interface DisplayStepVehicle {
+  carCategory: string;
+  passengers: number | null;
+  bags: number | null;
+}
+
 export interface DisplayStep {
   stepOrder: number;
   stepType: string;
@@ -23,6 +29,7 @@ export interface DisplayStep {
   carCategory: string | null;
   passengers: number | null;
   bags: number | null;
+  additionalVehicles?: DisplayStepVehicle[] | null;
   days: number | null;
   dailyHours: number | null;
   dailyUsage: string | null;
@@ -62,6 +69,12 @@ export function RequestJourney({ steps }: { steps: DisplayStep[] }) {
                 {(s.dropoffLocation || s.hotelName) && <Row k={pick(t.fields.dropoff)} v={s.dropoffLocation || s.hotelName!} />}
                 {s.hotelAddress && <Row k={pick(t.fields.hotelAddress)} v={s.hotelAddress} />}
                 {s.carCategory && <Row k={pick(t.fields.carCategory)} v={vehicleLabel(s.carCategory, locale)} />}
+                {s.additionalVehicles && s.additionalVehicles.length > 0 && (
+                  <Row
+                    k={pick(t.builder.additionalVehicles)}
+                    v={s.additionalVehicles.map((v) => vehicleLabel(v.carCategory, locale)).join("، ")}
+                  />
+                )}
                 {s.passengers != null && <Row k={pick(t.fields.passengers)} v={String(s.passengers)} />}
                 {s.bags != null && <Row k={pick(t.fields.bags)} v={String(s.bags)} />}
                 {s.days != null && <Row k={pick(t.fields.days)} v={String(s.days)} />}
