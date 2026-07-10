@@ -232,6 +232,45 @@ guide in [`docs/RAILWAY_PREPARATION_ENVIRONMENT.md`](docs/RAILWAY_PREPARATION_EN
 > override Railpack, so the app is deployed via Railpack to match the working
 > setup. A container image can be reintroduced if moving to a container platform.
 
+### Branching & deploys
+
+Two long-lived branches, each wired to a Railway environment:
+
+| Branch    | Deploys to  | URL                             |
+| --------- | ----------- | ------------------------------- |
+| `main`    | production  | the live site                   |
+| `staging` | preparation | `rtd-preparation.up.railway.app` |
+
+Each environment is fully isolated — its **own database, variables and URL** —
+so nothing on `staging` can touch production data. Preparation runs with
+`NEXT_PUBLIC_APP_ENV=preparation` (banner on, `noindex`, `console` notification
+providers); production runs with `NEXT_PUBLIC_APP_ENV=production` (no banner,
+indexed, real providers).
+
+**Change flow — never commit to `main` directly:**
+
+1. Put the change on `staging` (directly for a small tweak, or via a short
+   feature branch merged into `staging`).
+2. Push `staging` → Railway auto-deploys it to the preparation URL; review it
+   there against real behaviour.
+3. When satisfied, open a PR **`staging → main`** and merge it → production
+   deploys the change.
+
+```
+commit / merge ─▶ staging ─▶ auto-deploy ─▶ preparation URL (review)
+                     │
+               PR: staging → main
+                     │
+                     ▼
+                   main ─▶ auto-deploy ─▶ production URL (live)
+```
+
+`main` is protected: it only changes through a pull request (no direct or force
+pushes). After keeping `main` and `staging` in sync post-merge, fast-forward
+`staging` back onto `main` (`git checkout staging && git merge origin/main &&
+git push`) so preparation always previews on top of exactly what's live. Full
+Railway setup: [`docs/RAILWAY_PREPARATION_ENVIRONMENT.md`](docs/RAILWAY_PREPARATION_ENVIRONMENT.md).
+
 ## 🗄️ Useful scripts
 
 ```bash
