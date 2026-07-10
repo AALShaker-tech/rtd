@@ -122,10 +122,28 @@ Look at the top of the screen. If it says `production`, click it and switch to
      you start typing `${{`). This always resolves to _the current
      environment's_ Postgres, so it can never accidentally point at production.
 
-> ⚠️ If you ever see the **same** database host in both production and
-> preparation, stop — they are sharing a database. Fix it before deploying by
-> adding a dedicated PostgreSQL service to the preparation environment and
-> pointing `DATABASE_URL` at it as above.
+> **How to actually confirm the two databases are separate.** Don't rely on the
+> host name: the Postgres service's variables use references like
+> `${{RAILWAY_PRIVATE_DOMAIN}}`, which usually resolve to the **same string**
+> (`postgres.railway.internal`) in both environments even though each points to
+> a **different** database instance. Private networking is environment-scoped,
+> so identical host text does **not** mean a shared database. Two reliable
+> checks instead:
+>
+> 1. **Compare `POSTGRES_PASSWORD`** between the production Postgres and the
+>    preparation Postgres (each env → Postgres service → Variables). Forking
+>    generates fresh credentials, so **different passwords = separate
+>    instances** (the healthy result). Identical passwords → don't trust it,
+>    use check 2.
+> 2. **Compare the data** (the definitive proof): after you deploy, migrate and
+>    seed preparation (Part E), open the preparation Postgres → **Data** tab. It
+>    must contain **only seed/test data**. If real production bookings appear
+>    there, the environments are sharing a database — **stop** and fix it by
+>    giving preparation its own PostgreSQL service and pointing `DATABASE_URL`
+>    at it as above.
+>
+> Because a Postgres password is a live credential, treat it as secret — never
+> paste it into chats, tickets, or screenshots, and rotate it if it leaks.
 
 ### 3. Set the preparation variables
 
