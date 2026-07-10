@@ -8,7 +8,7 @@ import { usePricing } from "@/components/pricing/PricingProvider";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { useStepCatalog } from "@/components/steps/StepCatalogProvider";
-import { stepSideFromOrder } from "@/lib/domain";
+import { stepSideFromOrder, type StepDef, type Bilingual } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, isStepOffered } from "@/lib/availability";
 import { hasReturnTiming } from "@/lib/service-timing";
@@ -24,6 +24,53 @@ import { DateField, TimeField } from "@/components/ui/DateTimeField";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * The three phases of the journey builder. Each service belongs to exactly one
+ * phase, derived from its canonical side (departure/return) and city scope — no
+ * per-service metadata is needed:
+ *   1. Outbound from Riyadh — the departure-side Riyadh services (steps 1–2)
+ *   2. At Your Destination  — the departure-side destination services (steps 3–5, incl. chauffeur)
+ *   3. Your Return          — every return-side service (steps 6–9)
+ * The Return phase is a review/customization phase: it's seeded once from the
+ * outbound selections (see the store's mirror) and is only shown for round trips.
+ */
+type PhaseKey = "outbound" | "destination" | "return";
+
+interface PhaseDef {
+  key: PhaseKey;
+  title: Bilingual;
+  subtitle: Bilingual;
+  /** Whether this phase collects the return leg (shown only when a return date exists). */
+  isReturn: boolean;
+  inPhase: (def: StepDef) => boolean;
+}
+
+function buildPhases(t: ReturnType<typeof useI18n>["t"]): PhaseDef[] {
+  return [
+    {
+      key: "outbound",
+      title: t.builder.phaseOutboundTitle,
+      subtitle: t.builder.phaseOutboundSub,
+      isReturn: false,
+      inPhase: (d) => stepSideFromOrder(d.order) === "DEPARTURE" && d.cityScope === "RIYADH",
+    },
+    {
+      key: "destination",
+      title: t.builder.phaseDestinationTitle,
+      subtitle: t.builder.phaseDestinationSub,
+      isReturn: false,
+      inPhase: (d) => stepSideFromOrder(d.order) === "DEPARTURE" && d.cityScope === "DESTINATION",
+    },
+    {
+      key: "return",
+      title: t.builder.phaseReturnTitle,
+      subtitle: t.builder.phaseReturnSub,
+      isReturn: true,
+      inPhase: (d) => stepSideFromOrder(d.order) === "RETURN",
+    },
+  ];
+}
+
 export default function JourneyPage() {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
@@ -32,9 +79,10 @@ export default function JourneyPage() {
   const destination = useJourneyStore((s) => s.destination);
   const steps = useJourneyStore((s) => s.steps);
   const tripInfo = useJourneyStore((s) => s.tripInfo);
-  const setDestination = useJourneyStore((s) => s.setDestination);
   const initFlow = useJourneyStore((s) => s.initFlow);
   const updateStep = useJourneyStore((s) => s.updateStep);
+  const returnMirrored = useJourneyStore((s) => s.returnMirrored);
+  const mirrorReturn = useJourneyStore((s) => s.mirrorReturnFromOutbound);
   const draftExpired = useJourneyStore((s) => s.draftExpired);
   const clearExpiredNotice = useJourneyStore((s) => s.clearExpiredNotice);
   const resetDraft = useJourneyStore((s) => s.reset);
@@ -45,13 +93,8 @@ export default function JourneyPage() {
 
   // Service visibility is driven purely by price — the single admin control: a
   // step shows when it has a real price for its city (Riyadh-side steps follow
-  // RUH, destination-side steps follow the chosen destination). The legacy
-  // per-service enable/active flags (catalog.disabledSteps) are intentionally
-  // NOT honored here: they're no longer settable in the admin now that price is
-  // the control, and a stale flag was wrongly hiding fully-priced services.
-  // Retiring a service entirely is still done on the Services tab — it's dropped
-  // from the catalog, so it never reaches here. When pricing didn't load (empty
-  // fallback config) we fail open and show steps rather than an empty flow.
+  // RUH, destination-side steps follow the chosen destination). When pricing
+  // didn't load (empty fallback config) we fail open and show steps.
   const cityLoungePrices = (code: string | null | undefined) =>
     (catalog.city(code)?.airports ?? []).flatMap((a) => a.lounges.map((l) => l.price));
   const priceKnown = hasCityPricing(config);
@@ -60,14 +103,19 @@ export default function JourneyPage() {
     return priceKnown ? isStepOffered(def, cityCode, config, cityLoungePrices(cityCode)) : true;
   });
 
-  const [stage, setStage] = useState<"destination" | "tripinfo" | "flow">(
-    destination ? (tripInfo.departureDate ? "flow" : "tripinfo") : "destination",
+  const phases = buildPhases(t);
+  // The Return phase is only part of the journey when the customer gave a return
+  // date (round trip). Otherwise it's a one-way trip and Phase 3 is skipped.
+  const hasReturn = !!tripInfo.returnDate;
+  const activePhases = phases.filter((p) => !p.isReturn || hasReturn);
+
+  const [stage, setStage] = useState<"start" | "phase">(
+    destination && tripInfo.departureDate ? "phase" : "start",
   );
-  const [idx, setIdx] = useState(0);
+  const [phaseIdx, setPhaseIdx] = useState(0);
 
   // The draft persists to localStorage but is not hydrated during SSR (so the
-  // server and first client render match). Rehydrate on mount, then resume at
-  // the correct stage for whatever draft was restored.
+  // server and first client render match). Rehydrate on mount, then resume.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     Promise.resolve(useJourneyStore.persist.rehydrate()).then(() => setHydrated(true));
@@ -75,29 +123,48 @@ export default function JourneyPage() {
   useEffect(() => {
     if (!hydrated) return;
     const { destination: d, tripInfo: ti } = useJourneyStore.getState();
-    setStage(d ? (ti.departureDate ? "flow" : "tripinfo") : "destination");
-    setIdx(0);
+    setStage(d && ti.departureDate ? "phase" : "start");
+    setPhaseIdx(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
-  // If the persisted draft expired while away, snap back to a clean first step.
+  // If the persisted draft expired while away, snap back to a clean start.
   useEffect(() => {
     if (draftExpired) {
-      setStage("destination");
-      setIdx(0);
+      setStage("start");
+      setPhaseIdx(0);
     }
   }, [draftExpired]);
 
-  function pickDestination(code: string) {
-    clearExpiredNotice();
-    setDestination(code);
-    setStage("tripinfo");
-  }
+  const phase = activePhases[Math.min(phaseIdx, activePhases.length - 1)];
 
+  // Seed the return services from the outbound selections exactly once, the
+  // first time the customer reaches the Return phase. After that the return
+  // journey is independent — never auto-overwritten.
+  useEffect(() => {
+    if (stage === "phase" && phase?.isReturn && !returnMirrored) {
+      mirrorReturn();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, phase?.key, returnMirrored]);
+
+  function startFlow() {
+    initFlow(destination ?? undefined, flowSteps);
+    setPhaseIdx(0);
+    setStage("phase");
+  }
   function startNewBooking() {
     resetDraft();
-    setStage("destination");
-    setIdx(0);
+    setStage("start");
+    setPhaseIdx(0);
+  }
+  function advance() {
+    if (phaseIdx < activePhases.length - 1) setPhaseIdx(phaseIdx + 1);
+    else router.push("/journey/review");
+  }
+  function back() {
+    if (phaseIdx > 0) setPhaseIdx(phaseIdx - 1);
+    else setStage("start");
   }
 
   const expiredBanner = draftExpired ? (
@@ -106,53 +173,10 @@ export default function JourneyPage() {
       <button onClick={clearExpiredNotice} className="shrink-0 text-amber-700 hover:text-amber-900" aria-label="dismiss">✕</button>
     </div>
   ) : null;
-  function startFlow() {
-    initFlow(destination ?? undefined, flowSteps);
-    setIdx(0);
-    setStage("flow");
-  }
-  function advance() {
-    if (idx < flowSteps.length - 1) setIdx(idx + 1);
-    else router.push("/journey/review");
-  }
-  function back() {
-    if (idx > 0) setIdx(idx - 1);
-    else setStage("tripinfo");
-  }
 
-  // ─────────── Destination picker ───────────
-  if (stage === "destination") {
-    return (
-      <div className="luxe-container max-w-4xl py-12 md:py-16">
-        {expiredBanner}
-        <div className="mb-10 text-center">
-          <div className="gold-rule mx-auto mb-5" />
-          <h1 className="text-3xl font-semibold text-charcoal md:text-4xl">{pick(t.builder.chooseDestination)}</h1>
-          <p className="mx-auto mt-3 max-w-md text-charcoal/60">{pick(t.builder.chooseDestinationSub)}</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {catalog.destinations.map((d) => (
-            <button key={d.code} onClick={() => pickDestination(d.code)} className="sel-card flex items-center justify-between p-5">
-              <div className="flex items-center gap-4">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-charcoal text-gold-light">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
-                </span>
-                <div>
-                  <div className="font-serif text-lg font-semibold text-charcoal">{ar ? d.nameAr : d.nameEn}</div>
-                  {d.airports[0] && <div className="text-xs text-charcoal/50">{d.airports[0].code} · {ar ? d.airports[0].nameAr : d.airports[0].nameEn}</div>}
-                </div>
-              </div>
-              <span className="text-gold-dark rtl:rotate-180">→</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────── Trip Information ───────────
-  if (stage === "tripinfo") {
-    return <TripInfoStage onBack={() => setStage("destination")} onContinue={startFlow} />;
+  // ─────────── Merged start: destination + trip information ───────────
+  if (stage === "start") {
+    return <StartStage expiredBanner={expiredBanner} onContinue={startFlow} />;
   }
 
   // ─────────── No services priced for this destination yet ───────────
@@ -164,85 +188,76 @@ export default function JourneyPage() {
         <h1 className="text-2xl font-semibold text-charcoal md:text-3xl">{pick(t.builder.noServicesTitle)}</h1>
         <p className="mx-auto mt-3 max-w-md text-sm text-charcoal/60">{pick(t.builder.noServicesBody)}</p>
         <div className="mt-8 flex justify-center gap-3">
-          <button onClick={() => setStage("destination")} className="btn-gold">{pick(t.builder.chooseDestination)}</button>
+          <button onClick={() => setStage("start")} className="btn-gold">{pick(t.builder.chooseDestination)}</button>
         </div>
       </div>
     );
   }
 
-  // ─────────── Step-by-step flow ───────────
-  const def = flowSteps[Math.min(idx, flowSteps.length - 1)];
-  const step = steps.find((s) => s.stepType === def.type);
-  const progress = Math.round((idx / flowSteps.length) * 100);
-  if (!step) return null;
+  // ─────────── Phase screen ───────────
+  const phaseDefs = flowSteps.filter(phase.inPhase);
+  const phaseSteps = phaseDefs
+    .map((def) => ({ def, step: steps.find((s) => s.stepType === def.type) }))
+    .filter((x): x is { def: StepDef; step: NonNullable<typeof x.step> } => !!x.step);
 
-  const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
-  // Date/time is the Trip Information's job — it auto-fills every step. Departure
-  // steps never re-ask. For RETURN steps, if the return date/time wasn't entered
-  // up front we collect it once here (the return source of truth); once set, it
-  // propagates to every later return step and is never asked again.
-  const isReturnStep = stepSideFromOrder(def.order) === "RETURN";
-  const returnReady = hasReturnTiming(tripInfo);
-  const collectReturnTiming = isReturnStep && !returnReady;
-  const stepValidation = validateStep({ ...step, skipped: false }, new Date(), capacityByCategory);
-  // Assistance steps require an explicit option (lounge / airport service) before
-  // they can be added. Transfer/chauffeur steps have a visible default vehicle.
-  const needsService = def.features.assistance && !step.loungeType;
-  const blockAdd =
-    stepValidation.errors.some((e) => e.field === "passengers") || needsService || collectReturnTiming;
+  // A return-side service needs the return date/time to schedule. If it's active
+  // but the return timing wasn't captured up front, collect it once here.
+  const needsReturnTiming =
+    phase.isReturn &&
+    !hasReturnTiming(tripInfo) &&
+    phaseSteps.some(({ step }) => !step.skipped);
+
+  // Block Continue while any added service in this phase has a blocking error
+  // (e.g. an assistance step with no option chosen, or a return needing timing).
+  const phaseHasErrors =
+    needsReturnTiming ||
+    phaseSteps.some(({ step }) =>
+      !step.skipped && validateStep(step, new Date(), capacityByCategory).errors.length > 0,
+    );
+
+  const progress = Math.round(((phaseIdx + 1) / activePhases.length) * 100);
 
   return (
-    // Extra bottom padding below `lg` so the last Add/Skip buttons clear the
-    // fixed running-total bar (which is only shown on mobile/tablet).
     <div className="luxe-container max-w-6xl pt-8 pb-28 md:pt-12 lg:pb-12">
       {expiredBanner}
-      {/* Single integrated summary card: route · auto-filled trip info · actions */}
-      <TripSummaryBar onChangeDestination={() => setStage("destination")} onStartNew={startNewBooking} />
+      <TripSummaryBar onChangeDestination={() => setStage("start")} onStartNew={startNewBooking} />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div>
+          {/* Phase header + progress */}
           <div className="mb-4 flex items-center gap-3">
             <button onClick={back} className="btn-outline px-4 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-charcoal/10">
               <div className="h-full rounded-full bg-gold-gradient transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
-            <span className="text-xs text-charcoal/50">{pick(t.common.step)} {idx + 1} {pick(t.common.of)} {flowSteps.length}</span>
+            <span className="text-xs text-charcoal/50">
+              {pick(t.builder.phaseLabel)} {phaseIdx + 1} {pick(t.common.of)} {activePhases.length}
+            </span>
           </div>
 
-          <div key={def.type} className="luxe-card animate-fade-up p-6 md:p-8">
-            <div className="flex items-start gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gold-gradient text-base font-bold text-charcoal">{def.order}</span>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-gold-dark">
-                  {pick(def.cityScope === "RIYADH" ? { en: "Riyadh", ar: "الرياض" } : { en: "Destination", ar: "الوجهة" })}
-                </p>
-                <h2 className="mt-0.5 font-serif text-2xl font-semibold text-charcoal">{pick(def.name)}</h2>
-                <p className="mt-1 text-sm leading-relaxed text-charcoal/60">{pick(def.description)}</p>
-              </div>
-            </div>
+          <div className="mb-5">
+            <h1 className="font-serif text-2xl font-semibold text-charcoal md:text-3xl">{pick(phase.title)}</h1>
+            <p className="mt-1 text-sm text-charcoal/60">{pick(phase.subtitle)}</p>
+          </div>
 
-            {collectReturnTiming && <ReturnTimingPrompt />}
+          {/* Return phase — mirror notice + re-match action */}
+          {phase.isReturn && !needsReturnTiming && (
+            <ReturnMirrorBar onRematch={mirrorReturn} />
+          )}
 
-            <div className="mt-6">
-              <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={false} />
-            </div>
+          {/* Return-timing prompt (fallback when it wasn't set up front) */}
+          {needsReturnTiming && <ReturnTimingPrompt />}
 
-            <div className="mt-6 flex items-center justify-between rounded-xl bg-ivory-warm px-4 py-3">
-              <span className="text-sm text-charcoal/60">{pick(t.builder.estimatedPrice)}</span>
-              <span className="font-serif text-lg font-semibold text-gold-dark">{formatPrice(subtotal, locale)}</span>
-            </div>
-            {needsService && (
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.builder.selectServicePrompt)}</p>
-            )}
-            {collectReturnTiming && (
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.builder.selectReturnTiming)}</p>
-            )}
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => { if (blockAdd) return; updateStep(def.type, { skipped: false }); advance(); }} disabled={blockAdd} className="btn-gold flex-1">
-                ✓ {pick(t.builder.addService)}
-              </button>
-              <button onClick={() => { updateStep(def.type, { skipped: true }); advance(); }} className="btn-outline">{pick(t.common.skip)}</button>
-            </div>
+          <div className="grid gap-4">
+            {phaseSteps.map(({ def }) => (
+              <PhaseServiceCard key={def.type} def={def} />
+            ))}
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button onClick={advance} disabled={phaseHasErrors} className="btn-gold px-8">
+              {phaseIdx < activePhases.length - 1 ? pick(t.common.next) : pick(t.builder.reviewJourney)} {ar ? "←" : "→"}
+            </button>
           </div>
         </div>
 
@@ -268,10 +283,85 @@ export default function JourneyPage() {
 }
 
 /**
- * Collects the return journey's date & time once, on the first return-side step
- * the customer reaches without it. Writing here updates Trip Information (the
- * source of truth) and re-applies it to every step, so later return services
- * reuse the same smart timing and never ask again.
+ * A single service inside a phase: a toggle header (add / added) that expands to
+ * the full editor when the service is part of the journey. Skipping collapses it.
+ */
+function PhaseServiceCard({ def }: { def: StepDef }) {
+  const { t, pick, locale } = useI18n();
+  const step = useJourneyStore((s) => s.steps.find((x) => x.stepType === def.type));
+  const updateStep = useJourneyStore((s) => s.updateStep);
+  const tripInfo = useJourneyStore((s) => s.tripInfo);
+  const { config } = usePricing();
+  if (!step) return null;
+
+  const on = !step.skipped && step.serviceType !== "SKIP";
+  const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
+  // Return-side timing may still be pending; the editor shows editable date/time
+  // when the service time can't be auto-estimated.
+  const isReturnStep = stepSideFromOrder(def.order) === "RETURN";
+  const needsTimeInput = isReturnStep && !hasReturnTiming(tripInfo) && !step.time;
+
+  return (
+    <div className={cn("luxe-card p-5 md:p-6", !on && "bg-ivory-warm/40")}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gold-gradient text-sm font-bold text-charcoal">{def.order}</span>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-gold-dark">
+              {pick(def.cityScope === "RIYADH" ? { en: "Riyadh", ar: "الرياض" } : { en: "Destination", ar: "الوجهة" })}
+            </p>
+            <h3 className="mt-0.5 font-serif text-lg font-semibold text-charcoal">{pick(def.name)}</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-charcoal/55">{pick(def.description)}</p>
+          </div>
+        </div>
+        {/* Add / remove toggle */}
+        <button
+          onClick={() => updateStep(def.type, { skipped: on, serviceType: on ? "SKIP" : (def.features.assistance && !def.features.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY") })}
+          className={cn(
+            "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition",
+            on ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "btn-gold",
+          )}
+        >
+          {on ? `✓ ${pick(t.builder.stepIncluded)}` : `+ ${pick(t.builder.addStep)}`}
+        </button>
+      </div>
+
+      {on && (
+        <div className="mt-5 border-t border-charcoal/5 pt-5">
+          <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
+          <div className="mt-5 flex items-center justify-between rounded-xl bg-ivory-warm px-4 py-3">
+            <span className="text-sm text-charcoal/60">{pick(t.builder.estimatedPrice)}</span>
+            <span className="font-serif text-lg font-semibold text-gold-dark">{formatPrice(subtotal, locale)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Notice + explicit "re-match my outbound journey" action for the Return phase. */
+function ReturnMirrorBar({ onRematch }: { onRematch: () => void }) {
+  const { t, pick } = useI18n();
+  return (
+    <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-gold/40 bg-gold-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="flex items-start gap-2 text-xs leading-relaxed text-charcoal/70">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0"><path d="M21 12a9 9 0 11-3-6.7M21 4v4h-4" /></svg>
+        {pick(t.builder.returnMirroredNote)}
+      </p>
+      <button
+        onClick={() => { if (window.confirm(pick(t.builder.matchOutboundConfirm))) onRematch(); }}
+        className="btn-outline shrink-0 whitespace-nowrap px-4 py-2 text-xs"
+      >
+        {pick(t.builder.matchOutboundAgain)}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Collects the return journey's date & time once, when a return service is added
+ * but the return timing wasn't captured in Trip Information. Writing here updates
+ * Trip Information (the source of truth) and re-applies it to every step.
  */
 function ReturnTimingPrompt() {
   const { t, pick } = useI18n();
@@ -281,7 +371,7 @@ function ReturnTimingPrompt() {
   const update = (patch: Parameters<typeof setTripInfo>[0]) => { setTripInfo(patch); applyTripInfoToSteps(); };
 
   return (
-    <div className="mt-6 rounded-2xl border border-gold/40 bg-gold-50/60 p-4">
+    <div className="mb-5 rounded-2xl border border-gold/40 bg-gold-50/60 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold text-charcoal">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v4h-4" /></svg>
         {pick(t.builder.returnTimingTitle)}
@@ -301,10 +391,17 @@ function ReturnTimingPrompt() {
   );
 }
 
-/** Trip Information — collected once at the start, auto-filled into later steps. */
-function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
+/**
+ * Merged opening screen: pick a destination and enter Trip Information on one
+ * page. Trip Info is collected once and auto-filled into every later step.
+ */
+function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactNode; onContinue: () => void }) {
   const { t, pick, locale } = useI18n();
   const ar = locale === "ar";
+  const catalog = useCatalog();
+  const destination = useJourneyStore((s) => s.destination);
+  const setDestination = useJourneyStore((s) => s.setDestination);
+  const clearExpiredNotice = useJourneyStore((s) => s.clearExpiredNotice);
   const customer = useJourneyStore((s) => s.customer);
   const setCustomer = useJourneyStore((s) => s.setCustomer);
   const tripInfo = useJourneyStore((s) => s.tripInfo);
@@ -312,7 +409,6 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
 
   const [attempted, setAttempted] = useState(false);
 
-  // Collect field-level errors from the shared validators (errors only).
   const issues = [
     ...validateCustomer({ ...customer, language: locale }),
     ...validateTripInfo(tripInfo),
@@ -321,13 +417,21 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
     const i = issues.find((x) => x.field === field);
     return i ? (ar ? i.messageAr : i.messageEn) : undefined;
   };
-  const canContinue = issues.length === 0;
-  // Order in which required fields appear, for focusing the first missing one.
+  const canContinue = !!destination && issues.length === 0;
   const FIELD_ORDER = ["fullName", "phone", "departureDate", "departureTime", "passengers", "bags", "returnDate", "email"];
+
+  function pickDestination(code: string) {
+    clearExpiredNotice();
+    setDestination(code);
+  }
 
   function cont() {
     setAttempted(true);
-    if (!canContinue) {
+    if (!destination) {
+      document.getElementById("start-destinations")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (issues.length > 0) {
       const first = FIELD_ORDER.find((f) => errFor(f));
       if (first) {
         const el = document.getElementById(`ti-${first}`);
@@ -344,10 +448,42 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
 
   return (
     <div className="luxe-container max-w-2xl py-10 md:py-14">
+      {expiredBanner}
       <div className="mb-8 text-center">
         <div className="gold-rule mx-auto mb-5" />
         <h1 className="text-3xl font-semibold text-charcoal md:text-4xl">{pick(t.tripInfo.title)}</h1>
         <p className="mx-auto mt-3 max-w-md text-charcoal/60">{pick(t.tripInfo.subtitle)}</p>
+      </div>
+
+      {/* Destination selector */}
+      <div id="start-destinations" className="mb-6">
+        <span className="field-label">{pick(t.builder.chooseDestination)}</span>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {catalog.destinations.map((d) => {
+            const sel = destination === d.code;
+            return (
+              <button
+                key={d.code}
+                onClick={() => pickDestination(d.code)}
+                className={cn("sel-card flex items-center justify-between p-4", sel && "sel-card-on")}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={cn("grid h-10 w-10 place-items-center rounded-xl", sel ? "bg-gold-gradient text-charcoal" : "bg-charcoal text-gold-light")}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
+                  </span>
+                  <div className="text-start">
+                    <div className="font-serif text-base font-semibold text-charcoal">{ar ? d.nameAr : d.nameEn}</div>
+                    {d.airports[0] && <div className="text-[11px] text-charcoal/50">{d.airports[0].code} · {ar ? d.airports[0].nameAr : d.airports[0].nameEn}</div>}
+                  </div>
+                </div>
+                {sel && <span className="text-gold-dark">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+        {attempted && !destination && (
+          <p className="mt-2 text-xs text-red-600">{ar ? "يرجى اختيار وجهة." : "Please choose a destination."}</p>
+        )}
       </div>
 
       <div className="luxe-card space-y-5 p-6 md:p-8">
@@ -408,9 +544,8 @@ function TripInfoStage({ onBack, onContinue }: { onBack: () => void; onContinue:
             {ar ? "يرجى تعبئة الحقول المطلوبة المميّزة بالأحمر." : "Please complete the required fields highlighted in red."}
           </p>
         )}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
-          <button type="button" onClick={onBack} className="btn-ghost">{ar ? "→" : "←"} {pick(t.common.back)}</button>
-          <button type="button" onClick={cont} className="btn-gold">{pick(t.common.next)} {ar ? "←" : "→"}</button>
+        <div className="flex justify-end pt-2">
+          <button type="button" onClick={cont} className="btn-gold px-8">{pick(t.common.next)} {ar ? "←" : "→"}</button>
         </div>
       </div>
     </div>
@@ -461,8 +596,7 @@ function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeErro
     }
   }
 
-  // Re-resolve automatically when the trip date changes (the weekday — hence the
-  // schedule match — depends on it). Clears any stale "not found" result.
+  // Re-resolve automatically when the trip date changes.
   const prevDate = useRef(date);
   useEffect(() => {
     if (prevDate.current === date) return;
@@ -518,8 +652,7 @@ function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeErro
         </div>
       )}
 
-      {/* Manual time — always available when no flight is resolved (so the
-          customer can provide a time even without a schedule match). */}
+      {/* Manual time — always available when no flight is resolved. */}
       {!resolved && (
         <div className="mt-2 space-y-2">
           {status === "not_found" && (

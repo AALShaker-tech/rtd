@@ -89,6 +89,41 @@ describe("computeStepPrice — car transfers (per-class, per-city)", () => {
   });
 });
 
+describe("computeStepPrice — additional vehicles (multi-vehicle transfers)", () => {
+  it("adds each extra vehicle's class price to the primary", () => {
+    const b = computeStepPrice(
+      step({
+        stepType: "AIRPORT_TO_HOTEL",
+        serviceType: "CAR_ONLY",
+        carCategory: "VIP", // 532
+        additionalVehicles: [{ carCategory: "VVIP" }, { carCategory: "ECONOMY" }], // 760 + 380
+      }),
+      CFG,
+    );
+    expect(b.computedPrice).toBe(532 + 760 + 380);
+    // basePrice stays the primary unit price.
+    expect(b.basePrice).toBe(532);
+  });
+
+  it("ignores additional vehicles for a skipped step", () => {
+    expect(
+      computeStepPrice(
+        step({ stepType: "AIRPORT_TO_HOTEL", carCategory: "VIP", additionalVehicles: [{ carCategory: "VVIP" }], skipped: true }),
+        CFG,
+      ).computedPrice,
+    ).toBe(0);
+  });
+
+  it("prices an extra vehicle of an unpriced class as 0", () => {
+    expect(
+      computeStepPrice(
+        step({ stepType: "AIRPORT_TO_HOTEL", carCategory: "VIP", additionalVehicles: [{ carCategory: "NOT_PRICED" }] }),
+        CFG,
+      ).computedPrice,
+    ).toBe(532);
+  });
+});
+
 describe("computeStepPrice — chauffeur (per-class × days × usage tier)", () => {
   it("prices per-day × days × usage tier", () => {
     const b = computeStepPrice(

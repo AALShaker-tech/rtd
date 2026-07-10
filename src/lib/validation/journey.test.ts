@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   validateVehicleCapacity,
+  validateStepVehicles,
+  totalVehicleCapacity,
   validateStep,
   validateTimeline,
   validateJourney,
@@ -56,6 +58,42 @@ describe("validateVehicleCapacity", () => {
     const issue = validateVehicleCapacity("VVIP", 3, 2);
     expect(issue?.severity).toBe("error");
     expect(issue?.messageEn).toContain("2");
+  });
+});
+
+describe("multi-vehicle capacity", () => {
+  it("sums capacity across the primary and additional vehicles", () => {
+    // VIP (6) + VVIP (3) = 9 seats.
+    expect(totalVehicleCapacity("VIP", [{ carCategory: "VVIP" }])).toBe(9);
+  });
+
+  it("returns null total when a class capacity is unknown", () => {
+    expect(totalVehicleCapacity("MYSTERY_CLASS", undefined)).toBeNull();
+  });
+
+  it("passes when the combined vehicles seat the whole party", () => {
+    // 8 passengers, VIP (6) + ECONOMY (4) = 10 → fits.
+    expect(
+      validateStepVehicles(step({ carCategory: "VIP", passengers: 8, additionalVehicles: [{ carCategory: "ECONOMY" }] })),
+    ).toBeNull();
+  });
+
+  it("errors when even the combined vehicles can't seat everyone", () => {
+    // 10 passengers, VVIP (3) + VVIP (3) = 6 → short.
+    const issue = validateStepVehicles(
+      step({ carCategory: "VVIP", passengers: 10, additionalVehicles: [{ carCategory: "VVIP" }] }),
+    );
+    expect(issue?.severity).toBe("error");
+    expect(issue?.field).toBe("passengers");
+    expect(issue?.messageEn).toContain("6");
+  });
+
+  it("clears the step capacity error once enough vehicles are added", () => {
+    // VIP alone can't take 8, but adding a second VIP (6 + 6 = 12) resolves it.
+    const withOne = validateStep(step({ stepType: "AIRPORT_TO_HOTEL", carCategory: "VIP", passengers: 8, city: "LON", time: "10:00", date: "2026-06-10" }), NOW);
+    expect(hasError(withOne.errors, "passengers")).toBe(true);
+    const withTwo = validateStep(step({ stepType: "AIRPORT_TO_HOTEL", carCategory: "VIP", passengers: 8, additionalVehicles: [{ carCategory: "VIP" }], city: "LON", time: "10:00", date: "2026-06-10" }), NOW);
+    expect(hasError(withTwo.errors, "passengers")).toBe(false);
   });
 });
 

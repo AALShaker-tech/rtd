@@ -10,6 +10,13 @@ import type { NormalizedFlight, ResolvedFlight, FlightLookupStatusValue } from "
 
 export type FlightLookupStatus = "MANUAL" | "VERIFIED" | "LOOKUP_FAILED";
 
+/** One extra vehicle attached to a step (beyond the primary `carCategory`). */
+export interface StepVehicleInput {
+  carCategory: CarCategory;
+  passengers?: number;
+  bags?: number;
+}
+
 /** A single journey step as held in the client draft / submitted to the API. */
 export interface JourneyStepInput {
   stepType: StepType;
@@ -39,6 +46,14 @@ export interface JourneyStepInput {
   carCategory?: CarCategory;
   passengers?: number;
   bags?: number;
+
+  /**
+   * Additional vehicles booked for this step, on top of the primary
+   * `carCategory` above. Used when one vehicle can't carry the whole party:
+   * the customer keeps their chosen vehicle and adds one or more others of any
+   * category. Empty/undefined for the common single-vehicle case.
+   */
+  additionalVehicles?: StepVehicleInput[];
 
   // chauffeur
   days?: number;

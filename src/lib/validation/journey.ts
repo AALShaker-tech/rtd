@@ -15,6 +15,7 @@ import {
   type CarCategory,
   type StepType,
 } from "@/lib/domain";
+import type { StepVehicleInput } from "@/lib/types";
 import { combineDateTime } from "@/lib/utils";
 import { isValidEmail, isValidFlightNumber, parsePhone } from "@/lib/phone";
 import type {
@@ -99,6 +100,58 @@ export function validateVehicleCapacity(
   );
 }
 
+/** Look up a vehicle class's capacity (admin override first, then static). */
+function categoryCapacity(
+  category: CarCategory | undefined,
+  maxByCategory?: Record<string, number>,
+): number | null {
+  if (!category) return null;
+  return maxByCategory?.[category] ?? getVehicle(category)?.maxPassengers ?? null;
+}
+
+/**
+ * Combined seating capacity of a step's vehicles (primary + additional). Returns
+ * null when any selected class has an unknown capacity (so we never guess).
+ */
+export function totalVehicleCapacity(
+  primary: CarCategory | undefined,
+  additional: StepVehicleInput[] | undefined,
+  maxByCategory?: Record<string, number>,
+): number | null {
+  const categories = [primary, ...(additional ?? []).map((v) => v.carCategory)].filter(
+    (c): c is CarCategory => !!c,
+  );
+  if (categories.length === 0) return null;
+  let total = 0;
+  for (const c of categories) {
+    const cap = categoryCapacity(c, maxByCategory);
+    if (cap == null) return null; // unknown capacity → can't judge
+    total += cap;
+  }
+  return total;
+}
+
+/**
+ * Capacity check across ALL of a step's vehicles. The customer is never
+ * auto-switched to a different class: if the combined capacity can't seat the
+ * party, we return a clear error and they resolve it by choosing a larger class
+ * OR adding another vehicle of any category.
+ */
+export function validateStepVehicles(
+  step: JourneyStepInput,
+  maxByCategory?: Record<string, number>,
+): ValidationIssue | null {
+  if (step.passengers == null) return null;
+  const total = totalVehicleCapacity(step.carCategory, step.additionalVehicles, maxByCategory);
+  if (total == null || step.passengers <= total) return null;
+  return issue(
+    "error",
+    `Your selected vehicles seat up to ${total} passengers. Add another vehicle or choose a larger class.`,
+    `المركبات المختارة تتّسع حتى ${total} راكبًا. أضف مركبة أخرى أو اختر فئة أكبر.`,
+    "passengers",
+  );
+}
+
 // ─────────────────────────── Step-level validation ───────────────────────────
 
 export function validateStep(
@@ -179,11 +232,8 @@ export function validateStep(
     if (step.passengers == null || step.passengers < 1)
       errors.push(req("passengers", "عدد الركاب", "passengers"));
 
-    const cap = validateVehicleCapacity(
-      step.carCategory,
-      step.passengers,
-      step.carCategory ? maxByCategory?.[step.carCategory] : undefined,
-    );
+    // Capacity across all of the step's vehicles (primary + any added).
+    const cap = validateStepVehicles(step, maxByCategory);
     if (cap) errors.push(cap);
 
     if (step.passengers && step.bags != null) {

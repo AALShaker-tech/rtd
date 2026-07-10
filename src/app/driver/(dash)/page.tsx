@@ -41,6 +41,7 @@ export default async function DriverHome() {
           carCategory: true,
           passengers: true,
           bags: true,
+          additionalVehicles: true,
           notes: true,
         },
       },
@@ -67,6 +68,9 @@ export default async function DriverHome() {
       carCategory: r.journeyStep.carCategory,
       passengers: r.journeyStep.passengers,
       bags: r.journeyStep.bags,
+      additionalVehicles: Array.isArray(r.journeyStep.additionalVehicles)
+        ? (r.journeyStep.additionalVehicles as { carCategory: string; passengers: number | null; bags: number | null }[])
+        : [],
       notes: r.journeyStep.notes,
     },
   }));

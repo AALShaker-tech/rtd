@@ -72,6 +72,20 @@ function applyTripToStep(
  * The PostgreSQL database remains the single source of truth on submission.
  */
 
+/**
+ * Return-side → outbound-side step pairing for the one-time mirror. When the
+ * customer reaches the Return phase we copy each outbound service's selections
+ * into its return counterpart (key = return step, value = source outbound step).
+ * The chauffeur is deliberately absent — it belongs only to the destination
+ * stay and is never mirrored to the return journey.
+ */
+const RETURN_MIRROR: Record<string, string> = {
+  RIYADH_AIRPORT_TO_HOME: "HOME_TO_RIYADH_AIRPORT",
+  ARRIVAL_ASSIST_RIYADH: "DEPARTURE_ASSIST_RIYADH",
+  DEPARTURE_ASSIST_RETURN: "ARRIVAL_ASSIST_DESTINATION",
+  HOTEL_TO_AIRPORT: "AIRPORT_TO_HOTEL",
+};
+
 const emptyCustomer: CustomerDetailsInput = {
   fullName: "",
   phone: "",
@@ -123,6 +137,13 @@ interface JourneyDraftData {
   tripInfo: TripInfoInput;
   phoneVerified: boolean;
   emailVerified: boolean;
+  /**
+   * Whether the return services have already been seeded from the outbound
+   * selections. The mirror runs exactly once (on first entry to the Return
+   * phase); after that the return journey is independent and is never
+   * auto-overwritten again — only the explicit "match outbound" action re-copies.
+   */
+  returnMirrored: boolean;
   /** Epoch ms of last user activity — drives draft expiry. */
   lastTouched: number;
   /** Transient (not persisted): set when a stale draft was just cleared. */
@@ -135,6 +156,13 @@ interface JourneyState extends JourneyDraftData {
   applyTripInfoToSteps: () => void;
   initFlow: (destination?: string, stepDefs?: StepDef[]) => void;
   startBlank: () => void;
+  /**
+   * Copy the outbound service selections into their return counterparts. Called
+   * once automatically on first entry to the Return phase, and again only when
+   * the customer explicitly asks to re-match. Trip-derived fields (dates, times,
+   * passengers, bags) are NOT copied — they stay computed for the return side.
+   */
+  mirrorReturnFromOutbound: () => void;
   updateStep: (stepType: StepType, patch: Partial<JourneyStepInput>) => void;
   setSkipped: (stepType: StepType, skipped: boolean) => void;
   setCustomer: (patch: Partial<CustomerDetailsInput>) => void;
@@ -154,6 +182,7 @@ function freshDraft(): JourneyDraftData {
     tripInfo: emptyTripInfo,
     phoneVerified: false,
     emailVerified: false,
+    returnMirrored: false,
     lastTouched: Date.now(),
     draftExpired: false,
   };
@@ -222,10 +251,42 @@ export const useJourneyStore = create<JourneyState>()(
         // service catalog; fall back to the built-in steps when none supplied.
         const defs = stepDefs?.length ? stepDefs : STEPS;
         const steps = defs.map((def) => applyTripToStep(blankStep(def), tripInfo, dest, prior.get(def.type)));
-        set({ destination: dest, steps: sortByOrder(steps), lastTouched: NOW() });
+        // A freshly (re)built flow hasn't seeded its return services yet.
+        set({ destination: dest, steps: sortByOrder(steps), returnMirrored: false, lastTouched: NOW() });
       },
 
       startBlank: () => set({ steps: [] }),
+
+      mirrorReturnFromOutbound: () =>
+        set((st) => {
+          const bySource = new Map(st.steps.map((s) => [s.stepType, s]));
+          return {
+            lastTouched: NOW(),
+            returnMirrored: true,
+            steps: st.steps.map((s) => {
+              const sourceType = RETURN_MIRROR[s.stepType];
+              if (!sourceType) return s; // not a mirrored return step (e.g. chauffeur)
+              const src = bySource.get(sourceType);
+              if (!src) return s;
+              // Copy only the service *selections* — never the trip-derived
+              // timing/party fields, which stay correct for the return side.
+              return {
+                ...s,
+                skipped: src.skipped,
+                serviceType: src.serviceType,
+                carCategory: src.carCategory,
+                loungeType: src.loungeType,
+                airport: src.airport ?? s.airport,
+                homeAddress: src.homeAddress ?? s.homeAddress,
+                hotelName: src.hotelName ?? s.hotelName,
+                notes: src.notes ?? s.notes,
+                additionalVehicles: src.additionalVehicles
+                  ? src.additionalVehicles.map((v) => ({ ...v }))
+                  : undefined,
+              };
+            }),
+          };
+        }),
 
       updateStep: (stepType, patch) =>
         set((st) => ({
@@ -266,6 +327,7 @@ export const useJourneyStore = create<JourneyState>()(
         tripInfo: s.tripInfo,
         phoneVerified: s.phoneVerified,
         emailVerified: s.emailVerified,
+        returnMirrored: s.returnMirrored,
         lastTouched: s.lastTouched,
       }),
       // Drop a stale draft on rehydrate and raise the expiry notice; otherwise

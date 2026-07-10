@@ -73,7 +73,7 @@ function carClassPrice(
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "days" | "dailyUsage"
+    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "additionalVehicles" | "days" | "dailyUsage"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
@@ -91,10 +91,15 @@ export function computeStepPrice(
     return { basePrice: unit, computedPrice: Math.round(unit * days * usage) };
   }
 
-  // Car transfer — the direct per-class price.
+  // Car transfer — the direct per-class price, plus any additional vehicles the
+  // customer added to fit a larger party (each priced at its own class rate).
   if (f?.transfer && serviceHasCar(step.serviceType)) {
-    const price = carClassPrice(config, step.city, step.stepType, step.carCategory);
-    return { basePrice: price, computedPrice: Math.round(price) };
+    const primary = carClassPrice(config, step.city, step.stepType, step.carCategory);
+    const extra = (step.additionalVehicles ?? []).reduce(
+      (sum, v) => sum + carClassPrice(config, step.city, step.stepType, v.carCategory),
+      0,
+    );
+    return { basePrice: primary, computedPrice: Math.round(primary + extra) };
   }
 
   // Lounge / assistance — the lounge's per-airport price when a lounge is
