@@ -12,8 +12,7 @@ import { stepSideFromOrder, type StepDef, type Bilingual } from "@/lib/domain";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, isStepOffered } from "@/lib/availability";
 import { hasReturnTiming } from "@/lib/service-timing";
-import { validateCustomer, validateStep, validateTripInfo } from "@/lib/validation/journey";
-import { COUNTRY_CODES } from "@/lib/phone";
+import { validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { cn, formatDateOnly } from "@/lib/utils";
 import type { ResolvedFlight } from "@/lib/flight";
@@ -39,6 +38,8 @@ type PhaseKey = "outbound" | "destination" | "return";
 interface PhaseDef {
   key: PhaseKey;
   title: Bilingual;
+  /** Short chapter label for the progress stepper. */
+  short: Bilingual;
   subtitle: Bilingual;
   /** Whether this phase collects the return leg (shown only when a return date exists). */
   isReturn: boolean;
@@ -50,6 +51,7 @@ function buildPhases(t: ReturnType<typeof useI18n>["t"]): PhaseDef[] {
     {
       key: "outbound",
       title: t.builder.phaseOutboundTitle,
+      short: { en: "Outbound", ar: "المغادرة" },
       subtitle: t.builder.phaseOutboundSub,
       isReturn: false,
       inPhase: (d) => stepSideFromOrder(d.order) === "DEPARTURE" && d.cityScope === "RIYADH",
@@ -57,6 +59,7 @@ function buildPhases(t: ReturnType<typeof useI18n>["t"]): PhaseDef[] {
     {
       key: "destination",
       title: t.builder.phaseDestinationTitle,
+      short: { en: "Destination", ar: "الوجهة" },
       subtitle: t.builder.phaseDestinationSub,
       isReturn: false,
       inPhase: (d) => stepSideFromOrder(d.order) === "DEPARTURE" && d.cityScope === "DESTINATION",
@@ -64,6 +67,7 @@ function buildPhases(t: ReturnType<typeof useI18n>["t"]): PhaseDef[] {
     {
       key: "return",
       title: t.builder.phaseReturnTitle,
+      short: { en: "Return", ar: "العودة" },
       subtitle: t.builder.phaseReturnSub,
       isReturn: true,
       inPhase: (d) => stepSideFromOrder(d.order) === "RETURN",
@@ -223,8 +227,6 @@ export default function JourneyPage() {
       !step.skipped && validateStep(step, new Date(), capacityByCategory).errors.length > 0,
     );
 
-  const progress = Math.round(((phaseIdx + 1) / activePhases.length) * 100);
-
   return (
     <div className="luxe-container max-w-6xl pt-8 pb-28 md:pt-12 lg:pb-12">
       {expiredBanner}
@@ -232,19 +234,39 @@ export default function JourneyPage() {
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div>
-          {/* Phase header + progress */}
+          {/* Chapter stepper — turns the flow into a few legible chapters */}
           <div className="mb-4 flex items-center gap-3">
-            <button onClick={back} className="btn-outline px-4 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-charcoal/10">
-              <div className="h-full rounded-full bg-gold-gradient transition-all duration-500" style={{ width: `${progress}%` }} />
-            </div>
-            <span className="text-xs text-charcoal/50">
-              {pick(t.builder.phaseLabel)} {phaseIdx + 1} {pick(t.common.of)} {activePhases.length}
-            </span>
+            <button onClick={back} className="btn-outline shrink-0 px-4 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
+            <ol className="flex flex-1 items-center gap-2">
+              {activePhases.map((p, i) => {
+                const state = i === phaseIdx ? "current" : i < phaseIdx ? "done" : "upcoming";
+                return (
+                  <li key={p.key} className="flex flex-1 items-center gap-2">
+                    <span
+                      className={cn(
+                        "grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors",
+                        state === "current" && "bg-gold-gradient text-charcoal",
+                        state === "done" && "bg-emerald-500 text-white",
+                        state === "upcoming" && "bg-charcoal/10 text-charcoal/40",
+                      )}
+                    >
+                      {state === "done" ? "✓" : i + 1}
+                    </span>
+                    <span className={cn("hidden whitespace-nowrap text-xs font-medium sm:block", state === "current" ? "text-charcoal" : "text-charcoal/45")}>
+                      {pick(p.short)}
+                    </span>
+                    {i < activePhases.length - 1 && <span className="h-px flex-1 bg-charcoal/10" />}
+                  </li>
+                );
+              })}
+            </ol>
           </div>
 
           <div className="mb-5">
-            <h1 className="font-serif text-2xl font-semibold text-charcoal md:text-3xl">{pick(phase.title)}</h1>
+            <p className="text-xs font-medium uppercase tracking-wider text-gold-dark">
+              {pick(t.builder.phaseLabel)} {phaseIdx + 1} {pick(t.common.of)} {activePhases.length}
+            </p>
+            <h1 className="mt-0.5 font-serif text-2xl font-semibold text-charcoal md:text-3xl">{pick(phase.title)}</h1>
             <p className="mt-1 text-sm text-charcoal/60">{pick(phase.subtitle)}</p>
           </div>
 
@@ -449,23 +471,21 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
   const destination = useJourneyStore((s) => s.destination);
   const setDestination = useJourneyStore((s) => s.setDestination);
   const clearExpiredNotice = useJourneyStore((s) => s.clearExpiredNotice);
-  const customer = useJourneyStore((s) => s.customer);
   const setCustomer = useJourneyStore((s) => s.setCustomer);
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const setTripInfo = useJourneyStore((s) => s.setTripInfo);
 
   const [attempted, setAttempted] = useState(false);
 
-  const issues = [
-    ...validateCustomer({ ...customer, language: locale }),
-    ...validateTripInfo(tripInfo),
-  ].filter((i) => i.severity === "error");
+  // The opening screen is purely about the trip — no personal details. Name and
+  // mobile are collected on the Review step, right before Confirm.
+  const issues = validateTripInfo(tripInfo).filter((i) => i.severity === "error");
   const errFor = (field: string) => {
     const i = issues.find((x) => x.field === field);
     return i ? (ar ? i.messageAr : i.messageEn) : undefined;
   };
   const canContinue = !!destination && issues.length === 0;
-  const FIELD_ORDER = ["fullName", "phone", "departureDate", "departureTime", "passengers", "bags", "returnDate", "email"];
+  const FIELD_ORDER = ["departureDate", "departureTime", "passengers", "bags", "returnDate"];
 
   function pickDestination(code: string) {
     clearExpiredNotice();
@@ -534,25 +554,6 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
       </div>
 
       <div className="luxe-card space-y-5 p-6 md:p-8">
-        <Field label={pick(t.fields.fullName)} required error={showErr("fullName")}>
-          <input id="ti-fullName" className={cn("field-input", showErr("fullName") && "field-input-error")} value={customer.fullName} onChange={(e) => setCustomer({ fullName: e.target.value })} placeholder={ar ? "الاسم الكامل" : "Your full name"} />
-        </Field>
-
-        <div>
-          <span className="field-label">{pick(t.fields.phone)}<Req /></span>
-          <div className="flex gap-2">
-            <select className="field-input w-32 shrink-0" value={customer.phoneCountry} onChange={(e) => setCustomer({ phoneCountry: e.target.value })}>
-              {COUNTRY_CODES.map((c) => (<option key={c.code} value={c.code}>{c.dial} {c.code}</option>))}
-            </select>
-            <input id="ti-phone" className={cn("field-input flex-1", showErr("phone") && "field-input-error")} inputMode="tel" value={customer.phone} onChange={(e) => setCustomer({ phone: e.target.value })} placeholder="5XXXXXXXX" />
-          </div>
-          {showErr("phone") && <p className="mt-1 text-xs text-red-600">{showErr("phone")}</p>}
-        </div>
-
-        <Field label={`${pick(t.fields.email)} — ${pick(t.common.optional)}`} error={showErr("email")}>
-          <input id="ti-email" className={cn("field-input", showErr("email") && "field-input-error")} inputMode="email" value={customer.email} onChange={(e) => setCustomer({ email: e.target.value })} placeholder="name@example.com" />
-        </Field>
-
         {/* Each leg: date + time side by side, plus an optional flight lookup */}
         <LegFields leg="DEPARTURE" showErr={showErr} />
         <LegFields leg="RETURN" showErr={showErr} />
