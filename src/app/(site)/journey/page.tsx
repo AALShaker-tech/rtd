@@ -138,6 +138,14 @@ export default function JourneyPage() {
 
   const phase = activePhases[Math.min(phaseIdx, activePhases.length - 1)];
 
+  // Moving between the start screen and each phase (or phase → phase) swaps the
+  // content in place, so the browser keeps the previous scroll position — which
+  // leaves the customer at the bottom of the new, shorter step. Reset to the top
+  // on every stage / phase change so each step starts where they'd expect.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [stage, phaseIdx]);
+
   // Seed the return services from the outbound selections exactly once, the
   // first time the customer reaches the Return phase. After that the return
   // journey is independent — never auto-overwritten.
