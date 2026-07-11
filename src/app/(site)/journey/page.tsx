@@ -537,7 +537,7 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
               >
                 <div className="flex items-center gap-3">
                   <span className={cn("grid h-10 w-10 place-items-center rounded-xl", sel ? "bg-gold-gradient text-charcoal" : "bg-charcoal text-gold-light")}>
-                    <CityLandmark code={d.code} size={20} />
+                    <CityLandmark code={d.code} landmarkKey={d.landmarkKey} size={20} />
                   </span>
                   <div className="text-start">
                     <div className="font-serif text-base font-semibold text-charcoal">{ar ? d.nameAr : d.nameEn}</div>

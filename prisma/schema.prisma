@@ -399,6 +399,7 @@ model City {
   currency  String?
   approxDurationMinutes Int? // approx flight time from Riyadh
   notes     String?
+  landmarkKey String? // admin-chosen landmark icon preset (see CityLandmark)
   airports  Airport[]
   servicePricing CityServicePricing[]
   loungePricing  CityLoungePricing[]
