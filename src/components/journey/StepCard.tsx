@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   CHAUFFEUR_USAGE,
+  DEFAULT_CHAUFFEUR_USAGE,
   getStep,
   serviceHasCar,
 } from "@/lib/domain";
@@ -250,7 +251,7 @@ export function StepCard({
             <p className="field-label">{pick(t.fields.dailyUsage)}</p>
             <div className="grid gap-2 sm:grid-cols-3">
               {CHAUFFEUR_USAGE.map((u) => {
-                const sel = (step.dailyUsage ?? "EIGHT_HOURS") === u.value;
+                const sel = (step.dailyUsage ?? DEFAULT_CHAUFFEUR_USAGE) === u.value;
                 return (
                   <button key={u.value} type="button" onClick={() => onChange({ dailyUsage: u.value })} className={`sel-card text-center ${sel ? "sel-card-on" : ""}`}>
                     <span className="font-semibold text-charcoal">{pick(u.name)}</span>

@@ -130,8 +130,8 @@ describe("computeStepPrice — chauffeur (per-class × days × usage tier)", () 
       step({ stepType: "CHAUFFEUR_DURING_STAY", serviceType: "CAR_ONLY", carCategory: "VIP", days: 3, dailyUsage: "FULL_DAY" }),
       CFG,
     );
-    // 910 × 3 × 1.4 = 3822
-    expect(b.computedPrice).toBe(3822);
+    // Single full-day (10h) tier at ×1.0: 910 × 3 × 1.0 = 2730
+    expect(b.computedPrice).toBe(2730);
   });
 
   it("treats missing days as 1 and missing usage as ×1", () => {

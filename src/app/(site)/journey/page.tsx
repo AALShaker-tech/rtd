@@ -138,6 +138,14 @@ export default function JourneyPage() {
 
   const phase = activePhases[Math.min(phaseIdx, activePhases.length - 1)];
 
+  // Moving between the start screen and each phase (or phase → phase) swaps the
+  // content in place, so the browser keeps the previous scroll position — which
+  // leaves the customer at the bottom of the new, shorter step. Reset to the top
+  // on every stage / phase change so each step starts where they'd expect.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [stage, phaseIdx]);
+
   // Seed the return services from the outbound selections exactly once, the
   // first time the customer reaches the Return phase. After that the return
   // journey is independent — never auto-overwritten.
@@ -283,8 +291,10 @@ export default function JourneyPage() {
 }
 
 /**
- * A single service inside a phase: a toggle header (add / added) that expands to
- * the full editor when the service is part of the journey. Skipping collapses it.
+ * A single service inside a phase. The header always shows the service name and
+ * a short brief, and can be unfolded — whether or not the step is added — so the
+ * customer can preview and configure its options (vehicle, lounge, …) before
+ * deciding. Adding/removing the whole step is available straight from the header.
  */
 function PhaseServiceCard({ def }: { def: StepDef }) {
   const { t, pick, locale } = useI18n();
@@ -292,6 +302,7 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
   const updateStep = useJourneyStore((s) => s.updateStep);
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const { config } = usePricing();
+  const [open, setOpen] = useState(false);
   if (!step) return null;
 
   const on = !step.skipped && step.serviceType !== "SKIP";
@@ -301,37 +312,66 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
   const isReturnStep = stepSideFromOrder(def.order) === "RETURN";
   const needsTimeInput = isReturnStep && !hasReturnTiming(tripInfo) && !step.time;
 
+  const toggleAdd = () => {
+    if (on) {
+      updateStep(def.type, { skipped: true, serviceType: "SKIP" });
+    } else {
+      updateStep(def.type, {
+        skipped: false,
+        serviceType: def.features.assistance && !def.features.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY",
+      });
+      setOpen(true); // reveal the options right after adding
+    }
+  };
+
   return (
-    <div className={cn("luxe-card p-5 md:p-6", !on && "bg-ivory-warm/40")}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gold-gradient text-sm font-bold text-charcoal">{def.order}</span>
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-gold-dark">
-              {pick(def.cityScope === "RIYADH" ? { en: "Riyadh", ar: "الرياض" } : { en: "Destination", ar: "الوجهة" })}
-            </p>
-            <h3 className="mt-0.5 font-serif text-lg font-semibold text-charcoal">{pick(def.name)}</h3>
-            <p className="mt-0.5 text-xs leading-relaxed text-charcoal/55">{pick(def.description)}</p>
-          </div>
-        </div>
-        {/* Add / remove toggle */}
-        <button
-          onClick={() => updateStep(def.type, { skipped: on, serviceType: on ? "SKIP" : (def.features.assistance && !def.features.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY") })}
-          className={cn(
-            "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition",
-            on ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "btn-gold",
-          )}
-        >
-          {on ? `✓ ${pick(t.builder.stepIncluded)}` : `+ ${pick(t.builder.addStep)}`}
+    <div className={cn("luxe-card", on ? "ring-1 ring-gold/40" : "bg-ivory-warm/30")}>
+      <div className="flex items-start gap-3 p-5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gold-gradient text-sm font-bold text-charcoal">{def.order}</span>
+
+        {/* Name + brief + unfold toggle */}
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="min-w-0 flex-1 text-start">
+          <span className="block text-[11px] font-medium uppercase tracking-wider text-gold-dark">
+            {pick(def.cityScope === "RIYADH" ? { en: "Riyadh", ar: "الرياض" } : { en: "Destination", ar: "الوجهة" })}
+          </span>
+          <span className="mt-0.5 block font-serif text-lg font-semibold text-charcoal">{pick(def.name)}</span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-charcoal/55">{pick(def.description)}</span>
+          <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-gold-dark">
+            {open ? pick(t.builder.hideOptions) : pick(t.builder.viewOptions)}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={cn("transition-transform", open && "rotate-180")}>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
         </button>
+
+        {/* Add / remove + estimated price */}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={toggleAdd}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-xs font-semibold transition",
+              on ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "btn-gold",
+            )}
+          >
+            {on ? `✓ ${pick(t.builder.stepIncluded)}` : `+ ${pick(t.builder.addStep)}`}
+          </button>
+          <span className="text-xs font-semibold text-charcoal/50">{formatPrice(subtotal, locale)}</span>
+        </div>
       </div>
 
-      {on && (
-        <div className="mt-5 border-t border-charcoal/5 pt-5">
+      {/* Unfolded options — shown whether or not the step is added */}
+      {open && (
+        <div className="border-t border-charcoal/5 px-5 pb-5 pt-4">
           <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
-          <div className="mt-5 flex items-center justify-between rounded-xl bg-ivory-warm px-4 py-3">
-            <span className="text-sm text-charcoal/60">{pick(t.builder.estimatedPrice)}</span>
-            <span className="font-serif text-lg font-semibold text-gold-dark">{formatPrice(subtotal, locale)}</span>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ivory-warm px-4 py-3">
+            <button type="button" onClick={toggleAdd} className={cn("px-6", on ? "btn-outline" : "btn-gold")}>
+              {on ? pick(t.builder.removeFromJourney) : `✓ ${pick(t.builder.addStep)}`}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-charcoal/60">{pick(t.builder.estimatedPrice)}</span>
+              <span className="font-serif text-lg font-semibold text-gold-dark">{formatPrice(subtotal, locale)}</span>
+            </div>
           </div>
         </div>
       )}
