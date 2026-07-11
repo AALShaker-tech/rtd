@@ -306,7 +306,18 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
   if (!step) return null;
 
   const on = !step.skipped && step.serviceType !== "SKIP";
-  const subtotal = computeStepPrice({ ...step, skipped: false }, config).computedPrice;
+  // The natural active service type. A removed/never-added step may carry
+  // serviceType "SKIP", which prices to 0 and hides the car picker — so for the
+  // (un-added) preview we substitute the real type, so the customer always sees
+  // the true options and price before deciding.
+  const activeServiceType =
+    step.serviceType !== "SKIP"
+      ? step.serviceType
+      : def.features.assistance && !def.features.transfer
+        ? "MEET_ASSIST_ONLY"
+        : "CAR_ONLY";
+  const viewStep = step.serviceType === "SKIP" ? { ...step, serviceType: activeServiceType } : step;
+  const subtotal = computeStepPrice({ ...viewStep, skipped: false }, config).computedPrice;
   // Return-side timing may still be pending; the editor shows editable date/time
   // when the service time can't be auto-estimated.
   const isReturnStep = stepSideFromOrder(def.order) === "RETURN";
@@ -314,12 +325,12 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
 
   const toggleAdd = () => {
     if (on) {
-      updateStep(def.type, { skipped: true, serviceType: "SKIP" });
+      // Off is signalled by `skipped` alone — keep the real serviceType so the
+      // unfolded preview still shows the options and price (and the customer's
+      // choices survive a remove → re-add).
+      updateStep(def.type, { skipped: true });
     } else {
-      updateStep(def.type, {
-        skipped: false,
-        serviceType: def.features.assistance && !def.features.transfer ? "MEET_ASSIST_ONLY" : "CAR_ONLY",
-      });
+      updateStep(def.type, { skipped: false, serviceType: activeServiceType });
       setOpen(true); // reveal the options right after adding
     }
   };
@@ -363,7 +374,7 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
       {/* Unfolded options — shown whether or not the step is added */}
       {open && (
         <div className="border-t border-charcoal/5 px-5 pb-5 pt-4">
-          <StepCard step={step} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
+          <StepCard step={viewStep} onChange={(patch) => updateStep(def.type, patch)} needsTimeInput={needsTimeInput} />
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ivory-warm px-4 py-3">
             <button type="button" onClick={toggleAdd} className={cn("px-6", on ? "btn-outline" : "btn-gold")}>
               {on ? pick(t.builder.removeFromJourney) : `✓ ${pick(t.builder.addStep)}`}
