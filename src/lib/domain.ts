@@ -400,13 +400,15 @@ export function isLoungeValidForCity(loungeType: string, cityCode?: string | nul
 
 export type ChauffeurUsage = "SEVEN_HOURS" | "EIGHT_HOURS" | "FULL_DAY";
 
+// Chauffeur is offered as a single full-day (10 hour) tier. The price is simply
+// the admin's per-class chauffeur price × days (multiplier 1.0 — no tier
+// premium). The `ChauffeurUsage` union keeps the legacy values so historical
+// bookings that stored 7h/8h still resolve (their multiplier falls back to 1).
 export const CHAUFFEUR_USAGE: { value: ChauffeurUsage; name: Bilingual; multiplier: number }[] = [
-  { value: "SEVEN_HOURS", name: { en: "7 hours", ar: "٧ ساعات" }, multiplier: 1.0 },
-  { value: "EIGHT_HOURS", name: { en: "8 hours", ar: "٨ ساعات" }, multiplier: 1.1 },
-  { value: "FULL_DAY", name: { en: "Full day", ar: "يوم كامل" }, multiplier: 1.4 },
+  { value: "FULL_DAY", name: { en: "Full day (10 hours)", ar: "يوم كامل (١٠ ساعات)" }, multiplier: 1.0 },
 ];
 
-export const DEFAULT_CHAUFFEUR_USAGE: ChauffeurUsage = "EIGHT_HOURS";
+export const DEFAULT_CHAUFFEUR_USAGE: ChauffeurUsage = "FULL_DAY";
 
 export function chauffeurUsageMultiplier(usage?: string | null): number {
   return CHAUFFEUR_USAGE.find((u) => u.value === usage)?.multiplier ?? 1;
