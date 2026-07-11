@@ -355,18 +355,14 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
           </span>
         </button>
 
-        {/* Add / remove + estimated price */}
+        {/* Added status (non-interactive) + estimated price. Adding/removing is
+            done from the button in the unfolded panel below. */}
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <button
-            type="button"
-            onClick={toggleAdd}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-xs font-semibold transition",
-              on ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "btn-gold",
-            )}
-          >
-            {on ? `✓ ${pick(t.builder.stepIncluded)}` : `+ ${pick(t.builder.addStep)}`}
-          </button>
+          {on && (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              ✓ {pick(t.builder.stepIncluded)}
+            </span>
+          )}
           <span className="text-xs font-semibold text-charcoal/50">{formatPrice(subtotal, locale)}</span>
         </div>
       </div>
