@@ -16,6 +16,7 @@ import { validateStep, validateTripInfo } from "@/lib/validation/journey";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { cn, formatDateOnly } from "@/lib/utils";
 import type { ResolvedFlight } from "@/lib/flight";
+import { CityLandmark } from "@/components/ui/CityLandmark";
 import { StepCard } from "@/components/journey/StepCard";
 import { JourneySummary } from "@/components/journey/JourneySummary";
 import { TripSummaryBar } from "@/components/journey/TripSummaryBar";
@@ -536,7 +537,7 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
               >
                 <div className="flex items-center gap-3">
                   <span className={cn("grid h-10 w-10 place-items-center rounded-xl", sel ? "bg-gold-gradient text-charcoal" : "bg-charcoal text-gold-light")}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 16l20-7-7 20-3-8-8-3z" strokeLinejoin="round" /></svg>
+                    <CityLandmark code={d.code} size={20} />
                   </span>
                   <div className="text-start">
                     <div className="font-serif text-base font-semibold text-charcoal">{ar ? d.nameAr : d.nameEn}</div>
