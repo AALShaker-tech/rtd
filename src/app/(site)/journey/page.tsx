@@ -534,12 +534,12 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
       </div>
 
       <div className="luxe-card space-y-5 p-6 md:p-8">
-        <Field label={pick(t.fields.fullName)} error={showErr("fullName")}>
+        <Field label={pick(t.fields.fullName)} required error={showErr("fullName")}>
           <input id="ti-fullName" className={cn("field-input", showErr("fullName") && "field-input-error")} value={customer.fullName} onChange={(e) => setCustomer({ fullName: e.target.value })} placeholder={ar ? "الاسم الكامل" : "Your full name"} />
         </Field>
 
         <div>
-          <span className="field-label">{pick(t.fields.phone)}</span>
+          <span className="field-label">{pick(t.fields.phone)}<Req /></span>
           <div className="flex gap-2">
             <select className="field-input w-32 shrink-0" value={customer.phoneCountry} onChange={(e) => setCustomer({ phoneCountry: e.target.value })}>
               {COUNTRY_CODES.map((c) => (<option key={c.code} value={c.code}>{c.dial} {c.code}</option>))}
@@ -553,26 +553,13 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
           <input id="ti-email" className={cn("field-input", showErr("email") && "field-input-error")} inputMode="email" value={customer.email} onChange={(e) => setCustomer({ email: e.target.value })} placeholder="name@example.com" />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={pick(t.tripInfo.departureDate)} error={showErr("departureDate")}>
-            <div id="ti-departureDate">
-              <DateField value={tripInfo.departureDate} min={today()} error={!!showErr("departureDate")} onChange={(v) => setTripInfo({ departureDate: v })} />
-            </div>
-          </Field>
-          <Field label={`${pick(t.tripInfo.returnDate)} — ${pick(t.common.optional)}`} error={showErr("returnDate")}>
-            <div id="ti-returnDate">
-              <DateField value={tripInfo.returnDate} min={tripInfo.departureDate || today()} error={!!showErr("returnDate")} onChange={(v) => setTripInfo({ returnDate: v })} />
-            </div>
-          </Field>
-        </div>
-
-        {/* Flight details (resolved from the static schedule) */}
-        <FlightField leg="DEPARTURE" timeError={showErr("departureTime")} />
-        {tripInfo.returnDate && <FlightField leg="RETURN" timeError={showErr("returnTime")} />}
+        {/* Each leg: date + time side by side, plus an optional flight lookup */}
+        <LegFields leg="DEPARTURE" showErr={showErr} />
+        <LegFields leg="RETURN" showErr={showErr} />
         <p className="rounded-lg bg-ivory-warm px-3 py-2 text-[11px] text-charcoal/50">{pick(t.tripInfo.scheduleDisclaimer)}</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Stepper label={pick(t.fields.passengers)} value={tripInfo.passengers} min={1} onChange={(v) => setTripInfo({ passengers: v })} />
+          <Stepper label={pick(t.fields.passengers)} value={tripInfo.passengers} min={1} required onChange={(v) => setTripInfo({ passengers: v })} />
           <Stepper label={pick(t.fields.bags)} value={tripInfo.bags} min={0} onChange={(v) => setTripInfo({ bags: v })} />
         </div>
 
@@ -599,20 +586,43 @@ function StartStage({ expiredBanner, onContinue }: { expiredBanner: React.ReactN
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, error, required, children }: { label: string; error?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="field-label">{label}</span>
+      <span className="field-label">{label}{required && <Req />}</span>
       {children}
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
   );
 }
 
-/** Flight number entry with static-schedule lookup + manual fallback. */
-function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeError?: string }) {
+/** Red asterisk marking a required field. */
+function Req() {
+  return <span className="text-red-500"> *</span>;
+}
+
+/** Muted "— Optional" suffix. */
+function Opt() {
+  const { t, pick } = useI18n();
+  return <span className="font-normal text-charcoal/40"> — {pick(t.common.optional)}</span>;
+}
+
+/**
+ * All timing fields for one trip leg: the date and its time shown side by side,
+ * with an optional flight-number lookup below (which, when matched, fills the
+ * time from the schedule). Labels are plain (not <label>) so a click inside the
+ * date/time popovers isn't forwarded to the trigger — which kept the calendar
+ * from closing. Departure date & time are required; the return leg is optional
+ * and reveals its time + flight only once a return date is chosen.
+ */
+function LegFields({
+  leg,
+  showErr,
+}: {
+  leg: "DEPARTURE" | "RETURN";
+  showErr: (field: string) => string | undefined;
+}) {
   const { t, pick, locale } = useI18n();
-  const ar = locale === "ar";
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const setTripInfo = useJourneyStore((s) => s.setTripInfo);
   const [matches, setMatches] = useState<ResolvedFlight[] | null>(null);
@@ -624,6 +634,10 @@ function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeErro
   const resolved = isDep ? tripInfo.departureFlight : tripInfo.returnFlight;
   const status = isDep ? tripInfo.departureLookupStatus : tripInfo.returnLookupStatus;
   const manualTime = (isDep ? tripInfo.departureTime : tripInfo.returnTime) ?? "";
+  const dateErr = showErr(isDep ? "departureDate" : "returnDate");
+  const timeErr = showErr(isDep ? "departureTime" : "returnTime");
+  // The return leg only asks for time + flight once a return date is set.
+  const showTimeAndFlight = isDep || !!date;
 
   function patch(p: Partial<typeof tripInfo>) { setTripInfo(p); }
 
@@ -660,72 +674,96 @@ function FlightField({ leg, timeError }: { leg: "DEPARTURE" | "RETURN"; timeErro
   }
 
   return (
-    <div>
-      <span className="field-label">{pick(isDep ? t.tripInfo.departureFlight : t.tripInfo.returnFlight)}{!isDep ? ` — ${pick(t.common.optional)}` : ""}</span>
-      <div className="flex gap-2">
-        <input
-          className="field-input flex-1"
-          value={code}
-          placeholder="SV111"
-          onChange={(e) => {
-            const v = e.target.value.toUpperCase();
-            patch(isDep ? { departureFlightCode: v, departureFlight: null, departureLookupStatus: undefined } : { returnFlightCode: v, returnFlight: null, returnLookupStatus: undefined });
-            setMatches(null);
-          }}
-        />
-        <button onClick={find} disabled={busy || !code || !date} className="btn-outline shrink-0 px-4 py-2 text-xs">
-          {busy ? "…" : pick(t.tripInfo.findFlight)}
-        </button>
+    <div className="space-y-3">
+      {/* Date + time, side by side */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <span className="field-label">
+            {pick(isDep ? t.tripInfo.departureDate : t.tripInfo.returnDate)}{isDep ? <Req /> : <Opt />}
+          </span>
+          <div id={isDep ? "ti-departureDate" : "ti-returnDate"}>
+            <DateField
+              value={date}
+              min={isDep ? today() : tripInfo.departureDate || today()}
+              error={!!dateErr}
+              onChange={(v) => patch(isDep ? { departureDate: v } : { returnDate: v })}
+            />
+          </div>
+          {dateErr && <span className="mt-1 block text-xs text-red-600">{dateErr}</span>}
+        </div>
+
+        {showTimeAndFlight && (
+          <div>
+            <span className="field-label">
+              {pick(t.tripInfo.flightTime)}{isDep ? <Req /> : <Opt />}
+            </span>
+            <div id={isDep ? "ti-departureTime" : "ti-returnTime"}>
+              {resolved ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+                  <span>{resolved.departureTimeLocal}</span>
+                  <span className="text-[10px] font-normal text-emerald-700/70">{pick(t.tripInfo.sourceStatic)}</span>
+                </div>
+              ) : (
+                <TimeField value={manualTime} error={!!timeErr} onChange={(v) => patch(isDep ? { departureTime: v } : { returnTime: v })} />
+              )}
+            </div>
+            {timeErr && <span className="mt-1 block text-xs text-red-600">{timeErr}</span>}
+          </div>
+        )}
       </div>
 
-      {/* Multiple matches → selection */}
-      {matches && matches.length > 1 && (
-        <div className="mt-2 grid gap-2">
-          <p className="text-xs text-charcoal/60">{pick(t.tripInfo.chooseFlight)}</p>
-          {matches.map((f, i) => (
-            <button key={i} onClick={() => choose(f)} className="sel-card flex items-center justify-between p-3 text-start">
-              <span className="text-sm font-medium text-charcoal">{f.flightCode} · {f.airline}</span>
-              <span className="text-xs text-charcoal/60">{f.originAirport}→{f.destinationAirport} · {f.departureTimeLocal}</span>
+      {/* Optional flight-number lookup */}
+      {showTimeAndFlight && (
+        <div>
+          <span className="field-label">{pick(isDep ? t.tripInfo.departureFlight : t.tripInfo.returnFlight)}<Opt /></span>
+          <div className="flex gap-2">
+            <input
+              className="field-input flex-1"
+              value={code}
+              placeholder="SV111"
+              onChange={(e) => {
+                const v = e.target.value.toUpperCase();
+                patch(isDep ? { departureFlightCode: v, departureFlight: null, departureLookupStatus: undefined } : { returnFlightCode: v, returnFlight: null, returnLookupStatus: undefined });
+                setMatches(null);
+              }}
+            />
+            <button onClick={find} disabled={busy || !code || !date} className="btn-outline shrink-0 px-4 py-2 text-xs">
+              {busy ? "…" : pick(t.tripInfo.findFlight)}
             </button>
-          ))}
-        </div>
-      )}
-
-      {/* Matched */}
-      {resolved && (
-        <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-          ✓ {pick(t.tripInfo.flightMatched)} — {resolved.airline} {resolved.flightCode} · {resolved.originAirport}→{resolved.destinationAirport} · {resolved.departureTimeLocal}
-          <span className="text-emerald-700/70"> · {pick(t.tripInfo.estArrival)} {resolved.estimatedArrivalTimeLocal} ({formatDateOnly(resolved.estimatedArrivalDate, locale)})</span>
-        </div>
-      )}
-
-      {/* Manual time — always available when no flight is resolved. */}
-      {!resolved && (
-        <div className="mt-2 space-y-2">
-          {status === "not_found" && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
-          )}
-          <div className="block">
-            <span className="field-label">{pick(t.tripInfo.flightTime)}{!isDep ? ` — ${pick(t.common.optional)}` : ""}</span>
-            <div id={isDep ? "ti-departureTime" : "ti-returnTime"}>
-              <TimeField
-                value={manualTime}
-                error={!!timeError}
-                onChange={(v) => patch(isDep ? { departureTime: v } : { returnTime: v })}
-              />
-            </div>
-            {timeError && <span className="mt-1 block text-xs text-red-600">{timeError}</span>}
           </div>
+
+          {matches && matches.length > 1 && (
+            <div className="mt-2 grid gap-2">
+              <p className="text-xs text-charcoal/60">{pick(t.tripInfo.chooseFlight)}</p>
+              {matches.map((f, i) => (
+                <button key={i} onClick={() => choose(f)} className="sel-card flex items-center justify-between p-3 text-start">
+                  <span className="text-sm font-medium text-charcoal">{f.flightCode} · {f.airline}</span>
+                  <span className="text-xs text-charcoal/60">{f.originAirport}→{f.destinationAirport} · {f.departureTimeLocal}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {resolved && (
+            <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+              ✓ {pick(t.tripInfo.flightMatched)} — {resolved.airline} {resolved.flightCode} · {resolved.originAirport}→{resolved.destinationAirport}
+              <span className="text-emerald-700/70"> · {pick(t.tripInfo.estArrival)} {resolved.estimatedArrivalTimeLocal} ({formatDateOnly(resolved.estimatedArrivalDate, locale)})</span>
+            </div>
+          )}
+
+          {!resolved && status === "not_found" && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{pick(t.tripInfo.flightNotFound)}</p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function Stepper({ label, value, min, onChange }: { label: string; value: number; min: number; onChange: (v: number) => void }) {
+function Stepper({ label, value, min, required, onChange }: { label: string; value: number; min: number; required?: boolean; onChange: (v: number) => void }) {
   return (
     <div>
-      <span className="field-label">{label}</span>
+      <span className="field-label">{label}{required && <Req />}</span>
       <div className="flex items-center justify-between rounded-xl border border-charcoal/10 bg-white px-4 py-2.5 shadow-sm">
         <span className="text-sm text-charcoal/60">{label}</span>
         <div className="flex items-center gap-3">
