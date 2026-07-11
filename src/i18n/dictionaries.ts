@@ -179,6 +179,9 @@ export const dict = {
       ar: "طابقنا اختياراتك في الذهاب — راجعها وعدّل ما تحب.",
     },
     phaseLabel: { en: "Phase", ar: "المرحلة" },
+    viewOptions: { en: "View options", ar: "عرض الخيارات" },
+    hideOptions: { en: "Hide options", ar: "إخفاء الخيارات" },
+    removeFromJourney: { en: "Remove from journey", ar: "إزالة من الرحلة" },
     // Return phase — mirror controls
     returnMirroredNote: {
       en: "Your return services were copied from your outbound journey. Any change here won't affect the outbound trip.",
