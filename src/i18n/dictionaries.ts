@@ -229,6 +229,8 @@ export const dict = {
       ar: "زمن الرحلة التقريبي من الرياض (دقيقة)",
     },
     notes: { en: "Notes", ar: "ملاحظات" },
+    landmark: { en: "Landmark icon", ar: "أيقونة المعلم" },
+    landmarkAuto: { en: "Auto", ar: "تلقائي" },
     isOrigin: { en: "Origin city", ar: "مدينة الانطلاق" },
     active: { en: "Active", ar: "مفعّلة" },
     airports: { en: "Airports", ar: "المطارات" },

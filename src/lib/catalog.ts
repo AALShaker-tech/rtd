@@ -33,6 +33,8 @@ export interface CatalogCity {
   nameAr: string;
   country: string;
   isOrigin: boolean;
+  /** Admin-chosen landmark icon preset key (see CityLandmark). */
+  landmarkKey?: string | null;
   airports: CatalogAirport[];
   /** Journey step types disabled for this city. */
   disabledSteps: string[];
@@ -52,6 +54,7 @@ export const FALLBACK_CATALOG: Catalog = {
     nameAr: c.name.ar,
     country: c.country,
     isOrigin: !!c.isOrigin,
+    landmarkKey: null,
     airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals, lounges: [] })),
     disabledSteps: [],
     disabledVehicles: [],
