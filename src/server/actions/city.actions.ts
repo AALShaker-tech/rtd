@@ -40,6 +40,7 @@ const citySchema = z.object({
   currency: z.string().optional(),
   approxDurationMinutes: z.number().int().min(0).max(2000).optional(),
   notes: z.string().max(2000).optional(),
+  landmarkKey: z.string().max(40).optional(),
 });
 
 export async function upsertCity(raw: unknown) {
@@ -58,6 +59,7 @@ export async function upsertCity(raw: unknown) {
       currency: d.currency ?? null,
       approxDurationMinutes: d.approxDurationMinutes ?? null,
       notes: d.notes ?? null,
+      landmarkKey: d.landmarkKey || null,
     },
     create: {
       code: d.code,
@@ -69,6 +71,7 @@ export async function upsertCity(raw: unknown) {
       currency: d.currency ?? null,
       approxDurationMinutes: d.approxDurationMinutes ?? null,
       notes: d.notes ?? null,
+      landmarkKey: d.landmarkKey || null,
     },
   });
   await logAudit({

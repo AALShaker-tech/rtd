@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
+import { CityLandmark, LANDMARK_PRESETS } from "@/components/ui/CityLandmark";
 import {
   deleteCity,
   setCityActive,
@@ -23,12 +24,12 @@ interface VehicleRow { category: string; enabled: boolean }
 interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
-  multiplier: number; currency: string | null; approxDurationMinutes: number | null; notes: string | null;
+  multiplier: number; currency: string | null; approxDurationMinutes: number | null; notes: string | null; landmarkKey: string | null;
   airports: AirportRow[]; servicePricing: ServiceRow[]; loungePricing: LoungeRow[]; vehiclePricing: VehicleRow[];
   serviceClassPricing: ClassPriceRow[];
 }
 
-const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
+const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, landmarkKey: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
 interface VehicleOption { category: string; nameEn: string }
 interface StepOption { code: string; nameEn: string; nameAr: string; isCar: boolean }
@@ -89,7 +90,7 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted 
   const [form, setForm] = useState({
     code: city.code, nameEn: city.nameEn, nameAr: city.nameAr, country: city.country,
     currency: city.currency ?? "", approxDurationMinutes: city.approxDurationMinutes != null ? String(city.approxDurationMinutes) : "",
-    notes: city.notes ?? "", isOrigin: city.isOrigin,
+    notes: city.notes ?? "", isOrigin: city.isOrigin, landmarkKey: city.landmarkKey ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -103,7 +104,7 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted 
       // default to active.
       active: city.active, isOrigin: form.isOrigin, multiplier: 1, // multiplier retired; kept for schema back-compat
       currency: form.currency || undefined, approxDurationMinutes: form.approxDurationMinutes ? parseInt(form.approxDurationMinutes) : undefined,
-      notes: form.notes || undefined,
+      notes: form.notes || undefined, landmarkKey: form.landmarkKey || undefined,
     });
     setBusy(false);
     if (!res.ok) return setError(res.error);
@@ -147,6 +148,38 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted 
             <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </FieldWrap>
         </div>
+
+        {/* Landmark icon picker */}
+        <div className="mt-4">
+          <span className="field-label">{pick(t.cities.landmark)}</span>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {/* Auto — falls back to the city-code default, then a generic monument */}
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, landmarkKey: "" })}
+              className={`flex h-16 w-20 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] transition ${form.landmarkKey === "" ? "border-gold bg-gold-50 text-gold-dark" : "border-charcoal/15 text-charcoal/50 hover:border-gold/40"}`}
+            >
+              <CityLandmark code={form.code} size={22} />
+              <span>{pick(t.cities.landmarkAuto)}</span>
+            </button>
+            {LANDMARK_PRESETS.map((p) => {
+              const on = form.landmarkKey === p.key;
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  title={pick(p.name)}
+                  onClick={() => setForm({ ...form, landmarkKey: p.key })}
+                  className={`flex h-16 w-20 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] transition ${on ? "border-gold bg-gold-50 text-gold-dark" : "border-charcoal/15 text-charcoal/50 hover:border-gold/40"}`}
+                >
+                  <CityLandmark landmarkKey={p.key} size={22} />
+                  <span className="max-w-full truncate px-1">{pick(p.name)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-5">
           <label className="flex items-center gap-2 text-sm text-charcoal/70"><input type="checkbox" className="h-4 w-4 accent-gold" checked={form.isOrigin} onChange={(e) => setForm({ ...form, isOrigin: e.target.checked })} />{pick(t.cities.isOrigin)}</label>
           {!isNew && (

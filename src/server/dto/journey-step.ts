@@ -1,6 +1,6 @@
 import "server-only";
 import { isoOrNull } from "@/lib/utils";
-import type { DisplayStep } from "@/components/dashboard/RequestJourney";
+import type { DisplayStep, DisplayStepVehicle } from "@/components/dashboard/RequestJourney";
 
 /**
  * Prisma `select` covering exactly the fields a `DisplayStep` needs — nothing
@@ -26,6 +26,7 @@ export const displayStepSelect = {
   carCategory: true,
   passengers: true,
   bags: true,
+  additionalVehicles: true,
   days: true,
   dailyHours: true,
   dailyUsage: true,
@@ -55,6 +56,7 @@ interface DisplayStepRow {
   carCategory: string | null;
   passengers: number | null;
   bags: number | null;
+  additionalVehicles: unknown;
   days: number | null;
   dailyHours: number | null;
   dailyUsage: string | null;
@@ -62,6 +64,19 @@ interface DisplayStepRow {
   notes: string | null;
   flightLookupStatus: string | null;
   computedPrice: number | null;
+}
+
+/** Normalize the persisted JSON additional-vehicles into a typed, safe array. */
+function toDisplayVehicles(raw: unknown): DisplayStepVehicle[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((v): v is Record<string, unknown> => !!v && typeof v === "object")
+    .map((v) => ({
+      carCategory: typeof v.carCategory === "string" ? v.carCategory : "",
+      passengers: typeof v.passengers === "number" ? v.passengers : null,
+      bags: typeof v.bags === "number" ? v.bags : null,
+    }))
+    .filter((v) => v.carCategory);
 }
 
 /** Map a selected journey-step row to the client-facing DisplayStep DTO. */
@@ -85,6 +100,7 @@ export function toDisplayStep(s: DisplayStepRow): DisplayStep {
     carCategory: s.carCategory,
     passengers: s.passengers,
     bags: s.bags,
+    additionalVehicles: toDisplayVehicles(s.additionalVehicles),
     days: s.days,
     dailyHours: s.dailyHours,
     dailyUsage: s.dailyUsage,

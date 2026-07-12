@@ -32,6 +32,7 @@ export interface Task {
     carCategory: string | null;
     passengers: number | null;
     bags: number | null;
+    additionalVehicles: { carCategory: string; passengers: number | null; bags: number | null }[];
     notes: string | null;
   };
 }
@@ -94,6 +95,12 @@ function TaskCard({ task }: { task: Task }) {
           {(step.dropoffLocation || step.hotelName) && <Row k={pick(t.fields.dropoff)} v={step.dropoffLocation || step.hotelName!} />}
           {step.flightNumber && <Row k={pick(t.fields.flightNumber)} v={step.flightNumber} />}
           {step.carCategory && <Row k={pick(t.fields.carCategory)} v={vehicleLabel(step.carCategory, locale)} />}
+          {step.additionalVehicles.length > 0 && (
+            <Row
+              k={pick(t.builder.additionalVehicles)}
+              v={step.additionalVehicles.map((v) => vehicleLabel(v.carCategory, locale)).join("، ")}
+            />
+          )}
           {step.passengers != null && <Row k={pick(t.fields.passengers)} v={String(step.passengers)} />}
           {step.notes && <Row k={pick(t.fields.notes)} v={step.notes} />}
         </dl>

@@ -161,6 +161,54 @@ export const dict = {
       en: "We'll use this to time all your return services automatically.",
       ar: "بنستخدمها لضبط توقيت كل خدمات عودتك تلقائيًا.",
     },
+
+    // ── Three-phase builder ──
+    phaseOutboundTitle: { en: "Outbound from Riyadh", ar: "المغادرة من الرياض" },
+    phaseOutboundSub: {
+      en: "Your services on the way out of Riyadh.",
+      ar: "خدماتك أثناء مغادرتك من الرياض.",
+    },
+    phaseDestinationTitle: { en: "At Your Destination", ar: "في وجهتك" },
+    phaseDestinationSub: {
+      en: "Arrival, transfers and your chauffeur during the stay.",
+      ar: "الوصول والتنقّلات وسائقك الخاص أثناء الإقامة.",
+    },
+    phaseReturnTitle: { en: "Your Return", ar: "رحلة عودتك" },
+    phaseReturnSub: {
+      en: "We've matched your outbound choices — review and adjust anything.",
+      ar: "طابقنا اختياراتك في الذهاب — راجعها وعدّل ما تحب.",
+    },
+    phaseLabel: { en: "Phase", ar: "المرحلة" },
+    viewOptions: { en: "View options", ar: "عرض الخيارات" },
+    hideOptions: { en: "Hide options", ar: "إخفاء الخيارات" },
+    removeFromJourney: { en: "Remove from journey", ar: "إزالة من الرحلة" },
+    // Return phase — mirror controls
+    returnMirroredNote: {
+      en: "Your return services were copied from your outbound journey. Any change here won't affect the outbound trip.",
+      ar: "تم نسخ خدمات عودتك من رحلة الذهاب. أي تعديل هنا لن يؤثر على رحلة الذهاب.",
+    },
+    matchOutboundAgain: { en: "Match my outbound journey again", ar: "طابق رحلة الذهاب مرة أخرى" },
+    matchOutboundConfirm: {
+      en: "Replace your return selections with a fresh copy of your outbound journey? Your current return edits will be lost.",
+      ar: "استبدال اختيارات العودة بنسخة جديدة من رحلة الذهاب؟ ستفقد تعديلات العودة الحالية.",
+    },
+    oneWayTitle: { en: "One-way trip", ar: "رحلة ذهاب فقط" },
+    oneWayNote: {
+      en: "No return date was provided, so we've prepared a one-way journey. Add a return date in Trip Information to arrange your return.",
+      ar: "لم يُدخل تاريخ عودة، لذا جهّزنا رحلة ذهاب فقط. أضف تاريخ العودة في معلومات الرحلة لترتيب عودتك.",
+    },
+
+    // ── Multiple vehicles per step ──
+    additionalVehicles: { en: "Additional vehicles", ar: "مركبات إضافية" },
+    addVehicle: { en: "Add another vehicle", ar: "أضف مركبة أخرى" },
+    removeVehicle: { en: "Remove", ar: "إزالة" },
+    totalCapacity: { en: "Total capacity", ar: "السعة الإجمالية" },
+    capacityShortfall: {
+      en: "Your selected vehicles can't fit everyone. Choose a larger class or add another vehicle from any category.",
+      ar: "المركبات المختارة لا تتّسع للجميع. اختر فئة أكبر أو أضف مركبة أخرى من أي فئة.",
+    },
+    capacityOk: { en: "Seats everyone", ar: "تتّسع للجميع" },
+    vehicleSeats: { en: "seats", ar: "مقاعد" },
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
@@ -181,6 +229,8 @@ export const dict = {
       ar: "زمن الرحلة التقريبي من الرياض (دقيقة)",
     },
     notes: { en: "Notes", ar: "ملاحظات" },
+    landmark: { en: "Landmark icon", ar: "أيقونة المعلم" },
+    landmarkAuto: { en: "Auto", ar: "تلقائي" },
     isOrigin: { en: "Origin city", ar: "مدينة الانطلاق" },
     active: { en: "Active", ar: "مفعّلة" },
     airports: { en: "Airports", ar: "المطارات" },

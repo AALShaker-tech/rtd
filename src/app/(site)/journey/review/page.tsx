@@ -11,10 +11,11 @@ import { useVehicles } from "@/components/vehicles/VehicleProvider";
 import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
-import { validateJourney } from "@/lib/validation/journey";
+import { validateJourney, totalVehicleCapacity, validateCustomer } from "@/lib/validation/journey";
 import { submitJourney } from "@/server/actions/request.actions";
+import { COUNTRY_CODES } from "@/lib/phone";
 import { logger } from "@/lib/logger";
-import { formatDateOnly, formatDateTime } from "@/lib/utils";
+import { cn, formatDateOnly, formatDateTime } from "@/lib/utils";
 
 export default function ReviewPage() {
   const { t, pick, locale } = useI18n();
@@ -31,8 +32,18 @@ export default function ReviewPage() {
   // suppresses any re-validation while we navigate away.
   const [done, setDone] = useState(false);
   const [serverError, setServerError] = useState<string | undefined>();
+  // Show contact-field errors only once the customer has tried to confirm.
+  const [attempted, setAttempted] = useState(false);
   // Hard lock against double submission (survives re-renders, unlike state).
   const submitLock = useRef(false);
+
+  // Name + mobile are collected here (deferred from the opening screen).
+  const customerErrors = validateCustomer({ ...store.customer, language: locale });
+  const custErr = (field: string) => {
+    const i = customerErrors.find((x) => x.field === field);
+    return i ? (ar ? i.messageAr : i.messageEn) : undefined;
+  };
+  const showCustErr = (field: string) => (attempted ? custErr(field) : undefined);
 
   const draft = {
     selectedPackage: store.selectedPackage,
@@ -58,7 +69,17 @@ export default function ReviewPage() {
     // Prevent double-click / double-submit — never create duplicate requests.
     if (submitLock.current || submitting || done) return;
     // Never submit when the journey truly has errors (button is also disabled).
-    if (validation.hasErrors) return;
+    if (validation.hasErrors) {
+      setAttempted(true);
+      // Surface the first missing contact field, if any.
+      const firstMissing = ["fullName", "phone", "email"].find((f) => custErr(f));
+      if (firstMissing) {
+        const el = document.getElementById(`rv-${firstMissing}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => (el as HTMLElement | null)?.focus?.(), 250);
+      }
+      return;
+    }
 
     submitLock.current = true;
     setSubmitting(true);
@@ -103,7 +124,10 @@ export default function ReviewPage() {
     }
   }
 
-  const allIssues = validation.timeline;
+  // Contact-field errors are shown inline in the details card below, so keep
+  // them out of the general issues list to avoid duplication.
+  const contactFields = new Set(["fullName", "phone", "email"]);
+  const allIssues = validation.timeline.filter((i) => !i.field || !contactFields.has(i.field));
 
   return (
     <div className="luxe-container max-w-6xl py-10 md:py-14">
@@ -118,6 +142,34 @@ export default function ReviewPage() {
       {/* Flight summary */}
       <FlightSummary />
 
+      {/* Your details — collected here, right before Confirm (deferred from the start) */}
+      <div className="mb-6 luxe-card p-6">
+        <h3 className="font-serif text-lg font-semibold text-charcoal">{ar ? "بياناتك" : "Your details"}</h3>
+        <p className="mb-4 mt-0.5 text-xs text-charcoal/55">{ar ? "سيتواصل معك فريقنا لتأكيد رحلتك." : "Our team will contact you to confirm your journey."}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="field-label">{pick(t.fields.fullName)}<span className="text-red-500"> *</span></span>
+            <input id="rv-fullName" className={cn("field-input", showCustErr("fullName") && "field-input-error")} value={store.customer.fullName} onChange={(e) => store.setCustomer({ fullName: e.target.value })} placeholder={ar ? "الاسم الكامل" : "Your full name"} />
+            {showCustErr("fullName") && <span className="mt-1 block text-xs text-red-600">{showCustErr("fullName")}</span>}
+          </label>
+          <div className="block">
+            <span className="field-label">{pick(t.fields.phone)}<span className="text-red-500"> *</span></span>
+            <div className="flex gap-2">
+              <select className="field-input w-28 shrink-0" value={store.customer.phoneCountry} onChange={(e) => store.setCustomer({ phoneCountry: e.target.value })}>
+                {COUNTRY_CODES.map((c) => (<option key={c.code} value={c.code}>{c.dial} {c.code}</option>))}
+              </select>
+              <input id="rv-phone" className={cn("field-input flex-1", showCustErr("phone") && "field-input-error")} inputMode="tel" value={store.customer.phone} onChange={(e) => store.setCustomer({ phone: e.target.value })} placeholder="5XXXXXXXX" />
+            </div>
+            {showCustErr("phone") && <p className="mt-1 text-xs text-red-600">{showCustErr("phone")}</p>}
+          </div>
+        </div>
+        <label className="mt-4 block">
+          <span className="field-label">{pick(t.fields.email)} — {pick(t.common.optional)}</span>
+          <input id="rv-email" className={cn("field-input", showCustErr("email") && "field-input-error")} inputMode="email" value={store.customer.email} onChange={(e) => store.setCustomer({ email: e.target.value })} placeholder="name@example.com" />
+          {showCustErr("email") && <span className="mt-1 block text-xs text-red-600">{showCustErr("email")}</span>}
+        </label>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         {/* Itinerary */}
         <div className="space-y-3">
@@ -127,8 +179,9 @@ export default function ReviewPage() {
             const price = computeStepPrice(step, config).computedPrice;
             const f = def?.features ?? { transfer: false, assistance: false, flight: false, hotel: false, home: false, chauffeur: false };
             const update = (patch: Parameters<typeof store.updateStep>[1]) => store.updateStep(step.stepType, patch);
-            const cap = step.carCategory ? (capacityByCategory[step.carCategory] ?? Infinity) : Infinity;
-            const overCap = on && step.passengers != null && step.passengers > cap;
+            const totalCap = totalVehicleCapacity(step.carCategory, step.additionalVehicles, capacityByCategory);
+            const overCap = on && step.passengers != null && totalCap != null && step.passengers > totalCap;
+            const extraVehicles = step.additionalVehicles ?? [];
             const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
             const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
             const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category) && (!priceKnown || priced.has(v.category)));
@@ -169,7 +222,7 @@ export default function ReviewPage() {
                       const sel = (step.carCategory ?? defaultVehicleCategory(stepVehicles)) === v.category;
                       return (
                         <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill ${sel ? "pill-on" : ""}`}>
-                          {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat }, config).computedPrice, locale)}
+                          {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat, additionalVehicles: [] }, config).computedPrice, locale)}
                         </button>
                       );
                     })}
@@ -197,11 +250,14 @@ export default function ReviewPage() {
                     </div>
                   </div>
                 )}
+                {on && (f.transfer || f.chauffeur) && extraVehicles.length > 0 && (
+                  <p className="mt-2 text-xs text-charcoal/55">
+                    {pick(t.builder.additionalVehicles)}: {extraVehicles.map((v) => vehicle(v.carCategory)?.[ar ? "nameAr" : "nameEn"] ?? v.carCategory).join("، ")}
+                  </p>
+                )}
                 {overCap && (
                   <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                    {ar
-                      ? `فئة ${vehicle(step.carCategory)?.nameAr ?? ""} تدعم حتى ${cap} ركاب فقط. الرجاء تقليل عدد الركاب أو اختيار فئة أكبر.`
-                      : `${vehicle(step.carCategory)?.nameEn ?? ""} supports up to ${cap} passengers. Please reduce passengers or pick a larger class.`}
+                    {pick(t.builder.capacityShortfall)}
                   </p>
                 )}
               </div>

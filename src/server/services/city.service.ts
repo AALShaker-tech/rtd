@@ -44,6 +44,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         nameAr: c.nameAr,
         country: c.country,
         isOrigin: c.isOrigin,
+        landmarkKey: c.landmarkKey,
         airports: c.airports.map((a) => ({
           code: a.code,
           nameEn: a.nameEn,
