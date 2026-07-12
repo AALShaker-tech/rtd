@@ -305,6 +305,47 @@ export function getStep(type: StepType): StepDef | undefined {
   return STEPS.find((s) => s.type === type);
 }
 
+/**
+ * The city-owned pricing key a step draws its price from. Journey steps are the
+ * customer-facing legs; pricing is separated from them so a price is entered
+ * once per city and applies to every leg that shares the key. In particular the
+ * two directions of an airport transfer resolve to the same key (and city), so
+ * "to airport" and "from airport" always cost the same within a city.
+ *
+ *   Home ⇄ (origin) Airport   → HOME_AIRPORT_TRANSFER   (priced on the origin city)
+ *   (destination) Airport ⇄ Hotel → AIRPORT_HOTEL_TRANSFER (priced on the destination)
+ *   Chauffeur during stay      → CHAUFFEUR_DURING_STAY   (destination only)
+ *
+ * Airport-assistance legs are NOT here: they are priced per airport from the
+ * selected lounge (see AirportLounge), never per step.
+ */
+export const STEP_PRICE_KEY: Record<string, string> = {
+  HOME_TO_RIYADH_AIRPORT: "HOME_AIRPORT_TRANSFER",
+  RIYADH_AIRPORT_TO_HOME: "HOME_AIRPORT_TRANSFER",
+  AIRPORT_TO_HOTEL: "AIRPORT_HOTEL_TRANSFER",
+  HOTEL_TO_AIRPORT: "AIRPORT_HOTEL_TRANSFER",
+  CHAUFFEUR_DURING_STAY: "CHAUFFEUR_DURING_STAY",
+};
+
+/** The three city-owned car/transfer pricing keys, in display order. */
+export const TRANSFER_PRICE_KEYS = [
+  "HOME_AIRPORT_TRANSFER",
+  "AIRPORT_HOTEL_TRANSFER",
+  "CHAUFFEUR_DURING_STAY",
+] as const;
+
+/** Bilingual labels for the pricing keys (shown on the city pricing page). */
+export const PRICE_KEY_LABELS: Record<string, Bilingual> = {
+  HOME_AIRPORT_TRANSFER: { en: "Home ⇄ Airport transfer", ar: "التوصيل بين المنزل والمطار" },
+  AIRPORT_HOTEL_TRANSFER: { en: "Airport ⇄ Hotel transfer", ar: "التوصيل بين المطار والفندق" },
+  CHAUFFEUR_DURING_STAY: { en: "Chauffeur during stay", ar: "السائق الخاص أثناء الإقامة" },
+};
+
+/** Resolve the city-owned pricing key for a step code (self if not mapped). */
+export function stepPriceKey(stepType: string): string {
+  return STEP_PRICE_KEY[stepType] ?? stepType;
+}
+
 /** Which built-in steps spawn a driver task. Admin steps use their own flag. */
 export const DRIVER_TASK_STEPS = new Set<string>([
   "HOME_TO_RIYADH_AIRPORT",
@@ -550,6 +591,17 @@ export const DEFAULT_SERVICE_CLASS_PRICES: Record<string, Record<string, number>
   }
   return out;
 })();
+
+/**
+ * Default per-class prices keyed by the city-owned pricing key (see stepPriceKey).
+ * This is what a fresh database seeds into CityServiceClassPrice, so transfer
+ * prices are stored once per city and shared by both directions.
+ */
+export const DEFAULT_CITY_CLASS_PRICES: Record<string, Record<string, number>> = {
+  HOME_AIRPORT_TRANSFER: DEFAULT_SERVICE_CLASS_PRICES.HOME_TO_RIYADH_AIRPORT,
+  AIRPORT_HOTEL_TRANSFER: DEFAULT_SERVICE_CLASS_PRICES.AIRPORT_TO_HOTEL,
+  CHAUFFEUR_DURING_STAY: DEFAULT_SERVICE_CLASS_PRICES.CHAUFFEUR_DURING_STAY,
+};
 
 /** Default price per lounge / assistance option, in whole SAR. */
 export const DEFAULT_LOUNGE_PRICES: Record<string, number> = {
