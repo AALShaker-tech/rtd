@@ -74,6 +74,12 @@ enum PriceStatus {
   FINALIZED // admin confirmed a final price
 }
 
+/// How an airport lounge / assistance service is priced by its vendor.
+enum LoungePriceMode {
+  PER_PERSON // price is per traveller → total = price × passengers
+  GROUP // flat total covering a group (up to groupCapacity, if set)
+}
+
 /// Placeholder payment lifecycle (payment not implemented yet).
 enum PaymentStatus {
   UNPAID
@@ -478,7 +484,13 @@ model AirportLounge {
   loungeId    String
   lounge      Lounge  @relation(fields: [loungeId], references: [id], onDelete: Cascade)
   enabled     Boolean @default(true)
-  price       Int     @default(0)
+  // Per-airport price for this service. Interpreted per `priceMode`: PER_PERSON
+  // is multiplied by the passenger count; GROUP is a flat total (see groupCapacity).
+  price         Int             @default(0)
+  priceMode     LoungePriceMode @default(PER_PERSON)
+  // For GROUP pricing: the number of travellers one flat price covers. Null =
+  // unlimited (one flat price regardless of party size).
+  groupCapacity Int?
 
   @@unique([airportCode, loungeId])
 }
