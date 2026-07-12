@@ -39,6 +39,10 @@ export async function getCityCatalog(): Promise<Catalog> {
         ]),
       ];
       const disabledVehicles = c.vehiclePricing.filter((v) => !v.enabled).map((v) => v.category);
+      const vehicleExampleModels: Record<string, string> = {};
+      for (const v of c.vehiclePricing) {
+        if (v.exampleModels && v.exampleModels.trim() !== "") vehicleExampleModels[v.category] = v.exampleModels;
+      }
       return {
         code: c.code,
         nameEn: c.nameEn,
@@ -67,6 +71,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         })),
         disabledSteps,
         disabledVehicles,
+        vehicleExampleModels,
       };
     }),
   };

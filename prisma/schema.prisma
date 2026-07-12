@@ -444,6 +444,9 @@ model CityVehiclePricing {
   city       City        @relation(fields: [cityCode], references: [code], onDelete: Cascade)
   category   String // vehicle class code (see VehicleCategory.category)
   enabled    Boolean     @default(true) // false → category not offered in this city
+  // Per-city override of the vehicle class's example models text. Null/empty →
+  // fall back to VehicleCategory.exampleModels (the global default).
+  exampleModels String?
 
   @@unique([cityCode, category])
 }

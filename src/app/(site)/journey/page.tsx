@@ -285,7 +285,7 @@ export default function JourneyPage() {
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-3">
-            <button onClick={back} className="btn-outline px-6 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
+            <button onClick={back} className="btn-outline px-8">{ar ? "→" : "←"} {pick(t.common.back)}</button>
             <button onClick={advance} disabled={phaseHasErrors} className="btn-gold px-8">
               {phaseIdx < activePhases.length - 1 ? pick(t.common.next) : pick(t.builder.reviewJourney)} {ar ? "←" : "→"}
             </button>

@@ -283,6 +283,27 @@ export async function setCityVehicleEnabled(cityCode: string, category: string, 
   return { ok: true as const };
 }
 
+/** Per-city override of a vehicle class's example-models text. Blank clears the
+ *  override (the class's global default is used). Never changes availability. */
+export async function setCityVehicleExampleModels(cityCode: string, category: string, text: string | null) {
+  const s = await requireAdmin();
+  const value = text && text.trim() !== "" ? text.trim() : null;
+  await prisma.cityVehiclePricing.upsert({
+    where: { cityCode_category: { cityCode, category } },
+    update: { exampleModels: value },
+    create: { cityCode, category, exampleModels: value },
+  });
+  await logAudit({
+    action: "CITY_VEHICLE_EXAMPLE_MODELS_SET",
+    entity: "CityVehiclePricing",
+    entityId: `${cityCode}:${category}`,
+    actorId: s.userId,
+    metadata: { hasOverride: value != null },
+  });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
 export async function setCityLoungePrice(
   cityCode: string,
   loungeType: string,

@@ -64,6 +64,8 @@ export function StepCard({
   // than none, so the picker never renders empty.
   const priceKnown = hasCityPricing(config);
   const disabledForCity = new Set(catalog.city(step.city)?.disabledVehicles ?? []);
+  // Per-city example-models overrides (fall back to the class default when unset).
+  const exampleOverrides = catalog.city(step.city)?.vehicleExampleModels ?? {};
   const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
   const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category) && (!priceKnown || priced.has(v.category)));
   const selVeh = step.carCategory ?? defaultVehicleCategory(cityVehicles);
@@ -163,7 +165,7 @@ export function StepCard({
               return (
                 <button key={v.category} onClick={() => onChange({ carCategory: v.category as typeof step.carCategory })} className={`sel-card ${sel ? "sel-card-on" : ""}`}>
                   <span className="block font-semibold text-charcoal">{vehicleName(v, locale)}</span>
-                  <span className="block text-[0.7rem] text-charcoal/50">{v.exampleModels}</span>
+                  <span className="block text-[0.7rem] text-charcoal/50">{exampleOverrides[v.category] || v.exampleModels}</span>
                   <span className="mt-1 flex items-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.passengers)}><PeopleIcon size={12} /> {ar ? `حتى ${v.maxPassengers}` : `up to ${v.maxPassengers}`}</span>
                   <span className={`mt-2 block text-sm font-semibold ${sel ? "text-gold-dark" : "text-charcoal/60"}`}>
                     {formatPrice(unit, locale)}{f.chauffeur ? ` ${pick(t.builder.perDay)}` : ""}
