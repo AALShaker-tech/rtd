@@ -156,15 +156,18 @@ export async function sendEmail(msg: EmailMessage) {
  * rest. If no channel is reachable, the alert is logged so it stays visible in
  * the server logs. The phone stays env-only for now.
  */
-export async function sendOpsAlert(msg: { subject: string; body: string }): Promise<void> {
+export async function sendOpsAlert(msg: { subject: string; body: string; emailBody?: string }): Promise<void> {
   const { emails, phone } = await getOpsTargets();
   const channel: "SMS" | "WHATSAPP" =
     process.env.OPS_ALERT_SMS_CHANNEL === "WHATSAPP" ? "WHATSAPP" : "SMS";
 
+  // Email carries the full detail when provided; SMS/WhatsApp always uses the
+  // short body (length- and cost-sensitive).
+  const emailText = msg.emailBody ?? msg.body;
   let delivered = false;
   if (emails.length) {
     const results = await Promise.allSettled(
-      emails.map((to) => sendEmail({ to, subject: msg.subject, body: msg.body })),
+      emails.map((to) => sendEmail({ to, subject: msg.subject, body: emailText })),
     );
     results.forEach((r, i) => {
       if (r.status === "fulfilled") delivered = true;

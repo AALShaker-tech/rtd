@@ -11,7 +11,7 @@ import { getPricingConfig } from "./pricing.service";
 import { getStepMap } from "./step.service";
 import { isTargetVerified } from "./verification.service";
 import { sendOpsAlert } from "./notify.service";
-import { buildNewRequestAlert } from "@/lib/ops-alert";
+import { buildNewRequestAlert, buildNewRequestEmailBody, type NewRequestServiceLine } from "@/lib/ops-alert";
 import { logger } from "@/lib/logger";
 import type { CreateRequestInput } from "@/lib/validation/schemas";
 import type {
@@ -260,20 +260,67 @@ export async function createRequest(input: CreateRequestInput) {
   });
 
   // Alert operations about the new request. Fire-and-forget: a notification
-  // failure must never break a successful submission.
+  // failure must never break a successful submission. The SMS/WhatsApp stays
+  // short; the email carries the full request detail (every booked service).
   try {
-    await sendOpsAlert(
-      buildNewRequestAlert({
-        referenceNumber: result.referenceNumber,
-        customerName: input.customer.fullName,
-        phone: e164,
-        destination: input.destination ?? null,
-        estimatedTotal,
-        currency: "SAR",
-        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
-        contactMeInstead: input.customer.contactMeInstead,
-      }),
-    );
+    const ti = input.tripInfo;
+    const serviceLines: NewRequestServiceLine[] = steps
+      .filter((s) => !s.skipped && s.serviceType !== "SKIP")
+      .map((s) => ({
+        name: s.def?.name.en ?? s.stepType,
+        serviceType: s.serviceType,
+        city: s.city ?? null,
+        airport: s.airport ?? null,
+        terminal: s.terminal ?? null,
+        lounge: s.loungeType ?? null,
+        vehicle: s.carCategory ?? null,
+        extraVehicles: (s.additionalVehicles ?? []).map((v) => v.carCategory).filter(Boolean) as string[],
+        date: s.date ?? null,
+        time: s.time ?? null,
+        pickup: s.pickupLocation ?? null,
+        dropoff: s.dropoffLocation ?? null,
+        hotel: s.hotelName ?? null,
+        home: s.homeAddress ?? null,
+        days: s.days ?? null,
+        dailyUsage: s.dailyUsage ?? null,
+        price: stepBreakdowns.get(s.stepType)?.computedPrice ?? null,
+      }));
+
+    const alert = buildNewRequestAlert({
+      referenceNumber: result.referenceNumber,
+      customerName: input.customer.fullName,
+      phone: e164,
+      destination: input.destination ?? null,
+      estimatedTotal,
+      currency: "SAR",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+      contactMeInstead: input.customer.contactMeInstead,
+    });
+    const emailBody = buildNewRequestEmailBody({
+      referenceNumber: result.referenceNumber,
+      customerName: input.customer.fullName,
+      phone: e164,
+      email: input.customer.email ?? null,
+      language,
+      contactMeInstead: input.customer.contactMeInstead,
+      destination: input.destination ?? null,
+      departureDate: ti.departureDate || null,
+      returnDate: ti.returnDate || null,
+      passengers,
+      bags,
+      children: input.customer.children,
+      childSeat: input.customer.childSeat,
+      specialAssistance: ti.specialAssistance,
+      assistanceNotes: ti.assistanceNotes ?? null,
+      departureFlight: ti.departureFlightCode || null,
+      returnFlight: ti.returnFlightCode || null,
+      notes: input.customer.notes ?? null,
+      services: serviceLines,
+      estimatedTotal,
+      currency: "SAR",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+    });
+    await sendOpsAlert({ subject: alert.subject, body: alert.body, emailBody });
   } catch (e) {
     logger.error("ops alert failed", { err: e, reference: result.referenceNumber });
   }
@@ -349,18 +396,29 @@ export async function createPackageRequest(input: {
   });
 
   try {
-    await sendOpsAlert(
-      buildNewRequestAlert({
-        referenceNumber: result.referenceNumber,
-        customerName: input.fullName,
-        phone: e164,
-        destination: pkg.nameEn,
-        estimatedTotal: price,
-        currency: "SAR",
-        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
-        contactMeInstead: false,
-      }),
-    );
+    const alert = buildNewRequestAlert({
+      referenceNumber: result.referenceNumber,
+      customerName: input.fullName,
+      phone: e164,
+      destination: pkg.nameEn,
+      estimatedTotal: price,
+      currency: "SAR",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+      contactMeInstead: false,
+    });
+    const emailBody = buildNewRequestEmailBody({
+      referenceNumber: result.referenceNumber,
+      customerName: input.fullName,
+      phone: e164,
+      email: input.email ?? null,
+      language,
+      selectedPackage: pkg.nameEn,
+      notes: input.notes ?? null,
+      estimatedTotal: price,
+      currency: "SAR",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+    });
+    await sendOpsAlert({ subject: alert.subject, body: alert.body, emailBody });
   } catch (e) {
     logger.error("ops alert failed", { err: e, reference: result.referenceNumber });
   }
