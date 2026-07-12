@@ -134,6 +134,34 @@ const ART: Record<string, ReactNode> = {
       <path d="M8.5 21h5" />
     </>
   ),
+  // ── Beach / seaside destinations ──
+  // Beach umbrella planted in the sand
+  "beach-umbrella": (
+    <>
+      <path d="M12 4v17" />
+      <path d="M4 11a8 6 0 0 1 16 0z" />
+      <path d="M12 4c2.5 0 4 3 4 7" />
+      <path d="M12 4c-2.5 0-4 3-4 7" />
+      <path d="M9 21h6" />
+    </>
+  ),
+  // Sailboat on the water
+  sailboat: (
+    <>
+      <path d="M12 3v11" />
+      <path d="M12 5l5 9h-5z" />
+      <path d="M5 16h14l-2.5 4h-9z" />
+      <path d="M3 21q2.5-2 5 0t5 0 5 0" />
+    </>
+  ),
+  // Sun setting over the sea
+  "sea-sun": (
+    <>
+      <circle cx="12" cy="9" r="4" />
+      <path d="M2 15q2.5-2 5 0t5 0 5 0 5 0" />
+      <path d="M2 19q2.5-2 5 0t5 0 5 0 5 0" />
+    </>
+  ),
 };
 
 /** Default landmark for a city code, used when no explicit key is assigned. */
@@ -162,6 +190,9 @@ export const LANDMARK_PRESETS: { key: string; name: { en: string; ar: string } }
   { key: "monument", name: { en: "Monument", ar: "نصب تذكاري" } },
   { key: "mountains", name: { en: "Mountains", ar: "جبال" } },
   { key: "palm", name: { en: "Palm / Coast", ar: "نخلة / ساحل" } },
+  { key: "beach-umbrella", name: { en: "Beach umbrella", ar: "مظلة شاطئ" } },
+  { key: "sailboat", name: { en: "Sailboat", ar: "قارب شراعي" } },
+  { key: "sea-sun", name: { en: "Sea & sun", ar: "بحر وشمس" } },
 ];
 
 /** The generic monument fallback, used when nothing else resolves. */

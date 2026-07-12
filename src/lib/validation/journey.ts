@@ -189,7 +189,8 @@ export function validateStep(
     if (when && when < now) errors.push(pastDate());
   }
 
-  // Flight
+  // Flight — validate the format when provided; a missing number is not flagged
+  // (it's optional and the prompt shouldn't nag the customer).
   if (f.flight) {
     if (step.flightNumber && !isValidFlightNumber(step.flightNumber)) {
       errors.push(
@@ -197,15 +198,6 @@ export function validateStep(
           "error",
           "Please enter a valid flight number (e.g. SV021).",
           "الرجاء إدخال رقم رحلة صحيح (مثال: SV021).",
-          "flightNumber",
-        ),
-      );
-    } else if (!step.flightNumber) {
-      warnings.push(
-        issue(
-          "warning",
-          "Flight number helps us time your service precisely.",
-          "رقم الرحلة يساعدنا على ضبط توقيت خدمتك بدقة.",
           "flightNumber",
         ),
       );

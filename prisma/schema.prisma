@@ -459,6 +459,7 @@ model Airport {
   country  String?
   timezone String? // IANA, e.g. Asia/Riyadh
   utcOffsetMinutes Int @default(0) // offset for the schedule window (June 2026)
+  active  Boolean @default(true) // false → hidden from the customer flow
   lounges  AirportLounge[]
 }
 

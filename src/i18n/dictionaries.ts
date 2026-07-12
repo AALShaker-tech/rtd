@@ -439,8 +439,8 @@ export const dict = {
     warnings: { en: "Warnings", ar: "تنبيهات" },
     errors: { en: "Issues to fix", ar: "أمور يجب تصحيحها" },
     blockingError: {
-      en: "Please resolve the issues above before confirming.",
-      ar: "الرجاء معالجة الأمور أعلاه قبل التأكيد.",
+      en: "Please review the selected services before submitting.",
+      ar: "يرجى مراجعة الخدمات المختارة قبل الإرسال.",
     },
     confirmRequest: { en: "Confirm Request", ar: "تأكيد الطلب" },
     valid: { en: "Looks good", ar: "كل شيء جيد" },
