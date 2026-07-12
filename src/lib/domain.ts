@@ -193,7 +193,7 @@ export const STEPS: StepDef[] = [
     type: "HOME_TO_RIYADH_AIRPORT",
     order: 1,
     cityScope: "RIYADH",
-    name: { en: "Home to Riyadh Airport", ar: "من المنزل إلى مطار الرياض" },
+    name: { en: "Chauffeur from Your Home", ar: "سائقك من بيتك" },
     shortName: { en: "Home → Riyadh Airport", ar: "المنزل ← مطار الرياض" },
     description: {
       en: "Private pick-up from your doorstep to King Khalid International Airport.",
@@ -205,7 +205,7 @@ export const STEPS: StepDef[] = [
     type: "DEPARTURE_ASSIST_RIYADH",
     order: 2,
     cityScope: "RIYADH",
-    name: { en: "Departure Assistance at Riyadh Airport", ar: "خدمة المغادرة في مطار الرياض" },
+    name: { en: "Departure Send-Off — Riyadh", ar: "توديعك في مطار الرياض" },
     shortName: { en: "Riyadh Departure Assist", ar: "مساعدة المغادرة – الرياض" },
     description: {
       en: "Executive Office or Marhaba lounge assistance at Riyadh Airport.",
@@ -217,7 +217,7 @@ export const STEPS: StepDef[] = [
     type: "ARRIVAL_ASSIST_DESTINATION",
     order: 3,
     cityScope: "DESTINATION",
-    name: { en: "Arrival Assistance at Destination", ar: "خدمة الوصول في الوجهة" },
+    name: { en: "Arrival Welcome — Destination", ar: "استقبالك في مطار الوجهة" },
     shortName: { en: "Destination Arrival Assist", ar: "مساعدة الوصول – الوجهة" },
     description: {
       en: "Meet & Assist or Fast Track on arrival in London, Paris, Dubai or Cairo.",
@@ -229,7 +229,7 @@ export const STEPS: StepDef[] = [
     type: "AIRPORT_TO_HOTEL",
     order: 4,
     cityScope: "DESTINATION",
-    name: { en: "Airport to Hotel Transfer", ar: "التوصيل من المطار إلى الفندق" },
+    name: { en: "Chauffeur to Your Hotel", ar: "سائقك إلى الفندق" },
     shortName: { en: "Airport → Hotel", ar: "المطار ← الفندق" },
     description: {
       en: "Seamless private transfer from the destination airport to your hotel.",
@@ -241,7 +241,7 @@ export const STEPS: StepDef[] = [
     type: "CHAUFFEUR_DURING_STAY",
     order: 5,
     cityScope: "DESTINATION",
-    name: { en: "Chauffeur Service During Stay", ar: "خدمة السائق الخاص أثناء الإقامة" },
+    name: { en: "Private Chauffeur During Your Stay", ar: "سائقك الخاص طوال إقامتك" },
     shortName: { en: "Chauffeur During Stay", ar: "سائق خاص أثناء الإقامة" },
     description: {
       en: "A dedicated chauffeur for your days abroad — by the day and hours you choose.",
@@ -253,7 +253,7 @@ export const STEPS: StepDef[] = [
     type: "HOTEL_TO_AIRPORT",
     order: 6,
     cityScope: "DESTINATION",
-    name: { en: "Hotel to Airport Return Transfer", ar: "التوصيل من الفندق إلى المطار للعودة" },
+    name: { en: "Chauffeur to the Airport", ar: "سائقك إلى المطار" },
     shortName: { en: "Hotel → Airport", ar: "الفندق ← المطار" },
     description: {
       en: "Private transfer from your hotel back to the airport for your return flight.",
@@ -265,7 +265,7 @@ export const STEPS: StepDef[] = [
     type: "DEPARTURE_ASSIST_RETURN",
     order: 7,
     cityScope: "DESTINATION",
-    name: { en: "Departure Assistance at Return Airport", ar: "خدمة المغادرة في مطار العودة" },
+    name: { en: "Departure Send-Off — Destination", ar: "توديعك في مطار الوجهة" },
     shortName: { en: "Return Departure Assist", ar: "مساعدة المغادرة – العودة" },
     description: {
       en: "Meet & Assist or Fast Track for your departure from the destination.",
@@ -277,7 +277,7 @@ export const STEPS: StepDef[] = [
     type: "ARRIVAL_ASSIST_RIYADH",
     order: 8,
     cityScope: "RIYADH",
-    name: { en: "Arrival Assistance at Riyadh Airport", ar: "خدمة الوصول في مطار الرياض" },
+    name: { en: "Arrival Welcome — Riyadh", ar: "استقبالك في مطار الرياض" },
     shortName: { en: "Riyadh Arrival Assist", ar: "مساعدة الوصول – الرياض" },
     description: {
       en: "Executive Office, Meet & Assist and arrival assistance back home.",
@@ -289,7 +289,7 @@ export const STEPS: StepDef[] = [
     type: "RIYADH_AIRPORT_TO_HOME",
     order: 9,
     cityScope: "RIYADH",
-    name: { en: "Riyadh Airport to Home Transfer", ar: "التوصيل من مطار الرياض إلى المنزل" },
+    name: { en: "Chauffeur to Your Home", ar: "سائقك إلى بيتك" },
     shortName: { en: "Riyadh Airport → Home", ar: "مطار الرياض ← المنزل" },
     description: {
       en: "The final leg — a private transfer from the airport to your door.",
