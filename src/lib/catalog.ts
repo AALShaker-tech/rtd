@@ -16,6 +16,10 @@ export interface CatalogAirportLounge {
   descriptionEn: string;
   descriptionAr: string;
   price: number;
+  /** How the price is charged, so the customer sees per-person vs group. */
+  priceMode: "PER_PERSON" | "GROUP";
+  /** GROUP only: travellers one flat price covers (null = unlimited). */
+  groupCapacity: number | null;
 }
 
 export interface CatalogAirport {

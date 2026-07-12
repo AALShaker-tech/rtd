@@ -237,7 +237,6 @@ export default function JourneyPage() {
         <div>
           {/* Chapter stepper — turns the flow into a few legible chapters */}
           <div className="mb-4 flex items-center gap-3">
-            <button onClick={back} className="btn-outline shrink-0 px-4 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
             <ol className="flex flex-1 items-center gap-2">
               {activePhases.map((p, i) => {
                 const state = i === phaseIdx ? "current" : i < phaseIdx ? "done" : "upcoming";
@@ -285,7 +284,8 @@ export default function JourneyPage() {
             ))}
           </div>
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button onClick={back} className="btn-outline px-6 py-2 text-xs">{ar ? "→" : "←"} {pick(t.common.back)}</button>
             <button onClick={advance} disabled={phaseHasErrors} className="btn-gold px-8">
               {phaseIdx < activePhases.length - 1 ? pick(t.common.next) : pick(t.builder.reviewJourney)} {ar ? "←" : "→"}
             </button>

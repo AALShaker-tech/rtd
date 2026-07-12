@@ -15,6 +15,7 @@ import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
 import { validateStep, validateVehicleCapacity, totalVehicleCapacity } from "@/lib/validation/journey";
+import { PeopleIcon } from "@/components/ui/Glyphs";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
 import type { CarCategory } from "@/lib/domain";
@@ -123,13 +124,23 @@ export function StepCard({
               airportLounges.map((o) => {
                 const on = step.loungeType === o.id;
                 const desc = ar ? o.descriptionAr : o.descriptionEn;
+                // Show the charging basis so a group price isn't mistaken for a
+                // per-person one (the picker shows the rate; the total reflects it).
+                const basis = o.priceMode === "GROUP"
+                  ? (o.groupCapacity
+                      ? (ar ? `للمجموعة حتى ${o.groupCapacity}` : `group of up to ${o.groupCapacity}`)
+                      : (ar ? "للمجموعة" : "per group"))
+                  : (ar ? "للفرد" : "per person");
                 return (
                   <button key={o.id} onClick={() => onChange({ loungeType: o.id, airport: activeAirport })} className={`sel-card flex items-start justify-between gap-3 ${on ? "sel-card-on" : ""}`}>
                     <span className="min-w-0">
                       <span className="block font-medium text-charcoal">{ar ? o.nameAr : o.nameEn}</span>
                       {desc && <span className="mt-0.5 block text-xs leading-relaxed text-charcoal/50">{desc}</span>}
                     </span>
-                    <span className={`shrink-0 text-sm font-semibold ${on ? "text-gold-dark" : "text-charcoal/50"}`}>{formatPrice(priceFor({ loungeType: o.id, airport: activeAirport }), locale)}</span>
+                    <span className="shrink-0 text-end">
+                      <span className={`block text-sm font-semibold ${on ? "text-gold-dark" : "text-charcoal/60"}`}>{formatPrice(o.price, locale)}</span>
+                      <span className="mt-0.5 block text-[0.65rem] text-charcoal/45">{basis}</span>
+                    </span>
                   </button>
                 );
               })
@@ -153,7 +164,7 @@ export function StepCard({
                 <button key={v.category} onClick={() => onChange({ carCategory: v.category as typeof step.carCategory })} className={`sel-card ${sel ? "sel-card-on" : ""}`}>
                   <span className="block font-semibold text-charcoal">{vehicleName(v, locale)}</span>
                   <span className="block text-[0.7rem] text-charcoal/50">{v.exampleModels}</span>
-                  <span className="mt-1 block text-[0.7rem] text-charcoal/40">{ar ? `حتى ${v.maxPassengers} ركاب` : `Up to ${v.maxPassengers}`}</span>
+                  <span className="mt-1 flex items-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.passengers)}><PeopleIcon size={12} /> {ar ? `حتى ${v.maxPassengers}` : `up to ${v.maxPassengers}`}</span>
                   <span className={`mt-2 block text-sm font-semibold ${sel ? "text-gold-dark" : "text-charcoal/60"}`}>
                     {formatPrice(unit, locale)}{f.chauffeur ? ` ${pick(t.builder.perDay)}` : ""}
                   </span>
@@ -222,7 +233,7 @@ export function StepCard({
                         className={cn("sel-card text-center", sel && "sel-card-on")}
                       >
                         <span className="block font-semibold text-charcoal">{vehicleName(cv, locale)}</span>
-                        <span className="block text-[0.7rem] text-charcoal/40">{ar ? `حتى ${cv.maxPassengers}` : `Up to ${cv.maxPassengers}`}</span>
+                        <span className="flex items-center justify-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.passengers)}><PeopleIcon size={12} /> {ar ? `حتى ${cv.maxPassengers}` : `up to ${cv.maxPassengers}`}</span>
                         <span className={cn("mt-1 block text-sm font-semibold", sel ? "text-gold-dark" : "text-charcoal/60")}>
                           {formatPrice(priceFor({ carCategory: cv.category as typeof step.carCategory, additionalVehicles: [] }), locale)}
                         </span>

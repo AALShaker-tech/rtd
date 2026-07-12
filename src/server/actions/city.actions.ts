@@ -176,6 +176,39 @@ export async function upsertAirport(raw: unknown) {
   return { ok: true as const };
 }
 
+/** Enable/disable an airport. Disabled airports are hidden from the customer
+ *  flow but kept intact (routes / flight schedules reference them by code). */
+export async function setAirportActive(code: string, active: boolean) {
+  const s = await requireAdmin();
+  const airport = await prisma.airport.findUnique({ where: { code } });
+  if (!airport) return { ok: false as const, error: "Airport not found" };
+  await prisma.airport.update({ where: { code }, data: { active } });
+  await logAudit({ action: "AIRPORT_ACTIVE_SET", entity: "Airport", entityId: code, actorId: s.userId, metadata: { active } });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
+/** Permanently delete an airport (and its per-airport lounges). Blocked when a
+ *  flight route still references it — deactivate it instead in that case. */
+export async function deleteAirport(code: string) {
+  const s = await requireAdmin();
+  const airport = await prisma.airport.findUnique({ where: { code } });
+  if (!airport) return { ok: false as const, error: "Airport not found" };
+  const routeCount = await prisma.route.count({
+    where: { OR: [{ originAirportCode: code }, { destinationAirportCode: code }] },
+  });
+  if (routeCount > 0) {
+    return {
+      ok: false as const,
+      error: "This airport is used by flight routes. Disable it instead of deleting.",
+    };
+  }
+  await prisma.airport.delete({ where: { code } });
+  await logAudit({ action: "AIRPORT_DELETED", entity: "Airport", entityId: code, actorId: s.userId });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
 export async function setCityServicePrice(
   cityCode: string,
   stepType: string,

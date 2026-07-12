@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useJourneyStore } from "@/store/journeyStore";
 import { useCatalog } from "@/components/catalog/CatalogProvider";
 import { resolveFlightAction } from "@/server/actions/flight.actions";
 import { formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
+import { PeopleIcon, LuggageIcon } from "@/components/ui/Glyphs";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -66,11 +67,12 @@ export function TripSummaryBar({
   const catalog = useCatalog();
   const [open, setOpen] = useState(false);
 
-  const chips: string[] = [
+  const chips: ReactNode[] = [
     `${pick(t.tripInfo.departureDate)}: ${tripInfo.departureDate ? formatDateOnly(tripInfo.departureDate, locale) : "—"}`,
     ...(tripInfo.returnDate ? [`${pick(t.tripInfo.returnDate)}: ${formatDateOnly(tripInfo.returnDate, locale)}`] : []),
-    `${tripInfo.passengers} ${pick(t.fields.passengers)}`,
-    `${tripInfo.bags} ${pick(t.fields.bags)}`,
+    // Party size and luggage as icons — clearer and language-neutral.
+    <span key="pax" className="inline-flex items-center gap-1" title={pick(t.fields.passengers)}><PeopleIcon /> {tripInfo.passengers}</span>,
+    <span key="bags" className="inline-flex items-center gap-1" title={pick(t.fields.bags)}><LuggageIcon /> {tripInfo.bags}</span>,
     ...(tripInfo.specialAssistance ? [pick(t.tripInfo.specialAssistanceLabel)] : []),
   ];
 

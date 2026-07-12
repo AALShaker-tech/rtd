@@ -15,6 +15,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         // natural (seed) order → primary airport first; include each airport's
         // enabled lounges joined to the active catalog entry for name/description.
         airports: {
+          where: { active: true },
           orderBy: { id: "asc" },
           include: { lounges: { where: { enabled: true }, include: { lounge: true } } },
         },
@@ -60,6 +61,8 @@ export async function getCityCatalog(): Promise<Catalog> {
               descriptionEn: al.lounge.descriptionEn,
               descriptionAr: al.lounge.descriptionAr,
               price: al.price,
+              priceMode: al.priceMode,
+              groupCapacity: al.groupCapacity,
             })),
         })),
         disabledSteps,

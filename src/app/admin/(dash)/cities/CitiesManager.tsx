@@ -7,7 +7,9 @@ import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import { CityLandmark, LANDMARK_PRESETS } from "@/components/ui/CityLandmark";
 import { PRICE_KEY_LABELS } from "@/lib/domain";
 import {
+  deleteAirport,
   deleteCity,
+  setAirportActive,
   setCityActive,
   setCityServiceClassPrice,
   setCityVehicleEnabled,
@@ -17,7 +19,7 @@ import {
 import { setAirportLounge } from "@/server/actions/lounge.actions";
 
 interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number; priceMode: "PER_PERSON" | "GROUP"; groupCapacity: number | null }
-interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; lounges: AirportLoungeRow[] }
+interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; active: boolean; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
 interface VehicleRow { category: string; enabled: boolean }
@@ -232,9 +234,9 @@ function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airp
   return (
     <div className="luxe-card p-5">
       <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">{pick(t.cities.airports)}</h3>
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 space-y-1.5">
         {airports.map((a) => (
-          <button key={a.code} onClick={() => edit(a)} className="badge bg-charcoal/5 text-charcoal/70 hover:bg-gold-50">{a.code} · {a.nameEn}</button>
+          <AirportListRow key={a.code} airport={a} onEdit={() => edit(a)} />
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -260,6 +262,48 @@ function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airp
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** One airport in the list: edit, enable/disable, or delete it. */
+function AirportListRow({ airport, onEdit }: { airport: AirportRow; onEdit: () => void }) {
+  const { locale } = useI18n();
+  const router = useRouter();
+  const ar = locale === "ar";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    setBusy(true); setError(null);
+    await setAirportActive(airport.code, !airport.active);
+    setBusy(false);
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!confirm(ar ? `حذف المطار ${airport.code}؟` : `Delete airport ${airport.code}?`)) return;
+    setBusy(true); setError(null);
+    const res = await deleteAirport(airport.code);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    router.refresh();
+  }
+
+  return (
+    <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${airport.active ? "border-charcoal/10" : "border-charcoal/10 bg-charcoal/[0.03]"}`}>
+      <button onClick={onEdit} className="min-w-0 flex-1 text-start text-sm text-charcoal/80 hover:text-gold-dark">
+        <span className="font-medium">{airport.code}</span>
+        <span className="ms-2 text-charcoal/50">{ar ? airport.nameAr : airport.nameEn}</span>
+      </button>
+      {!airport.active && <span className="badge bg-charcoal/10 text-charcoal/50">{ar ? "معطّل" : "Disabled"}</span>}
+      <button onClick={toggle} disabled={busy} className="btn-ghost px-2.5 py-1 text-xs">
+        {airport.active ? (ar ? "تعطيل" : "Disable") : (ar ? "تفعيل" : "Enable")}
+      </button>
+      <button onClick={remove} disabled={busy} className="btn-ghost px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
+        {ar ? "حذف" : "Delete"}
+      </button>
+      {error && <span className="w-full text-xs text-red-600">{error}</span>}
     </div>
   );
 }
