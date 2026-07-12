@@ -21,9 +21,19 @@ import {
   chauffeurUsageMultiplier,
   getStep,
   serviceHasCar,
+  stepPriceKey,
   type StepType,
 } from "@/lib/domain";
 import type { JourneyStepInput } from "@/lib/types";
+
+/** An airport lounge's per-airport price and how it is charged. */
+export interface LoungePrice {
+  price: number;
+  /** PER_PERSON multiplies by party size; GROUP is a flat total. */
+  mode: "PER_PERSON" | "GROUP";
+  /** GROUP only: travellers one flat price covers (null/0 = unlimited). */
+  capacity?: number | null;
+}
 
 export interface PricingConfig {
   services: Record<string, number>; // stepType → base price (assistance / no-car)
@@ -32,9 +42,22 @@ export interface PricingConfig {
   // Per-city overrides (admin-managed). Take precedence over the global values.
   cityServicePrices?: Record<string, Record<string, number>>; // cityCode → stepType → price
   cityLoungePrices?: Record<string, Record<string, number>>; // cityCode → loungeType → price (legacy, unused)
-  cityServiceClassPrices?: Record<string, Record<string, Record<string, number>>>; // city → stepType → class → price
-  // Lounges are priced per airport: airportCode → loungeId → price.
-  airportLoungePrices?: Record<string, Record<string, number>>;
+  // Car/transfer prices, keyed by the step's city-owned pricing key (see
+  // stepPriceKey) so both directions of a transfer share one price:
+  //   city → priceKey → class → price
+  cityServiceClassPrices?: Record<string, Record<string, Record<string, number>>>;
+  // Lounges are priced per airport: airportCode → loungeId → { price, mode, capacity }.
+  airportLoungePrices?: Record<string, Record<string, LoungePrice>>;
+}
+
+/** The charged total for a lounge given the party size, honouring its mode. */
+export function loungeTotal(l: LoungePrice, passengers: number): number {
+  const pax = Math.max(1, passengers);
+  if (l.mode === "GROUP") {
+    const cap = l.capacity ?? 0;
+    return cap > 0 && pax > cap ? Math.ceil(pax / cap) * l.price : l.price;
+  }
+  return l.price * pax;
 }
 
 /** Built-in defaults — used as a fallback when the DB hasn't been seeded. */
@@ -66,14 +89,15 @@ function carClassPrice(
   category: string | null | undefined,
 ): number {
   const cat = category ?? "VIP";
-  return (cityCode ? config.cityServiceClassPrices?.[cityCode]?.[stepType]?.[cat] : undefined) ?? 0;
+  const key = stepPriceKey(stepType);
+  return (cityCode ? config.cityServiceClassPrices?.[cityCode]?.[key]?.[cat] : undefined) ?? 0;
 }
 
 /** Compute the price breakdown for a single journey step. */
 export function computeStepPrice(
   step: Pick<
     JourneyStepInput,
-    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "additionalVehicles" | "days" | "dailyUsage"
+    "stepType" | "def" | "serviceType" | "skipped" | "city" | "airport" | "loungeType" | "carCategory" | "additionalVehicles" | "days" | "dailyUsage" | "passengers"
   >,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): StepPriceBreakdown {
@@ -102,14 +126,21 @@ export function computeStepPrice(
     return { basePrice: primary, computedPrice: Math.round(primary + extra) };
   }
 
-  // Lounge / assistance — the lounge's per-airport price when a lounge is
-  // selected, otherwise the city's base price for the service. Unset → 0.
-  const loungePrice = step.loungeType && step.airport
-    ? config.airportLoungePrices?.[step.airport]?.[step.loungeType]
-    : undefined;
-  const base = step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined;
-  const price = loungePrice ?? base ?? 0;
-  return { basePrice: price, computedPrice: Math.round(price) };
+  // Airport assistance (lounge) — the single source for airport services. The
+  // price lives on the selected lounge at the chosen airport, charged per its
+  // mode (per-person × party, or a flat group total). No per-step base price.
+  if (f?.assistance) {
+    const l = step.loungeType && step.airport
+      ? config.airportLoungePrices?.[step.airport]?.[step.loungeType]
+      : undefined;
+    if (!l) return { basePrice: 0, computedPrice: 0 };
+    const total = loungeTotal(l, step.passengers ?? 1);
+    return { basePrice: l.price, computedPrice: Math.round(total) };
+  }
+
+  // Any other (non-car, non-lounge) service — the city's base price. Unset → 0.
+  const base = (step.city ? config.cityServicePrices?.[step.city]?.[step.stepType] : undefined) ?? 0;
+  return { basePrice: base, computedPrice: Math.round(base) };
 }
 
 export interface JourneyPricing {

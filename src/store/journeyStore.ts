@@ -52,7 +52,8 @@ function applyTripToStep(
     date: est.date,
     time: f?.flight || f?.transfer ? est.time : undefined,
     flightNumber: f?.flight ? flightCode : undefined,
-    passengers: f?.transfer ? tripInfo.passengers : undefined,
+    // Party size drives both transfer vehicle sizing and per-person lounge pricing.
+    passengers: f?.transfer || f?.assistance ? tripInfo.passengers : undefined,
     bags: f?.transfer ? tripInfo.bags : undefined,
   };
 

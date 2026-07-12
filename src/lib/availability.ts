@@ -10,7 +10,7 @@
  */
 
 import type { PricingConfig } from "@/lib/pricing";
-import type { StepDef } from "@/lib/domain";
+import { stepPriceKey, type StepDef } from "@/lib/domain";
 
 /**
  * Whether the config actually carries per-city pricing (i.e. it was loaded from
@@ -32,7 +32,8 @@ export function pricedVehicleClasses(
   city: string | null | undefined,
   stepType: string,
 ): string[] {
-  const byClass = (city ? config.cityServiceClassPrices?.[city]?.[stepType] : undefined) ?? {};
+  const key = stepPriceKey(stepType);
+  const byClass = (city ? config.cityServiceClassPrices?.[city]?.[key] : undefined) ?? {};
   return Object.entries(byClass)
     .filter(([, price]) => (price ?? 0) > 0)
     .map(([category]) => category);

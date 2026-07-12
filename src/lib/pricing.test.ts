@@ -20,23 +20,24 @@ const CFG: PricingConfig = {
   services: {},
   lounges: {},
   serviceClassPrices: {},
+  // Transfer/chauffeur prices are keyed by the city-owned pricing key, so both
+  // directions of a transfer share one price within a city.
   cityServiceClassPrices: {
     RUH: {
-      HOME_TO_RIYADH_AIRPORT: { VVIP: 500, VIP: 350, ECONOMY: 250 },
-      AIRPORT_TO_HOTEL: { VVIP: 760, VIP: 532, ECONOMY: 380, LUXURY_SUV: 1200 },
+      HOME_AIRPORT_TRANSFER: { VVIP: 500, VIP: 350, ECONOMY: 250 },
+      AIRPORT_HOTEL_TRANSFER: { VVIP: 760, VIP: 532, ECONOMY: 380, LUXURY_SUV: 1200 },
       CHAUFFEUR_DURING_STAY: { VVIP: 1300, VIP: 910, ECONOMY: 650 },
     },
-    LON: { AIRPORT_TO_HOTEL: { VIP: 700 } },
-    PAR: { AIRPORT_TO_HOTEL: { VIP: 532 } },
+    LON: { AIRPORT_HOTEL_TRANSFER: { VIP: 700 } },
+    PAR: { AIRPORT_HOTEL_TRANSFER: { VIP: 532 } },
   },
-  cityServicePrices: {
-    RUH: { DEPARTURE_ASSIST_RIYADH: 320 },
-    LON: { ARRIVAL_ASSIST_DESTINATION: 420 },
-  },
-  // Lounges are priced per airport (airportCode → loungeId → price).
+  cityServicePrices: {},
+  // Lounges are priced per airport (airportCode → loungeId → { price, mode }).
   airportLoungePrices: {
-    RUHT: { EXECUTIVE_OFFICE: 320 },
-    LHR: { MEET_ASSIST: 180 },
+    RUHT: { EXECUTIVE_OFFICE: { price: 320, mode: "PER_PERSON" } },
+    LHR: { MEET_ASSIST: { price: 180, mode: "PER_PERSON" } },
+    // Group-priced lounge: flat 900 up to 4 travellers, then per extra block.
+    DXBT: { VIP_LOUNGE: { price: 900, mode: "GROUP", capacity: 4 } },
   },
 };
 
@@ -86,6 +87,18 @@ describe("computeStepPrice — car transfers (per-class, per-city)", () => {
     expect(
       computeStepPrice(step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "LUXURY_SUV" }), CFG).computedPrice,
     ).toBe(1200);
+  });
+
+  it("charges the same price both directions of an airport transfer", () => {
+    const toAirport = computeStepPrice(step({ stepType: "HOME_TO_RIYADH_AIRPORT", serviceType: "CAR_ONLY", carCategory: "VVIP" }), CFG);
+    const fromAirport = computeStepPrice(step({ stepType: "RIYADH_AIRPORT_TO_HOME", serviceType: "CAR_ONLY", carCategory: "VVIP" }), CFG);
+    expect(toAirport.computedPrice).toBe(500);
+    expect(fromAirport.computedPrice).toBe(500);
+
+    const inbound = computeStepPrice(step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "VIP", city: "LON" }), CFG);
+    const outbound = computeStepPrice(step({ stepType: "HOTEL_TO_AIRPORT", serviceType: "CAR_ONLY", carCategory: "VIP", city: "LON" }), CFG);
+    expect(inbound.computedPrice).toBe(700);
+    expect(outbound.computedPrice).toBe(700);
   });
 });
 
@@ -142,16 +155,29 @@ describe("computeStepPrice — chauffeur (per-class × days × usage tier)", () 
 });
 
 describe("computeStepPrice — assistance / lounge (lounge per airport)", () => {
-  it("uses the lounge's per-airport price when a lounge is chosen", () => {
+  it("uses the lounge's per-airport price when a lounge is chosen (per person, 1 pax)", () => {
     expect(
       computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", airport: "RUHT", loungeType: "EXECUTIVE_OFFICE" }), CFG).computedPrice,
     ).toBe(320);
   });
 
-  it("uses the city's service base when no lounge is chosen", () => {
+  it("multiplies a per-person lounge by the party size", () => {
+    expect(
+      computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", airport: "RUHT", loungeType: "EXECUTIVE_OFFICE", passengers: 3 }), CFG).computedPrice,
+    ).toBe(960);
+  });
+
+  it("charges a flat group price up to capacity, then per extra block", () => {
+    const one = computeStepPrice(step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", city: "DXB", airport: "DXBT", loungeType: "VIP_LOUNGE", passengers: 4 }), CFG);
+    const two = computeStepPrice(step({ stepType: "ARRIVAL_ASSIST_DESTINATION", serviceType: "MEET_ASSIST_ONLY", city: "DXB", airport: "DXBT", loungeType: "VIP_LOUNGE", passengers: 5 }), CFG);
+    expect(one.computedPrice).toBe(900); // 4 ≤ capacity → one flat price
+    expect(two.computedPrice).toBe(1800); // 5 > capacity(4) → two blocks
+  });
+
+  it("is 0 when no lounge is chosen (airport services are lounge-priced only)", () => {
     expect(
       computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY" }), CFG).computedPrice,
-    ).toBe(320);
+    ).toBe(0);
   });
 
   it("prices the lounge from the chosen airport", () => {
@@ -160,7 +186,7 @@ describe("computeStepPrice — assistance / lounge (lounge per airport)", () => 
     ).toBe(180);
   });
 
-  it("is 0 when the airport has no price for the chosen lounge and the city has no base", () => {
+  it("is 0 when the airport has no price for the chosen lounge", () => {
     expect(
       computeStepPrice(step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", city: "DXB", airport: "DXBT", loungeType: "EXECUTIVE_OFFICE" }), CFG).computedPrice,
     ).toBe(0);
@@ -178,7 +204,7 @@ describe("computeJourneyPricing — accumulative sum", () => {
   it("sums the selected step prices", () => {
     const steps: JourneyStepInput[] = [
       step({ stepType: "HOME_TO_RIYADH_AIRPORT", serviceType: "CAR_ONLY", carCategory: "VIP" }), // 350
-      step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", loungeType: "EXECUTIVE_OFFICE" }), // 320
+      step({ stepType: "DEPARTURE_ASSIST_RIYADH", serviceType: "MEET_ASSIST_ONLY", airport: "RUHT", loungeType: "EXECUTIVE_OFFICE" }), // 320
       step({ stepType: "AIRPORT_TO_HOTEL", serviceType: "CAR_ONLY", carCategory: "VVIP" }), // 760
     ];
     expect(computeJourneyPricing(steps, CFG).estimatedTotal).toBe(350 + 320 + 760);
