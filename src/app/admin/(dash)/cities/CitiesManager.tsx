@@ -13,6 +13,7 @@ import {
   setCityActive,
   setCityServiceClassPrice,
   setCityVehicleEnabled,
+  setCityVehicleExampleModels,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
@@ -22,7 +23,7 @@ interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number; 
 interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; active: boolean; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
-interface VehicleRow { category: string; enabled: boolean }
+interface VehicleRow { category: string; enabled: boolean; exampleModels: string | null }
 interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
@@ -33,7 +34,7 @@ interface CityRow {
 
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, landmarkKey: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
-interface VehicleOption { category: string; nameEn: string }
+interface VehicleOption { category: string; nameEn: string; exampleModels: string }
 interface LoungeOption { id: string; nameEn: string; nameAr: string; descriptionEn: string; descriptionAr: string }
 
 export function CitiesManager({ cities, vehicles, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; lounges: LoungeOption[] }) {
@@ -506,7 +507,9 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
         {locale === "ar" ? "توفّر المركبات" : "Vehicle availability"}
       </h3>
       <p className="mb-3 text-xs text-charcoal/45">
-        {locale === "ar" ? "ألغِ التفعيل لإخفاء الفئة في هذه المدينة." : "Uncheck to hide a class in this city."}
+        {locale === "ar"
+          ? "ألغِ التفعيل لإخفاء الفئة في هذه المدينة. يمكنك تخصيص أمثلة السيارات لكل مدينة؛ اتركها فارغة لاستخدام الافتراضي."
+          : "Uncheck to hide a class in this city. You can customise the example models per city — leave blank to use the class default."}
       </p>
       <div className="grid gap-2">
         {vehicles.map((v) => {
@@ -518,6 +521,8 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
               category={v.category}
               label={`${v.nameEn} (${v.category})`}
               enabled={row?.enabled ?? true}
+              exampleModels={row?.exampleModels ?? ""}
+              defaultExampleModels={v.exampleModels}
             />
           );
         })}
@@ -526,10 +531,12 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
   );
 }
 
-function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: string; category: string; label: string; enabled: boolean }) {
-  const { t, pick } = useI18n();
+function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, defaultExampleModels }: { cityCode: string; category: string; label: string; enabled: boolean; exampleModels: string; defaultExampleModels: string }) {
+  const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const router = useRouter();
   const [on, setOn] = useState(enabled);
+  const [models, setModels] = useState(exampleModels);
   const [busy, setBusy] = useState(false);
 
   async function toggle(v: boolean) {
@@ -540,13 +547,32 @@ function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: st
     router.refresh();
   }
 
+  async function saveModels() {
+    setBusy(true);
+    await setCityVehicleExampleModels(cityCode, category, models.trim() === "" ? null : models);
+    setBusy(false);
+    router.refresh();
+  }
+
   return (
-    <div className="flex items-center justify-between rounded-lg border border-charcoal/10 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
-      <label className="flex items-center gap-1 text-xs text-charcoal/60">
-        <input type="checkbox" disabled={busy} className="h-4 w-4 accent-gold" checked={on} onChange={(e) => toggle(e.target.checked)} />
-        {pick(t.cities.enabled)}
-      </label>
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
+        <label className="flex items-center gap-1 text-xs text-charcoal/60">
+          <input type="checkbox" disabled={busy} className="h-4 w-4 accent-gold" checked={on} onChange={(e) => toggle(e.target.checked)} />
+          {pick(t.cities.enabled)}
+        </label>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          value={models}
+          onChange={(e) => setModels(e.target.value)}
+          placeholder={defaultExampleModels || (ar ? "أمثلة السيارات" : "example models")}
+          title={ar ? "أمثلة السيارات لهذه المدينة (فارغ = الافتراضي)" : "Example models for this city (blank = default)"}
+          className="min-w-0 flex-1 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+        />
+        <button onClick={saveModels} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+      </div>
     </div>
   );
 }

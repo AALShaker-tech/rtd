@@ -15,7 +15,7 @@ export default async function CitiesPage() {
   return (
     <CitiesManager
       cities={serialize(cities)}
-      vehicles={vehicles.map((v) => ({ category: v.category, nameEn: v.nameEn }))}
+      vehicles={vehicles.map((v) => ({ category: v.category, nameEn: v.nameEn, exampleModels: v.exampleModels }))}
       lounges={lounges.map((l) => ({ id: l.id, nameEn: l.nameEn, nameAr: l.nameAr, descriptionEn: l.descriptionEn, descriptionAr: l.descriptionAr }))}
     />
   );

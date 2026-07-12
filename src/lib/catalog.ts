@@ -44,6 +44,9 @@ export interface CatalogCity {
   disabledSteps: string[];
   /** Vehicle categories disabled for this city. */
   disabledVehicles: string[];
+  /** Per-city override of a vehicle class's example-models text (category → text).
+   *  Absent categories fall back to the class's global exampleModels. */
+  vehicleExampleModels: Record<string, string>;
 }
 
 export interface Catalog {
@@ -62,6 +65,7 @@ export const FALLBACK_CATALOG: Catalog = {
     airports: c.airports.map((a) => ({ code: a.code, nameEn: a.name.en, nameAr: a.name.ar, terminals: a.terminals, lounges: [] })),
     disabledSteps: [],
     disabledVehicles: [],
+    vehicleExampleModels: {},
   })),
 };
 
