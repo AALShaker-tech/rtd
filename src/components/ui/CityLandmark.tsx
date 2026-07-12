@@ -23,13 +23,17 @@ const ART: Record<string, ReactNode> = {
   ),
   "eiffel-tower": (
     <>
-      <path d="M12 2v3" />
-      <path d="M9.5 5h5" />
-      <path d="M9.5 5 4 21" />
-      <path d="M14.5 5 20 21" />
-      <path d="M8 12h8" />
-      <path d="M6 17h12" />
-      <path d="M3.5 21h17" />
+      <path d="M12 2.5v2.5" />
+      {/* Curved, flaring legs — the tower's signature silhouette */}
+      <path d="M11.2 5C10.5 9 9 13 7.7 15.5" />
+      <path d="M12.8 5c.7 4 2.2 8 3.5 10.5" />
+      <path d="M7.7 15.5C6.5 18 5 20 4 21" />
+      <path d="M16.3 15.5c1.2 2.5 2.7 4.5 3.7 5.5" />
+      <path d="M10.3 9h3.4" />
+      <path d="M8.4 13.5h7.2" />
+      <path d="M12 5v10.5" />
+      <path d="M8 21q4-5 8 0" />
+      <path d="M4 21h16" />
     </>
   ),
   "burj-khalifa": (
