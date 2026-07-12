@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import { CityLandmark, LANDMARK_PRESETS } from "@/components/ui/CityLandmark";
+import { PRICE_KEY_LABELS } from "@/lib/domain";
 import {
   deleteCity,
   setCityActive,
-  setCityServicePrice,
   setCityServiceClassPrice,
   setCityVehicleEnabled,
   upsertAirport,
@@ -16,7 +16,7 @@ import {
 } from "@/server/actions/city.actions";
 import { setAirportLounge } from "@/server/actions/lounge.actions";
 
-interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number }
+interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number; priceMode: "PER_PERSON" | "GROUP"; groupCapacity: number | null }
 interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
@@ -32,10 +32,9 @@ interface CityRow {
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, landmarkKey: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
 interface VehicleOption { category: string; nameEn: string }
-interface StepOption { code: string; nameEn: string; nameAr: string; isCar: boolean }
-interface LoungeOption { id: string; nameEn: string; nameAr: string }
+interface LoungeOption { id: string; nameEn: string; nameAr: string; descriptionEn: string; descriptionAr: string }
 
-export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[] }) {
+export function CitiesManager({ cities, vehicles, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; lounges: LoungeOption[] }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(cities[0]?.code ?? null);
@@ -74,7 +73,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} onDeleted={() => { setSelected(null); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} onDeleted={() => { setSelected(null); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -84,7 +83,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
   );
 }
 
-function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void; onDeleted: () => void }) {
+function CityEditor({ city, vehicles, lounges, isNew, onSaved, onDeleted }: { city: CityRow; vehicles: VehicleOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void; onDeleted: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -204,7 +203,7 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted 
       ) : (
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} lounges={lounges} />
-          <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} steps={steps} />
+          <ServicePrices cityCode={city.code} isOrigin={city.isOrigin} classRows={city.serviceClassPricing} vehicles={vehicles} />
           <VehicleAvailability cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
         </>
       )}
@@ -265,39 +264,39 @@ function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airp
   );
 }
 
-function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCode: string; rows: ServiceRow[]; classRows: ClassPriceRow[]; vehicles: VehicleOption[]; steps: StepOption[] }) {
+/**
+ * Per-city transfer & chauffeur pricing. Prices are city-owned and keyed by a
+ * pricing key (not a directional step), so a transfer price is entered once and
+ * applies both directions. Airport-assistance is NOT here — it is priced per
+ * airport in the Airports section (each lounge/service carries its own price).
+ *
+ *   Origin city (Riyadh): Home ⇄ Airport transfer.
+ *   Destination city:      Airport ⇄ Hotel transfer + Chauffeur during stay.
+ */
+function ServicePrices({ cityCode, isOrigin, classRows, vehicles }: { cityCode: string; isOrigin: boolean; classRows: ClassPriceRow[]; vehicles: VehicleOption[] }) {
   const { t, pick, locale } = useI18n();
+  const keys = isOrigin
+    ? ["HOME_AIRPORT_TRANSFER"]
+    : ["AIRPORT_HOTEL_TRANSFER", "CHAUFFEUR_DURING_STAY"];
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.cities.servicePrices)}</h3>
-      <p className="mb-3 text-xs text-charcoal/45">{pick(t.cities.overrideHint)}</p>
+      <p className="mb-3 text-xs text-charcoal/45">
+        {locale === "ar"
+          ? "أسعار التوصيل خاصة بهذه المدينة وتُطبَّق في الاتجاهين. خدمات المطار تُسعَّر ضمن قسم المطارات."
+          : "Transfer prices are per city and apply both directions. Airport services are priced in the Airports section."}
+      </p>
       <div className="grid gap-2">
-        {steps.map((s) => {
-          const label = locale === "ar" ? s.nameAr : s.nameEn;
-          if (s.isCar) {
-            return (
-              <CityClassPrices
-                key={s.code}
-                label={label}
-                cityCode={cityCode}
-                stepType={s.code}
-                vehicles={vehicles}
-                rows={classRows.filter((r) => r.stepType === s.code)}
-              />
-            );
-          }
-          const row = rows.find((r) => r.stepType === s.code);
-          return (
-            <PriceRow
-              key={s.code}
-              label={label}
-              price={row?.price ?? null}
-              // Price is the single control — a set price offers the service and
-              // (re)enables it; a blank price hides it (enabled follows price).
-              onSave={(price) => setCityServicePrice(cityCode, s.code, price, price != null)}
-            />
-          );
-        })}
+        {keys.map((key) => (
+          <CityClassPrices
+            key={key}
+            label={PRICE_KEY_LABELS[key] ? pick(PRICE_KEY_LABELS[key]) : key}
+            cityCode={cityCode}
+            stepType={key}
+            vehicles={vehicles}
+            rows={classRows.filter((r) => r.stepType === key)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -320,8 +319,11 @@ function AirportLounges({ airport, lounges }: { airport: AirportRow; lounges: Lo
               airportCode={airport.code}
               loungeId={l.id}
               label={ar ? l.nameAr : l.nameEn}
+              description={ar ? l.descriptionAr : l.descriptionEn}
               enabled={row?.enabled ?? false}
               price={row?.price ?? 0}
+              priceMode={row?.priceMode ?? "PER_PERSON"}
+              groupCapacity={row?.groupCapacity ?? null}
             />
           );
         })}
@@ -330,32 +332,65 @@ function AirportLounges({ airport, lounges }: { airport: AirportRow; lounges: Lo
   );
 }
 
-function AirportLoungeRowEditor({ airportCode, loungeId, label, enabled, price }: { airportCode: string; loungeId: string; label: string; enabled: boolean; price: number }) {
+function AirportLoungeRowEditor({ airportCode, loungeId, label, description, enabled, price, priceMode, groupCapacity }: { airportCode: string; loungeId: string; label: string; description: string; enabled: boolean; price: number; priceMode: "PER_PERSON" | "GROUP"; groupCapacity: number | null }) {
   const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [val, setVal] = useState(String(price));
+  const [mode, setMode] = useState<"PER_PERSON" | "GROUP">(priceMode);
+  const [cap, setCap] = useState(groupCapacity != null ? String(groupCapacity) : "");
   const [busy, setBusy] = useState(false);
 
   async function save(nextOn: boolean) {
     setBusy(true);
-    await setAirportLounge({ airportCode, loungeId, enabled: nextOn, price: parseInt(val) || 0 });
+    await setAirportLounge({
+      airportCode,
+      loungeId,
+      enabled: nextOn,
+      price: parseInt(val) || 0,
+      priceMode: mode,
+      groupCapacity: mode === "GROUP" && cap.trim() !== "" ? parseInt(cap) || null : null,
+    });
     setBusy(false);
     router.refresh();
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-charcoal/80">
-        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => { setOn(e.target.checked); }} />
-        <span className="truncate">{label}</span>
-      </label>
-      <input
-        type="number" min={0} step={10} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder={locale === "ar" ? "السعر" : "price"}
-        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
-      />
-      <button onClick={() => save(on)} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-charcoal/80">
+          <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => { setOn(e.target.checked); }} />
+          <span className="truncate">{label}</span>
+        </label>
+        {/* Per-person multiplies by party size; group is a flat total. */}
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "PER_PERSON" | "GROUP")}
+          className="rounded-lg border border-charcoal/15 px-2 py-1 text-xs"
+          title={ar ? "طريقة التسعير" : "Pricing mode"}
+        >
+          <option value="PER_PERSON">{ar ? "للفرد" : "Per person"}</option>
+          <option value="GROUP">{ar ? "للمجموعة" : "Group"}</option>
+        </select>
+        {mode === "GROUP" && (
+          <input
+            type="number" min={1} value={cap} onChange={(e) => setCap(e.target.value)}
+            placeholder={ar ? "السعة" : "capacity"}
+            title={ar ? "عدد الأفراد الذين يشملهم السعر الثابت (اتركه فارغًا لغير محدود)" : "Travellers one flat price covers (blank = unlimited)"}
+            className="w-20 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+          />
+        )}
+        <input
+          type="number" min={0} step={10} value={val} onChange={(e) => setVal(e.target.value)}
+          placeholder={ar ? "السعر" : "price"}
+          className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+        />
+        <button onClick={() => save(on)} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+      </div>
+      {description.trim() !== "" && (
+        <p className="mt-1 text-xs text-charcoal/45">{description}</p>
+      )}
     </div>
   );
 }
@@ -371,34 +406,6 @@ function OfferedPill({ offered }: { offered: boolean }) {
   );
 }
 
-function PriceRow({ label, price, onSave }: { label: string; price: number | null; onSave: (price: number | null) => Promise<unknown> }) {
-  const { t, pick } = useI18n();
-  const router = useRouter();
-  const [val, setVal] = useState(price != null ? String(price) : "");
-  const [busy, setBusy] = useState(false);
-  const offered = val.trim() !== "" && Number(val) > 0;
-
-  async function save() {
-    setBusy(true);
-    await onSave(val.trim() === "" ? null : parseInt(val) || 0);
-    setBusy(false);
-    router.refresh();
-  }
-
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-charcoal/10 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
-      <OfferedPill offered={offered} />
-      <input
-        type="number" min={0} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder="—"
-        title={pick(t.cities.blankHides)}
-        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
-      />
-      <button onClick={save} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
-    </div>
-  );
-}
 
 /** Per-city per-class price overrides for one car service. Blank = use global. */
 function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label: string; cityCode: string; stepType: string; vehicles: VehicleOption[]; rows: ClassPriceRow[] }) {
