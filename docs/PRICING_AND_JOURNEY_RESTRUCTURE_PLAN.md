@@ -1,10 +1,28 @@
 # Journey-Steps & City-Pricing Restructure — Review + Implementation Plan
 
-_Status: proposal for approval. No production code changed yet._
 _Source: `prep_users.docx` (client brief, Riyadh pricing screenshots) + review of the current codebase._
 
 This document reviews the client brief against the current implementation, records the
 decisions already agreed, and lays out a concrete, staged implementation plan.
+
+## Implementation status (updated)
+
+| Stage | Scope | Status |
+|---|---|---|
+| 1 | `AirportLounge` per-person/group pricing mode (schema + migration) | ✅ done |
+| 2–3 | City-owned pricing key + engine (both-directions transfers, lounge modes) | ✅ done |
+| 5 | Cities admin UI: dedup transfers, lounge mode/capacity/brief | ✅ done |
+| 4 | Customer-facing Departure/Arrival grouping with dynamic city names | ⬜ remaining (cosmetic; price presentation already unchanged) |
+| 6 | Seed / i18n polish | ◻ partial (seed done; i18n copy uses inline fallbacks) |
+
+**Design refinement vs. the original Stage 2 wording.** Rather than literally
+collapsing the 9 step *codes* to 5 (which would then re-expand into ~9 visible legs
+and disturb the return mirror, driver tasks and validation), pricing is *separated
+from* the steps via a city-owned **pricing key** (`stepPriceKey` in `src/lib/domain.ts`).
+The 9 customer-visible legs stay; multiple legs share one key, so a transfer price is
+entered once per city and applies both directions. This satisfies the brief's
+"separate the journey steps from the pricing" with a much smaller blast radius. The
+customer page count and price presentation are unchanged.
 
 ---
 
