@@ -5,22 +5,25 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FieldWrap, TextInput, Select } from "@/components/ui/Field";
 import { CityLandmark, LANDMARK_PRESETS } from "@/components/ui/CityLandmark";
+import { PRICE_KEY_LABELS } from "@/lib/domain";
 import {
+  deleteAirport,
   deleteCity,
+  setAirportActive,
   setCityActive,
-  setCityServicePrice,
   setCityServiceClassPrice,
   setCityVehicleEnabled,
+  setCityVehicleExampleModels,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
 import { setAirportLounge } from "@/server/actions/lounge.actions";
 
-interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number }
-interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; lounges: AirportLoungeRow[] }
+interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number; priceMode: "PER_PERSON" | "GROUP"; groupCapacity: number | null }
+interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; active: boolean; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
-interface VehicleRow { category: string; enabled: boolean }
+interface VehicleRow { category: string; enabled: boolean; exampleModels: string | null }
 interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
@@ -31,11 +34,10 @@ interface CityRow {
 
 const EMPTY: CityRow = { code: "", nameEn: "", nameAr: "", country: "", active: true, isOrigin: false, multiplier: 1, currency: null, approxDurationMinutes: null, notes: null, landmarkKey: null, airports: [], servicePricing: [], loungePricing: [], vehiclePricing: [], serviceClassPricing: [] };
 
-interface VehicleOption { category: string; nameEn: string }
-interface StepOption { code: string; nameEn: string; nameAr: string; isCar: boolean }
-interface LoungeOption { id: string; nameEn: string; nameAr: string }
+interface VehicleOption { category: string; nameEn: string; exampleModels: string }
+interface LoungeOption { id: string; nameEn: string; nameAr: string; descriptionEn: string; descriptionAr: string }
 
-export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[] }) {
+export function CitiesManager({ cities, vehicles, lounges }: { cities: CityRow[]; vehicles: VehicleOption[]; lounges: LoungeOption[] }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(cities[0]?.code ?? null);
@@ -74,7 +76,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
         {/* Editor */}
         <div>
           {city ? (
-            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} steps={steps} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} onDeleted={() => { setSelected(null); router.refresh(); }} />
+            <CityEditor key={adding ? "__new" : city.code} city={city} vehicles={vehicles} lounges={lounges} isNew={adding} onSaved={() => { setAdding(false); router.refresh(); }} onDeleted={() => { setSelected(null); router.refresh(); }} />
           ) : (
             <div className="luxe-card p-10 text-center text-sm text-charcoal/40">{pick(t.cities.selectCity)}</div>
           )}
@@ -84,7 +86,7 @@ export function CitiesManager({ cities, vehicles, steps, lounges }: { cities: Ci
   );
 }
 
-function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted }: { city: CityRow; vehicles: VehicleOption[]; steps: StepOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void; onDeleted: () => void }) {
+function CityEditor({ city, vehicles, lounges, isNew, onSaved, onDeleted }: { city: CityRow; vehicles: VehicleOption[]; lounges: LoungeOption[]; isNew: boolean; onSaved: () => void; onDeleted: () => void }) {
   const { t, pick, locale } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -204,7 +206,7 @@ function CityEditor({ city, vehicles, steps, lounges, isNew, onSaved, onDeleted 
       ) : (
         <>
           <AirportEditor cityCode={city.code} airports={city.airports} lounges={lounges} />
-          <ServicePrices cityCode={city.code} rows={city.servicePricing} classRows={city.serviceClassPricing} vehicles={vehicles} steps={steps} />
+          <ServicePrices cityCode={city.code} isOrigin={city.isOrigin} classRows={city.serviceClassPricing} vehicles={vehicles} />
           <VehicleAvailability cityCode={city.code} rows={city.vehiclePricing} vehicles={vehicles} />
         </>
       )}
@@ -233,9 +235,9 @@ function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airp
   return (
     <div className="luxe-card p-5">
       <h3 className="mb-4 font-serif text-lg font-semibold text-charcoal">{pick(t.cities.airports)}</h3>
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 space-y-1.5">
         {airports.map((a) => (
-          <button key={a.code} onClick={() => edit(a)} className="badge bg-charcoal/5 text-charcoal/70 hover:bg-gold-50">{a.code} · {a.nameEn}</button>
+          <AirportListRow key={a.code} airport={a} onEdit={() => edit(a)} />
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -265,39 +267,81 @@ function AirportEditor({ cityCode, airports, lounges }: { cityCode: string; airp
   );
 }
 
-function ServicePrices({ cityCode, rows, classRows, vehicles, steps }: { cityCode: string; rows: ServiceRow[]; classRows: ClassPriceRow[]; vehicles: VehicleOption[]; steps: StepOption[] }) {
+/** One airport in the list: edit, enable/disable, or delete it. */
+function AirportListRow({ airport, onEdit }: { airport: AirportRow; onEdit: () => void }) {
+  const { locale } = useI18n();
+  const router = useRouter();
+  const ar = locale === "ar";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    setBusy(true); setError(null);
+    await setAirportActive(airport.code, !airport.active);
+    setBusy(false);
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!confirm(ar ? `حذف المطار ${airport.code}؟` : `Delete airport ${airport.code}?`)) return;
+    setBusy(true); setError(null);
+    const res = await deleteAirport(airport.code);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    router.refresh();
+  }
+
+  return (
+    <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${airport.active ? "border-charcoal/10" : "border-charcoal/10 bg-charcoal/[0.03]"}`}>
+      <button onClick={onEdit} className="min-w-0 flex-1 text-start text-sm text-charcoal/80 hover:text-gold-dark">
+        <span className="font-medium">{airport.code}</span>
+        <span className="ms-2 text-charcoal/50">{ar ? airport.nameAr : airport.nameEn}</span>
+      </button>
+      {!airport.active && <span className="badge bg-charcoal/10 text-charcoal/50">{ar ? "معطّل" : "Disabled"}</span>}
+      <button onClick={toggle} disabled={busy} className="btn-ghost px-2.5 py-1 text-xs">
+        {airport.active ? (ar ? "تعطيل" : "Disable") : (ar ? "تفعيل" : "Enable")}
+      </button>
+      <button onClick={remove} disabled={busy} className="btn-ghost px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
+        {ar ? "حذف" : "Delete"}
+      </button>
+      {error && <span className="w-full text-xs text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * Per-city transfer & chauffeur pricing. Prices are city-owned and keyed by a
+ * pricing key (not a directional step), so a transfer price is entered once and
+ * applies both directions. Airport-assistance is NOT here — it is priced per
+ * airport in the Airports section (each lounge/service carries its own price).
+ *
+ *   Origin city (Riyadh): Home ⇄ Airport transfer.
+ *   Destination city:      Airport ⇄ Hotel transfer + Chauffeur during stay.
+ */
+function ServicePrices({ cityCode, isOrigin, classRows, vehicles }: { cityCode: string; isOrigin: boolean; classRows: ClassPriceRow[]; vehicles: VehicleOption[] }) {
   const { t, pick, locale } = useI18n();
+  const keys = isOrigin
+    ? ["HOME_AIRPORT_TRANSFER"]
+    : ["AIRPORT_HOTEL_TRANSFER", "CHAUFFEUR_DURING_STAY"];
   return (
     <div className="luxe-card p-5">
       <h3 className="font-serif text-lg font-semibold text-charcoal">{pick(t.cities.servicePrices)}</h3>
-      <p className="mb-3 text-xs text-charcoal/45">{pick(t.cities.overrideHint)}</p>
+      <p className="mb-3 text-xs text-charcoal/45">
+        {locale === "ar"
+          ? "أسعار التوصيل خاصة بهذه المدينة وتُطبَّق في الاتجاهين. خدمات المطار تُسعَّر ضمن قسم المطارات."
+          : "Transfer prices are per city and apply both directions. Airport services are priced in the Airports section."}
+      </p>
       <div className="grid gap-2">
-        {steps.map((s) => {
-          const label = locale === "ar" ? s.nameAr : s.nameEn;
-          if (s.isCar) {
-            return (
-              <CityClassPrices
-                key={s.code}
-                label={label}
-                cityCode={cityCode}
-                stepType={s.code}
-                vehicles={vehicles}
-                rows={classRows.filter((r) => r.stepType === s.code)}
-              />
-            );
-          }
-          const row = rows.find((r) => r.stepType === s.code);
-          return (
-            <PriceRow
-              key={s.code}
-              label={label}
-              price={row?.price ?? null}
-              // Price is the single control — a set price offers the service and
-              // (re)enables it; a blank price hides it (enabled follows price).
-              onSave={(price) => setCityServicePrice(cityCode, s.code, price, price != null)}
-            />
-          );
-        })}
+        {keys.map((key) => (
+          <CityClassPrices
+            key={key}
+            label={PRICE_KEY_LABELS[key] ? pick(PRICE_KEY_LABELS[key]) : key}
+            cityCode={cityCode}
+            stepType={key}
+            vehicles={vehicles}
+            rows={classRows.filter((r) => r.stepType === key)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -320,8 +364,11 @@ function AirportLounges({ airport, lounges }: { airport: AirportRow; lounges: Lo
               airportCode={airport.code}
               loungeId={l.id}
               label={ar ? l.nameAr : l.nameEn}
+              description={ar ? l.descriptionAr : l.descriptionEn}
               enabled={row?.enabled ?? false}
               price={row?.price ?? 0}
+              priceMode={row?.priceMode ?? "PER_PERSON"}
+              groupCapacity={row?.groupCapacity ?? null}
             />
           );
         })}
@@ -330,32 +377,65 @@ function AirportLounges({ airport, lounges }: { airport: AirportRow; lounges: Lo
   );
 }
 
-function AirportLoungeRowEditor({ airportCode, loungeId, label, enabled, price }: { airportCode: string; loungeId: string; label: string; enabled: boolean; price: number }) {
+function AirportLoungeRowEditor({ airportCode, loungeId, label, description, enabled, price, priceMode, groupCapacity }: { airportCode: string; loungeId: string; label: string; description: string; enabled: boolean; price: number; priceMode: "PER_PERSON" | "GROUP"; groupCapacity: number | null }) {
   const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [val, setVal] = useState(String(price));
+  const [mode, setMode] = useState<"PER_PERSON" | "GROUP">(priceMode);
+  const [cap, setCap] = useState(groupCapacity != null ? String(groupCapacity) : "");
   const [busy, setBusy] = useState(false);
 
   async function save(nextOn: boolean) {
     setBusy(true);
-    await setAirportLounge({ airportCode, loungeId, enabled: nextOn, price: parseInt(val) || 0 });
+    await setAirportLounge({
+      airportCode,
+      loungeId,
+      enabled: nextOn,
+      price: parseInt(val) || 0,
+      priceMode: mode,
+      groupCapacity: mode === "GROUP" && cap.trim() !== "" ? parseInt(cap) || null : null,
+    });
     setBusy(false);
     router.refresh();
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-charcoal/80">
-        <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => { setOn(e.target.checked); }} />
-        <span className="truncate">{label}</span>
-      </label>
-      <input
-        type="number" min={0} step={10} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder={locale === "ar" ? "السعر" : "price"}
-        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
-      />
-      <button onClick={() => save(on)} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-charcoal/80">
+          <input type="checkbox" className="h-4 w-4 accent-gold" checked={on} onChange={(e) => { setOn(e.target.checked); }} />
+          <span className="truncate">{label}</span>
+        </label>
+        {/* Per-person multiplies by party size; group is a flat total. */}
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "PER_PERSON" | "GROUP")}
+          className="rounded-lg border border-charcoal/15 px-2 py-1 text-xs"
+          title={ar ? "طريقة التسعير" : "Pricing mode"}
+        >
+          <option value="PER_PERSON">{ar ? "للفرد" : "Per person"}</option>
+          <option value="GROUP">{ar ? "للمجموعة" : "Group"}</option>
+        </select>
+        {mode === "GROUP" && (
+          <input
+            type="number" min={1} value={cap} onChange={(e) => setCap(e.target.value)}
+            placeholder={ar ? "السعة" : "capacity"}
+            title={ar ? "عدد الأفراد الذين يشملهم السعر الثابت (اتركه فارغًا لغير محدود)" : "Travellers one flat price covers (blank = unlimited)"}
+            className="w-20 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+          />
+        )}
+        <input
+          type="number" min={0} step={10} value={val} onChange={(e) => setVal(e.target.value)}
+          placeholder={ar ? "السعر" : "price"}
+          className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+        />
+        <button onClick={() => save(on)} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+      </div>
+      {description.trim() !== "" && (
+        <p className="mt-1 text-xs text-charcoal/45">{description}</p>
+      )}
     </div>
   );
 }
@@ -371,34 +451,6 @@ function OfferedPill({ offered }: { offered: boolean }) {
   );
 }
 
-function PriceRow({ label, price, onSave }: { label: string; price: number | null; onSave: (price: number | null) => Promise<unknown> }) {
-  const { t, pick } = useI18n();
-  const router = useRouter();
-  const [val, setVal] = useState(price != null ? String(price) : "");
-  const [busy, setBusy] = useState(false);
-  const offered = val.trim() !== "" && Number(val) > 0;
-
-  async function save() {
-    setBusy(true);
-    await onSave(val.trim() === "" ? null : parseInt(val) || 0);
-    setBusy(false);
-    router.refresh();
-  }
-
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-charcoal/10 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
-      <OfferedPill offered={offered} />
-      <input
-        type="number" min={0} value={val} onChange={(e) => setVal(e.target.value)}
-        placeholder="—"
-        title={pick(t.cities.blankHides)}
-        className="w-24 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
-      />
-      <button onClick={save} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
-    </div>
-  );
-}
 
 /** Per-city per-class price overrides for one car service. Blank = use global. */
 function CityClassPrices({ label, cityCode, stepType, vehicles, rows }: { label: string; cityCode: string; stepType: string; vehicles: VehicleOption[]; rows: ClassPriceRow[] }) {
@@ -455,7 +507,9 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
         {locale === "ar" ? "توفّر المركبات" : "Vehicle availability"}
       </h3>
       <p className="mb-3 text-xs text-charcoal/45">
-        {locale === "ar" ? "ألغِ التفعيل لإخفاء الفئة في هذه المدينة." : "Uncheck to hide a class in this city."}
+        {locale === "ar"
+          ? "ألغِ التفعيل لإخفاء الفئة في هذه المدينة. يمكنك تخصيص أمثلة السيارات لكل مدينة؛ اتركها فارغة لاستخدام الافتراضي."
+          : "Uncheck to hide a class in this city. You can customise the example models per city — leave blank to use the class default."}
       </p>
       <div className="grid gap-2">
         {vehicles.map((v) => {
@@ -467,6 +521,8 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
               category={v.category}
               label={`${v.nameEn} (${v.category})`}
               enabled={row?.enabled ?? true}
+              exampleModels={row?.exampleModels ?? ""}
+              defaultExampleModels={v.exampleModels}
             />
           );
         })}
@@ -475,10 +531,12 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
   );
 }
 
-function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: string; category: string; label: string; enabled: boolean }) {
-  const { t, pick } = useI18n();
+function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, defaultExampleModels }: { cityCode: string; category: string; label: string; enabled: boolean; exampleModels: string; defaultExampleModels: string }) {
+  const { t, pick, locale } = useI18n();
+  const ar = locale === "ar";
   const router = useRouter();
   const [on, setOn] = useState(enabled);
+  const [models, setModels] = useState(exampleModels);
   const [busy, setBusy] = useState(false);
 
   async function toggle(v: boolean) {
@@ -489,13 +547,32 @@ function VehicleToggleRow({ cityCode, category, label, enabled }: { cityCode: st
     router.refresh();
   }
 
+  async function saveModels() {
+    setBusy(true);
+    await setCityVehicleExampleModels(cityCode, category, models.trim() === "" ? null : models);
+    setBusy(false);
+    router.refresh();
+  }
+
   return (
-    <div className="flex items-center justify-between rounded-lg border border-charcoal/10 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
-      <label className="flex items-center gap-1 text-xs text-charcoal/60">
-        <input type="checkbox" disabled={busy} className="h-4 w-4 accent-gold" checked={on} onChange={(e) => toggle(e.target.checked)} />
-        {pick(t.cities.enabled)}
-      </label>
+    <div className="rounded-lg border border-charcoal/10 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-charcoal/80">{label}</span>
+        <label className="flex items-center gap-1 text-xs text-charcoal/60">
+          <input type="checkbox" disabled={busy} className="h-4 w-4 accent-gold" checked={on} onChange={(e) => toggle(e.target.checked)} />
+          {pick(t.cities.enabled)}
+        </label>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          value={models}
+          onChange={(e) => setModels(e.target.value)}
+          placeholder={defaultExampleModels || (ar ? "أمثلة السيارات" : "example models")}
+          title={ar ? "أمثلة السيارات لهذه المدينة (فارغ = الافتراضي)" : "Example models for this city (blank = default)"}
+          className="min-w-0 flex-1 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+        />
+        <button onClick={saveModels} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
+      </div>
     </div>
   );
 }

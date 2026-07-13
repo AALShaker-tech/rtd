@@ -59,25 +59,30 @@ const airportLoungeSchema = z.object({
   loungeId: z.string().min(1),
   enabled: z.boolean(),
   price: z.number().int().min(0),
+  priceMode: z.enum(["PER_PERSON", "GROUP"]).default("PER_PERSON"),
+  // GROUP only: travellers one flat price covers. Null/absent = unlimited.
+  groupCapacity: z.number().int().min(1).max(50).nullable().optional(),
 });
 
-/** Enable/disable a lounge at an airport and set its per-airport price. */
+/** Enable/disable a lounge at an airport and set its per-airport price + mode. */
 export async function setAirportLounge(raw: unknown) {
   const s = await requireAdmin();
   const p = airportLoungeSchema.safeParse(raw);
   if (!p.success) return { ok: false as const, error: "Invalid data" };
-  const { airportCode, loungeId, enabled, price } = p.data;
+  const { airportCode, loungeId, enabled, price, priceMode } = p.data;
+  // Capacity only applies to GROUP pricing; clear it for per-person.
+  const groupCapacity = priceMode === "GROUP" ? p.data.groupCapacity ?? null : null;
   await prisma.airportLounge.upsert({
     where: { airportCode_loungeId: { airportCode, loungeId } },
-    update: { enabled, price },
-    create: { airportCode, loungeId, enabled, price },
+    update: { enabled, price, priceMode, groupCapacity },
+    create: { airportCode, loungeId, enabled, price, priceMode, groupCapacity },
   });
   await logAudit({
     action: "AIRPORT_LOUNGE_SET",
     entity: "AirportLounge",
     entityId: `${airportCode}:${loungeId}`,
     actorId: s.userId,
-    metadata: { enabled, price },
+    metadata: { enabled, price, priceMode, groupCapacity },
   });
   revalidatePath("/admin/cities");
   return { ok: true as const };

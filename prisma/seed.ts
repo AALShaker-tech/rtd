@@ -10,6 +10,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import {
   CITIES,
+  DEFAULT_CITY_CLASS_PRICES,
   DEFAULT_LOUNGE_PRICES,
   DEFAULT_SERVICE_PRICES,
   DEFAULT_SERVICE_CLASS_PRICES,
@@ -173,12 +174,14 @@ async function main() {
         create: { cityCode: c.code, stepType, price: basePrice },
       });
     }
-    for (const [stepType, byClass] of Object.entries(DEFAULT_SERVICE_CLASS_PRICES)) {
+    // Transfer/chauffeur prices live on the city under the pricing key, so both
+    // directions of a transfer share one price (see DEFAULT_CITY_CLASS_PRICES).
+    for (const [priceKey, byClass] of Object.entries(DEFAULT_CITY_CLASS_PRICES)) {
       for (const [category, price] of Object.entries(byClass)) {
         await prisma.cityServiceClassPrice.upsert({
-          where: { cityCode_stepType_category: { cityCode: c.code, stepType, category } },
+          where: { cityCode_stepType_category: { cityCode: c.code, stepType: priceKey, category } },
           update: {},
-          create: { cityCode: c.code, stepType, category, price },
+          create: { cityCode: c.code, stepType: priceKey, category, price },
         });
       }
     }

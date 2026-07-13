@@ -38,9 +38,13 @@ export async function getPricingConfig(): Promise<PricingConfig> {
     ((config.cityServiceClassPrices![cp.cityCode] ??= {})[cp.stepType] ??= {})[cp.category] =
       cp.price;
   }
-  // Lounge price per airport.
+  // Lounge price per airport, with its charging mode (per-person / group).
   for (const al of airportLounges) {
-    (config.airportLoungePrices![al.airportCode] ??= {})[al.loungeId] = al.price;
+    (config.airportLoungePrices![al.airportCode] ??= {})[al.loungeId] = {
+      price: al.price,
+      mode: al.priceMode,
+      capacity: al.groupCapacity,
+    };
   }
 
   return config;

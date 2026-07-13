@@ -23,13 +23,17 @@ const ART: Record<string, ReactNode> = {
   ),
   "eiffel-tower": (
     <>
-      <path d="M12 2v3" />
-      <path d="M9.5 5h5" />
-      <path d="M9.5 5 4 21" />
-      <path d="M14.5 5 20 21" />
-      <path d="M8 12h8" />
-      <path d="M6 17h12" />
-      <path d="M3.5 21h17" />
+      <path d="M12 2.5v2.5" />
+      {/* Curved, flaring legs — the tower's signature silhouette */}
+      <path d="M11.2 5C10.5 9 9 13 7.7 15.5" />
+      <path d="M12.8 5c.7 4 2.2 8 3.5 10.5" />
+      <path d="M7.7 15.5C6.5 18 5 20 4 21" />
+      <path d="M16.3 15.5c1.2 2.5 2.7 4.5 3.7 5.5" />
+      <path d="M10.3 9h3.4" />
+      <path d="M8.4 13.5h7.2" />
+      <path d="M12 5v10.5" />
+      <path d="M8 21q4-5 8 0" />
+      <path d="M4 21h16" />
     </>
   ),
   "burj-khalifa": (
@@ -134,6 +138,34 @@ const ART: Record<string, ReactNode> = {
       <path d="M8.5 21h5" />
     </>
   ),
+  // ── Beach / seaside destinations ──
+  // Beach umbrella planted in the sand
+  "beach-umbrella": (
+    <>
+      <path d="M12 4v17" />
+      <path d="M4 11a8 6 0 0 1 16 0z" />
+      <path d="M12 4c2.5 0 4 3 4 7" />
+      <path d="M12 4c-2.5 0-4 3-4 7" />
+      <path d="M9 21h6" />
+    </>
+  ),
+  // Sailboat on the water
+  sailboat: (
+    <>
+      <path d="M12 3v11" />
+      <path d="M12 5l5 9h-5z" />
+      <path d="M5 16h14l-2.5 4h-9z" />
+      <path d="M3 21q2.5-2 5 0t5 0 5 0" />
+    </>
+  ),
+  // Sun setting over the sea
+  "sea-sun": (
+    <>
+      <circle cx="12" cy="9" r="4" />
+      <path d="M2 15q2.5-2 5 0t5 0 5 0 5 0" />
+      <path d="M2 19q2.5-2 5 0t5 0 5 0 5 0" />
+    </>
+  ),
 };
 
 /** Default landmark for a city code, used when no explicit key is assigned. */
@@ -162,6 +194,9 @@ export const LANDMARK_PRESETS: { key: string; name: { en: string; ar: string } }
   { key: "monument", name: { en: "Monument", ar: "نصب تذكاري" } },
   { key: "mountains", name: { en: "Mountains", ar: "جبال" } },
   { key: "palm", name: { en: "Palm / Coast", ar: "نخلة / ساحل" } },
+  { key: "beach-umbrella", name: { en: "Beach umbrella", ar: "مظلة شاطئ" } },
+  { key: "sailboat", name: { en: "Sailboat", ar: "قارب شراعي" } },
+  { key: "sea-sun", name: { en: "Sea & sun", ar: "بحر وشمس" } },
 ];
 
 /** The generic monument fallback, used when nothing else resolves. */

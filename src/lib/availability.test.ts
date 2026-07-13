@@ -12,8 +12,9 @@ function cfg(over: Partial<PricingConfig>): PricingConfig {
 }
 
 describe("pricedVehicleClasses", () => {
-  it("returns only classes with a price > 0", () => {
-    const config = cfg({ cityServiceClassPrices: { RUH: { HOME_TO_RIYADH_AIRPORT: { ECONOMY: 0, VIP: 350, VVIP: 500 } } } });
+  it("returns only classes with a price > 0 (looked up by the step's pricing key)", () => {
+    const config = cfg({ cityServiceClassPrices: { RUH: { HOME_AIRPORT_TRANSFER: { ECONOMY: 0, VIP: 350, VVIP: 500 } } } });
+    // Queried by the directional step code, which resolves to HOME_AIRPORT_TRANSFER.
     expect(pricedVehicleClasses(config, "RUH", "HOME_TO_RIYADH_AIRPORT").sort()).toEqual(["VIP", "VVIP"]);
   });
   it("is empty when the city has no class prices", () => {
@@ -27,15 +28,15 @@ describe("hasCityPricing", () => {
     expect(hasCityPricing(cfg({ cityServiceClassPrices: {}, cityServicePrices: {} }))).toBe(false);
   });
   it("is true once any per-city price is present", () => {
-    expect(hasCityPricing(cfg({ cityServiceClassPrices: { RUH: { HOME_TO_RIYADH_AIRPORT: { VIP: 350 } } } }))).toBe(true);
-    expect(hasCityPricing(cfg({ cityServicePrices: { RUH: { DEPARTURE_ASSIST_RIYADH: 320 } } }))).toBe(true);
+    expect(hasCityPricing(cfg({ cityServiceClassPrices: { RUH: { HOME_AIRPORT_TRANSFER: { VIP: 350 } } } }))).toBe(true);
+    expect(hasCityPricing(cfg({ cityServicePrices: { RUH: { SOME_SERVICE: 320 } } }))).toBe(true);
   });
 });
 
 describe("isStepOffered", () => {
   it("car step: offered only when at least one class is priced", () => {
-    expect(isStepOffered(carDef, "RUH", cfg({ cityServiceClassPrices: { RUH: { HOME_TO_RIYADH_AIRPORT: { VIP: 350 } } } }), [])).toBe(true);
-    expect(isStepOffered(carDef, "RUH", cfg({ cityServiceClassPrices: { RUH: { HOME_TO_RIYADH_AIRPORT: { VIP: 0 } } } }), [])).toBe(false);
+    expect(isStepOffered(carDef, "RUH", cfg({ cityServiceClassPrices: { RUH: { HOME_AIRPORT_TRANSFER: { VIP: 350 } } } }), [])).toBe(true);
+    expect(isStepOffered(carDef, "RUH", cfg({ cityServiceClassPrices: { RUH: { HOME_AIRPORT_TRANSFER: { VIP: 0 } } } }), [])).toBe(false);
     expect(isStepOffered(carDef, "RUH", cfg({}), [])).toBe(false);
   });
   it("chauffeur step: offered only when a class is priced", () => {

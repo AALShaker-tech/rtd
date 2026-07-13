@@ -15,6 +15,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         // natural (seed) order → primary airport first; include each airport's
         // enabled lounges joined to the active catalog entry for name/description.
         airports: {
+          where: { active: true },
           orderBy: { id: "asc" },
           include: { lounges: { where: { enabled: true }, include: { lounge: true } } },
         },
@@ -38,6 +39,10 @@ export async function getCityCatalog(): Promise<Catalog> {
         ]),
       ];
       const disabledVehicles = c.vehiclePricing.filter((v) => !v.enabled).map((v) => v.category);
+      const vehicleExampleModels: Record<string, string> = {};
+      for (const v of c.vehiclePricing) {
+        if (v.exampleModels && v.exampleModels.trim() !== "") vehicleExampleModels[v.category] = v.exampleModels;
+      }
       return {
         code: c.code,
         nameEn: c.nameEn,
@@ -60,10 +65,13 @@ export async function getCityCatalog(): Promise<Catalog> {
               descriptionEn: al.lounge.descriptionEn,
               descriptionAr: al.lounge.descriptionAr,
               price: al.price,
+              priceMode: al.priceMode,
+              groupCapacity: al.groupCapacity,
             })),
         })),
         disabledSteps,
         disabledVehicles,
+        vehicleExampleModels,
       };
     }),
   };

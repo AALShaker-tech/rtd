@@ -74,6 +74,12 @@ enum PriceStatus {
   FINALIZED // admin confirmed a final price
 }
 
+/// How an airport lounge / assistance service is priced by its vendor.
+enum LoungePriceMode {
+  PER_PERSON // price is per traveller → total = price × passengers
+  GROUP // flat total covering a group (up to groupCapacity, if set)
+}
+
 /// Placeholder payment lifecycle (payment not implemented yet).
 enum PaymentStatus {
   UNPAID
@@ -438,6 +444,9 @@ model CityVehiclePricing {
   city       City        @relation(fields: [cityCode], references: [code], onDelete: Cascade)
   category   String // vehicle class code (see VehicleCategory.category)
   enabled    Boolean     @default(true) // false → category not offered in this city
+  // Per-city override of the vehicle class's example models text. Null/empty →
+  // fall back to VehicleCategory.exampleModels (the global default).
+  exampleModels String?
 
   @@unique([cityCode, category])
 }
@@ -453,6 +462,7 @@ model Airport {
   country  String?
   timezone String? // IANA, e.g. Asia/Riyadh
   utcOffsetMinutes Int @default(0) // offset for the schedule window (June 2026)
+  active  Boolean @default(true) // false → hidden from the customer flow
   lounges  AirportLounge[]
 }
 
@@ -478,7 +488,13 @@ model AirportLounge {
   loungeId    String
   lounge      Lounge  @relation(fields: [loungeId], references: [id], onDelete: Cascade)
   enabled     Boolean @default(true)
-  price       Int     @default(0)
+  // Per-airport price for this service. Interpreted per `priceMode`: PER_PERSON
+  // is multiplied by the passenger count; GROUP is a flat total (see groupCapacity).
+  price         Int             @default(0)
+  priceMode     LoungePriceMode @default(PER_PERSON)
+  // For GROUP pricing: the number of travellers one flat price covers. Null =
+  // unlimited (one flat price regardless of party size).
+  groupCapacity Int?
 
   @@unique([airportCode, loungeId])
 }

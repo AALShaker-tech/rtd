@@ -193,7 +193,7 @@ export const STEPS: StepDef[] = [
     type: "HOME_TO_RIYADH_AIRPORT",
     order: 1,
     cityScope: "RIYADH",
-    name: { en: "Home to Riyadh Airport", ar: "من المنزل إلى مطار الرياض" },
+    name: { en: "Chauffeur from Your Home", ar: "سائقك من بيتك" },
     shortName: { en: "Home → Riyadh Airport", ar: "المنزل ← مطار الرياض" },
     description: {
       en: "Private pick-up from your doorstep to King Khalid International Airport.",
@@ -205,7 +205,7 @@ export const STEPS: StepDef[] = [
     type: "DEPARTURE_ASSIST_RIYADH",
     order: 2,
     cityScope: "RIYADH",
-    name: { en: "Departure Assistance at Riyadh Airport", ar: "خدمة المغادرة في مطار الرياض" },
+    name: { en: "Departure Send-Off — Riyadh", ar: "توديعك في مطار الرياض" },
     shortName: { en: "Riyadh Departure Assist", ar: "مساعدة المغادرة – الرياض" },
     description: {
       en: "Executive Office or Marhaba lounge assistance at Riyadh Airport.",
@@ -217,7 +217,7 @@ export const STEPS: StepDef[] = [
     type: "ARRIVAL_ASSIST_DESTINATION",
     order: 3,
     cityScope: "DESTINATION",
-    name: { en: "Arrival Assistance at Destination", ar: "خدمة الوصول في الوجهة" },
+    name: { en: "Arrival Welcome — Destination", ar: "استقبالك في مطار الوجهة" },
     shortName: { en: "Destination Arrival Assist", ar: "مساعدة الوصول – الوجهة" },
     description: {
       en: "Meet & Assist or Fast Track on arrival in London, Paris, Dubai or Cairo.",
@@ -229,7 +229,7 @@ export const STEPS: StepDef[] = [
     type: "AIRPORT_TO_HOTEL",
     order: 4,
     cityScope: "DESTINATION",
-    name: { en: "Airport to Hotel Transfer", ar: "التوصيل من المطار إلى الفندق" },
+    name: { en: "Chauffeur to Your Hotel", ar: "سائقك إلى الفندق" },
     shortName: { en: "Airport → Hotel", ar: "المطار ← الفندق" },
     description: {
       en: "Seamless private transfer from the destination airport to your hotel.",
@@ -241,7 +241,7 @@ export const STEPS: StepDef[] = [
     type: "CHAUFFEUR_DURING_STAY",
     order: 5,
     cityScope: "DESTINATION",
-    name: { en: "Chauffeur Service During Stay", ar: "خدمة السائق الخاص أثناء الإقامة" },
+    name: { en: "Private Chauffeur During Your Stay", ar: "سائقك الخاص طوال إقامتك" },
     shortName: { en: "Chauffeur During Stay", ar: "سائق خاص أثناء الإقامة" },
     description: {
       en: "A dedicated chauffeur for your days abroad — by the day and hours you choose.",
@@ -253,7 +253,7 @@ export const STEPS: StepDef[] = [
     type: "HOTEL_TO_AIRPORT",
     order: 6,
     cityScope: "DESTINATION",
-    name: { en: "Hotel to Airport Return Transfer", ar: "التوصيل من الفندق إلى المطار للعودة" },
+    name: { en: "Chauffeur to the Airport", ar: "سائقك إلى المطار" },
     shortName: { en: "Hotel → Airport", ar: "الفندق ← المطار" },
     description: {
       en: "Private transfer from your hotel back to the airport for your return flight.",
@@ -265,7 +265,7 @@ export const STEPS: StepDef[] = [
     type: "DEPARTURE_ASSIST_RETURN",
     order: 7,
     cityScope: "DESTINATION",
-    name: { en: "Departure Assistance at Return Airport", ar: "خدمة المغادرة في مطار العودة" },
+    name: { en: "Departure Send-Off — Destination", ar: "توديعك في مطار الوجهة" },
     shortName: { en: "Return Departure Assist", ar: "مساعدة المغادرة – العودة" },
     description: {
       en: "Meet & Assist or Fast Track for your departure from the destination.",
@@ -277,7 +277,7 @@ export const STEPS: StepDef[] = [
     type: "ARRIVAL_ASSIST_RIYADH",
     order: 8,
     cityScope: "RIYADH",
-    name: { en: "Arrival Assistance at Riyadh Airport", ar: "خدمة الوصول في مطار الرياض" },
+    name: { en: "Arrival Welcome — Riyadh", ar: "استقبالك في مطار الرياض" },
     shortName: { en: "Riyadh Arrival Assist", ar: "مساعدة الوصول – الرياض" },
     description: {
       en: "Executive Office, Meet & Assist and arrival assistance back home.",
@@ -289,7 +289,7 @@ export const STEPS: StepDef[] = [
     type: "RIYADH_AIRPORT_TO_HOME",
     order: 9,
     cityScope: "RIYADH",
-    name: { en: "Riyadh Airport to Home Transfer", ar: "التوصيل من مطار الرياض إلى المنزل" },
+    name: { en: "Chauffeur to Your Home", ar: "سائقك إلى بيتك" },
     shortName: { en: "Riyadh Airport → Home", ar: "مطار الرياض ← المنزل" },
     description: {
       en: "The final leg — a private transfer from the airport to your door.",
@@ -303,6 +303,47 @@ export const STEPS: StepDef[] = [
  * (those live only in the DB / step catalog). */
 export function getStep(type: StepType): StepDef | undefined {
   return STEPS.find((s) => s.type === type);
+}
+
+/**
+ * The city-owned pricing key a step draws its price from. Journey steps are the
+ * customer-facing legs; pricing is separated from them so a price is entered
+ * once per city and applies to every leg that shares the key. In particular the
+ * two directions of an airport transfer resolve to the same key (and city), so
+ * "to airport" and "from airport" always cost the same within a city.
+ *
+ *   Home ⇄ (origin) Airport   → HOME_AIRPORT_TRANSFER   (priced on the origin city)
+ *   (destination) Airport ⇄ Hotel → AIRPORT_HOTEL_TRANSFER (priced on the destination)
+ *   Chauffeur during stay      → CHAUFFEUR_DURING_STAY   (destination only)
+ *
+ * Airport-assistance legs are NOT here: they are priced per airport from the
+ * selected lounge (see AirportLounge), never per step.
+ */
+export const STEP_PRICE_KEY: Record<string, string> = {
+  HOME_TO_RIYADH_AIRPORT: "HOME_AIRPORT_TRANSFER",
+  RIYADH_AIRPORT_TO_HOME: "HOME_AIRPORT_TRANSFER",
+  AIRPORT_TO_HOTEL: "AIRPORT_HOTEL_TRANSFER",
+  HOTEL_TO_AIRPORT: "AIRPORT_HOTEL_TRANSFER",
+  CHAUFFEUR_DURING_STAY: "CHAUFFEUR_DURING_STAY",
+};
+
+/** The three city-owned car/transfer pricing keys, in display order. */
+export const TRANSFER_PRICE_KEYS = [
+  "HOME_AIRPORT_TRANSFER",
+  "AIRPORT_HOTEL_TRANSFER",
+  "CHAUFFEUR_DURING_STAY",
+] as const;
+
+/** Bilingual labels for the pricing keys (shown on the city pricing page). */
+export const PRICE_KEY_LABELS: Record<string, Bilingual> = {
+  HOME_AIRPORT_TRANSFER: { en: "Home ⇄ Airport transfer", ar: "التوصيل بين المنزل والمطار" },
+  AIRPORT_HOTEL_TRANSFER: { en: "Airport ⇄ Hotel transfer", ar: "التوصيل بين المطار والفندق" },
+  CHAUFFEUR_DURING_STAY: { en: "Chauffeur during stay", ar: "السائق الخاص أثناء الإقامة" },
+};
+
+/** Resolve the city-owned pricing key for a step code (self if not mapped). */
+export function stepPriceKey(stepType: string): string {
+  return STEP_PRICE_KEY[stepType] ?? stepType;
 }
 
 /** Which built-in steps spawn a driver task. Admin steps use their own flag. */
@@ -550,6 +591,17 @@ export const DEFAULT_SERVICE_CLASS_PRICES: Record<string, Record<string, number>
   }
   return out;
 })();
+
+/**
+ * Default per-class prices keyed by the city-owned pricing key (see stepPriceKey).
+ * This is what a fresh database seeds into CityServiceClassPrice, so transfer
+ * prices are stored once per city and shared by both directions.
+ */
+export const DEFAULT_CITY_CLASS_PRICES: Record<string, Record<string, number>> = {
+  HOME_AIRPORT_TRANSFER: DEFAULT_SERVICE_CLASS_PRICES.HOME_TO_RIYADH_AIRPORT,
+  AIRPORT_HOTEL_TRANSFER: DEFAULT_SERVICE_CLASS_PRICES.AIRPORT_TO_HOTEL,
+  CHAUFFEUR_DURING_STAY: DEFAULT_SERVICE_CLASS_PRICES.CHAUFFEUR_DURING_STAY,
+};
 
 /** Default price per lounge / assistance option, in whole SAR. */
 export const DEFAULT_LOUNGE_PRICES: Record<string, number> = {
