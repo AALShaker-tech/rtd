@@ -11,7 +11,10 @@ export function EmployeeNav({
   children: React.ReactNode;
 }) {
   const { t, pick } = useI18n();
-  const nav = [{ href: "/employee", label: pick(t.admin.myRequests) }];
+  const nav = [
+    { href: "/employee", label: pick(t.admin.myRequests) },
+    { href: "/employee/help", label: pick(t.help.nav) },
+  ];
   return (
     <DashboardShell title={pick(t.auth.employeeTitle)} nav={nav} user={user}>
       {children}

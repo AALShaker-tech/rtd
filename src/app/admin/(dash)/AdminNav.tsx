@@ -24,6 +24,7 @@ export function AdminNav({
     // Managing admin accounts is reserved for the superadmin.
     ...(user.role === "SUPERADMIN" ? [{ href: "/admin/admins", label: pick(t.admin.admins) }] : []),
     { href: "/admin/settings", label: pick(t.admin.settings) },
+    { href: "/admin/help", label: pick(t.help.nav) },
   ];
   return (
     <DashboardShell title={pick(t.auth.adminTitle)} nav={nav} user={user}>
