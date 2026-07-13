@@ -594,6 +594,27 @@ export const dict = {
     updateStatus: { en: "Update status", ar: "تحديث الحالة" },
     driverNotes: { en: "Driver notes", ar: "ملاحظات السائق" },
   },
+  help: {
+    nav: { en: "Help", ar: "المساعدة" },
+    title: { en: "Help Center", ar: "مركز المساعدة" },
+    subtitle: {
+      en: "Guides for using RTD — written for your role.",
+      ar: "أدلّة لاستخدام RTD — مكتوبة لدورك.",
+    },
+    searchPlaceholder: { en: "Search topics…", ar: "ابحث في المواضيع…" },
+    noResults: { en: "No topics match your search.", ar: "لا توجد مواضيع تطابق بحثك." },
+    empty: { en: "No help topics are available yet.", ar: "لا توجد مواضيع مساعدة متاحة بعد." },
+    backToTopics: { en: "All topics", ar: "كل المواضيع" },
+    notFound: {
+      en: "This help topic wasn't found, or isn't available for your role.",
+      ar: "لم يُعثر على هذا الموضوع، أو أنه غير متاح لدورك.",
+    },
+    readMore: { en: "Open", ar: "فتح" },
+    imagePending: {
+      en: "Screenshot coming soon",
+      ar: "لقطة الشاشة قريبًا",
+    },
+  },
 } as const;
 
 type Dict = typeof dict;

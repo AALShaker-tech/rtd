@@ -38,7 +38,11 @@ export function DashboardShell({
         <p className="mt-1 text-[0.65rem] uppercase tracking-widest text-gold-light/60">{title}</p>
       </div>
       {nav.map((n) => {
-        const active = pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href));
+        // A dashboard root (single path segment, e.g. "/admin", "/employee",
+        // "/driver") is a prefix of every page under it, so it only counts as
+        // active on an exact match; deeper items match their sub-routes too.
+        const isRoot = /^\/[^/]+$/.test(n.href);
+        const active = pathname === n.href || (!isRoot && pathname.startsWith(n.href));
         return (
           <Link
             key={n.href}
