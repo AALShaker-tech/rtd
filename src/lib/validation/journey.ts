@@ -254,9 +254,8 @@ export function validateStep(
       issue("warning", "Add your hotel so we can plan the transfer.", "أضف اسم فندقك لنتمكن من تخطيط التوصيل.", "hotelName"),
     );
   }
-  if (f.transfer && hasCar && def?.cityScope === "DESTINATION" && !step.airport) {
-    warnings.push(issue("warning", "Select the airport for this transfer.", "اختر المطار لهذا التوصيل.", "airport"));
-  }
+  // No airport-selection prompt: each city currently has a single airport, which
+  // the builder auto-selects, so asking the customer to pick one adds no value.
 
   return { stepType: step.stepType, errors, warnings };
 }
