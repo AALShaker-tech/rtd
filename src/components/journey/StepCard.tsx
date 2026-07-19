@@ -16,6 +16,7 @@ import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
 import { validateStep, validateVehicleCapacity, totalVehicleCapacity } from "@/lib/validation/journey";
 import { PeopleIcon, LuggageIcon } from "@/components/ui/Glyphs";
+import { Modal } from "@/components/ui/Modal";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
 import type { CarCategory } from "@/lib/domain";
@@ -82,6 +83,33 @@ export function StepCard({
         step.carCategory ? capacityByCategory[step.carCategory] : undefined,
       )
     : null;
+
+  // ── Excess-luggage modal ──────────────────────────────────────────────────
+  // Advisory popup shown when the customer's luggage exceeds the selected
+  // vehicle class's configured luggage capacity (per city). It never changes the
+  // selection, alters pricing/validation, or blocks the booking — the customer
+  // may continue with the current vehicle.
+  const vehiclePickerRef = useRef<HTMLDivElement>(null);
+  const selVehMaxBags = selVeh != null ? maxBagsByCat[selVeh] : undefined;
+  const bagsOverCapacity =
+    f.transfer && hasCar && selVehMaxBags != null && step.bags != null && step.bags > selVehMaxBags;
+  // Identifies the current violating (vehicle, bags) combination, so the modal
+  // shows once per distinct situation and reappears if either value changes.
+  const luggageKey = bagsOverCapacity ? `${selVeh}:${step.bags}` : null;
+  const [luggageModalOpen, setLuggageModalOpen] = useState(false);
+  const [luggageAckKey, setLuggageAckKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (luggageKey && luggageKey !== luggageAckKey) setLuggageModalOpen(true);
+    else if (!luggageKey) setLuggageModalOpen(false);
+  }, [luggageKey, luggageAckKey]);
+  const dismissLuggageModal = () => {
+    setLuggageAckKey(luggageKey);
+    setLuggageModalOpen(false);
+  };
+  const changeVehicleFromModal = () => {
+    dismissLuggageModal();
+    vehiclePickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   // Single source of truth for the price of any option/state. Force `skipped:false`
   // so prices are visible while the customer is still deciding (the step starts
@@ -157,7 +185,7 @@ export function StepCard({
 
       {/* Vehicle picker */}
       {((f.transfer && hasCar) || f.chauffeur) && (
-        <div className="grid gap-2.5">
+        <div ref={vehiclePickerRef} className="grid gap-2.5">
           <p className="text-sm font-medium text-charcoal/70">{pick(t.builder.chooseCar)}</p>
           <div className="grid gap-2.5 sm:grid-cols-3">
             {cityVehicles.map((v) => {
@@ -338,15 +366,45 @@ export function StepCard({
         </p>
       )}
 
-      {/* Other validation */}
-      {(result.errors.filter((e) => e.field !== "passengers").length > 0 || result.warnings.length > 0) && (
-        <div className="grid gap-1.5">
-          {[...result.errors.filter((e) => e.field !== "passengers"), ...result.warnings].map((iss, i) => (
-            <p key={i} className={`rounded-xl px-3 py-2 text-xs ${iss.severity === "error" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>
-              {ar ? iss.messageAr : iss.messageEn}
-            </p>
-          ))}
-        </div>
+      {/* Other validation. The luggage ("bags") warning is presented as a modal
+          popup instead of inline here — see the excess-luggage modal below. */}
+      {(() => {
+        const otherErrors = result.errors.filter((e) => e.field !== "passengers");
+        const otherWarnings = result.warnings.filter((w) => w.field !== "bags");
+        if (otherErrors.length === 0 && otherWarnings.length === 0) return null;
+        return (
+          <div className="grid gap-1.5">
+            {[...otherErrors, ...otherWarnings].map((iss, i) => (
+              <p key={i} className={`rounded-xl px-3 py-2 text-xs ${iss.severity === "error" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>
+                {ar ? iss.messageAr : iss.messageEn}
+              </p>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Excess-luggage modal — bags exceed the selected vehicle's capacity. */}
+      {luggageModalOpen && (
+        <Modal
+          title={pick(t.builder.luggageModalTitle)}
+          onClose={dismissLuggageModal}
+          describedById={`luggage-modal-desc-${step.stepType}`}
+          footer={
+            <>
+              <button onClick={dismissLuggageModal} className="btn-ghost">{pick(t.builder.luggageModalContinueAnyway)}</button>
+              <button onClick={changeVehicleFromModal} className="btn-gold">{pick(t.builder.luggageModalChangeVehicle)}</button>
+            </>
+          }
+        >
+          <div id={`luggage-modal-desc-${step.stepType}`} className="space-y-3 text-sm text-charcoal/75">
+            <p>{pick(t.builder.luggageModalMessage)}</p>
+            <p className="font-medium text-charcoal">{pick(t.builder.luggageModalChoose)}</p>
+            <ul className="list-disc space-y-1.5 ps-5">
+              <li>{pick(t.builder.luggageModalOptionChange)}</li>
+              <li>{pick(t.builder.luggageModalOptionContinue)}</li>
+            </ul>
+          </div>
+        </Modal>
       )}
     </div>
   );

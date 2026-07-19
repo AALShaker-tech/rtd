@@ -209,6 +209,24 @@ export const dict = {
     },
     capacityOk: { en: "Seats everyone", ar: "تتّسع للجميع" },
     vehicleSeats: { en: "seats", ar: "مقاعد" },
+
+    // ── Excess-luggage modal (shown when bags exceed the vehicle's capacity) ──
+    luggageModalTitle: { en: "Excess Luggage Capacity", ar: "تجاوز سعة الحقائب" },
+    luggageModalMessage: {
+      en: "The number of luggage items exceeds the capacity of the selected vehicle category.",
+      ar: "عدد الحقائب يتجاوز سعة فئة السيارة المختارة.",
+    },
+    luggageModalChoose: { en: "Please choose one of the following:", ar: "الرجاء اختيار أحد الخيارات التالية:" },
+    luggageModalOptionChange: {
+      en: "Change to a more suitable vehicle category.",
+      ar: "التغيير إلى فئة سيارة أنسب.",
+    },
+    luggageModalOptionContinue: {
+      en: "Continue with the current vehicle category. Additional charges may apply, and the final cost will be confirmed by our booking team when they contact you.",
+      ar: "المتابعة بفئة السيارة الحالية. قد تُطبَّق رسوم إضافية، وسيؤكّد فريق الحجز التكلفة النهائية عند التواصل معك.",
+    },
+    luggageModalChangeVehicle: { en: "Change Vehicle", ar: "تغيير السيارة" },
+    luggageModalContinueAnyway: { en: "Continue Anyway", ar: "المتابعة على أي حال" },
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
