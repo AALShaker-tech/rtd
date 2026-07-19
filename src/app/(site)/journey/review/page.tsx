@@ -16,6 +16,7 @@ import { submitJourney } from "@/server/actions/request.actions";
 import { COUNTRY_CODES } from "@/lib/phone";
 import { logger } from "@/lib/logger";
 import { cn, formatDateOnly, formatDateTime } from "@/lib/utils";
+import { LuggageIcon } from "@/components/ui/Glyphs";
 
 export default function ReviewPage() {
   const { t, pick, locale } = useI18n();
@@ -185,6 +186,7 @@ export default function ReviewPage() {
             const disabledForCity = catalog.city(step.city)?.disabledVehicles ?? [];
             const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
             const stepVehicles = vehicles.filter((v) => !disabledForCity.includes(v.category) && (!priceKnown || priced.has(v.category)));
+            const stepMaxBags = catalog.city(step.city)?.vehicleMaxBags ?? {};
             const stepAirports = catalog.city(step.city)?.airports ?? [];
             const stepAirport = step.airport ?? (stepAirports.length === 1 ? stepAirports[0].code : undefined);
             const stepLounges = (stepAirport ? catalog.airportLounges(stepAirport) : []).filter((l) => !priceKnown || l.price > 0);
@@ -221,8 +223,11 @@ export default function ReviewPage() {
                       const cat = v.category as typeof step.carCategory;
                       const sel = (step.carCategory ?? defaultVehicleCategory(stepVehicles)) === v.category;
                       return (
-                        <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill ${sel ? "pill-on" : ""}`}>
+                        <button key={v.category} onClick={() => update({ carCategory: cat })} className={`pill inline-flex items-center gap-1 ${sel ? "pill-on" : ""}`}>
                           {vehicleName(v, locale)} · {formatPrice(computeStepPrice({ ...step, carCategory: cat, additionalVehicles: [] }, config).computedPrice, locale)}
+                          {stepMaxBags[v.category] != null && (
+                            <span className="inline-flex items-center gap-0.5 text-charcoal/45" title={pick(t.fields.bags)}>· <LuggageIcon size={11} /> {ar ? `حتى ${stepMaxBags[v.category]}` : `up to ${stepMaxBags[v.category]}`}</span>
+                          )}
                         </button>
                       );
                     })}

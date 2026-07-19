@@ -209,6 +209,24 @@ export const dict = {
     },
     capacityOk: { en: "Seats everyone", ar: "تتّسع للجميع" },
     vehicleSeats: { en: "seats", ar: "مقاعد" },
+
+    // ── Excess-luggage modal (shown when bags exceed the vehicle's capacity) ──
+    luggageModalTitle: { en: "Excess Luggage Capacity", ar: "تجاوز سعة الحقائب" },
+    luggageModalMessage: {
+      en: "The number of luggage items exceeds the capacity of the selected vehicle category.",
+      ar: "عدد الحقائب يتجاوز سعة فئة السيارة المختارة.",
+    },
+    luggageModalChoose: { en: "Please choose one of the following:", ar: "الرجاء اختيار أحد الخيارات التالية:" },
+    luggageModalOptionChange: {
+      en: "Change to a more suitable vehicle category.",
+      ar: "التغيير إلى فئة سيارة أنسب.",
+    },
+    luggageModalOptionContinue: {
+      en: "Continue with the current vehicle category. Additional charges may apply, and the final cost will be confirmed by our booking team when they contact you.",
+      ar: "المتابعة بفئة السيارة الحالية. قد تُطبَّق رسوم إضافية، وسيؤكّد فريق الحجز التكلفة النهائية عند التواصل معك.",
+    },
+    luggageModalChangeVehicle: { en: "Change Vehicle", ar: "تغيير السيارة" },
+    luggageModalContinueAnyway: { en: "Continue Anyway", ar: "المتابعة على أي حال" },
   },
   cities: {
     title: { en: "Cities & Pricing", ar: "المدن والأسعار" },
@@ -593,6 +611,27 @@ export const dict = {
     myTasks: { en: "My tasks", ar: "مهامي" },
     updateStatus: { en: "Update status", ar: "تحديث الحالة" },
     driverNotes: { en: "Driver notes", ar: "ملاحظات السائق" },
+  },
+  help: {
+    nav: { en: "Help", ar: "المساعدة" },
+    title: { en: "Help Center", ar: "مركز المساعدة" },
+    subtitle: {
+      en: "Guides for using RTD — written for your role.",
+      ar: "أدلّة لاستخدام RTD — مكتوبة لدورك.",
+    },
+    searchPlaceholder: { en: "Search topics…", ar: "ابحث في المواضيع…" },
+    noResults: { en: "No topics match your search.", ar: "لا توجد مواضيع تطابق بحثك." },
+    empty: { en: "No help topics are available yet.", ar: "لا توجد مواضيع مساعدة متاحة بعد." },
+    backToTopics: { en: "All topics", ar: "كل المواضيع" },
+    notFound: {
+      en: "This help topic wasn't found, or isn't available for your role.",
+      ar: "لم يُعثر على هذا الموضوع، أو أنه غير متاح لدورك.",
+    },
+    readMore: { en: "Open", ar: "فتح" },
+    imagePending: {
+      en: "Screenshot coming soon",
+      ar: "لقطة الشاشة قريبًا",
+    },
   },
 } as const;
 
