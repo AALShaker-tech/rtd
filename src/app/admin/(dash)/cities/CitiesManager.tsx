@@ -14,6 +14,7 @@ import {
   setCityServiceClassPrice,
   setCityVehicleEnabled,
   setCityVehicleExampleModels,
+  setCityVehicleMaxBags,
   upsertAirport,
   upsertCity,
 } from "@/server/actions/city.actions";
@@ -23,7 +24,7 @@ interface AirportLoungeRow { loungeId: string; enabled: boolean; price: number; 
 interface AirportRow { code: string; nameEn: string; nameAr: string; terminals: string[]; timezone: string | null; utcOffsetMinutes: number; active: boolean; lounges: AirportLoungeRow[] }
 interface ServiceRow { stepType: string; price: number | null; enabled: boolean }
 interface LoungeRow { loungeType: string; price: number | null; enabled: boolean }
-interface VehicleRow { category: string; enabled: boolean; exampleModels: string | null }
+interface VehicleRow { category: string; enabled: boolean; exampleModels: string | null; maxBags: number | null }
 interface ClassPriceRow { stepType: string; category: string; price: number }
 interface CityRow {
   code: string; nameEn: string; nameAr: string; country: string; active: boolean; isOrigin: boolean;
@@ -523,6 +524,7 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
               enabled={row?.enabled ?? true}
               exampleModels={row?.exampleModels ?? ""}
               defaultExampleModels={v.exampleModels}
+              maxBags={row?.maxBags ?? null}
             />
           );
         })}
@@ -531,12 +533,13 @@ function VehicleAvailability({ cityCode, rows, vehicles }: { cityCode: string; r
   );
 }
 
-function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, defaultExampleModels }: { cityCode: string; category: string; label: string; enabled: boolean; exampleModels: string; defaultExampleModels: string }) {
+function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, defaultExampleModels, maxBags }: { cityCode: string; category: string; label: string; enabled: boolean; exampleModels: string; defaultExampleModels: string; maxBags: number | null }) {
   const { t, pick, locale } = useI18n();
   const ar = locale === "ar";
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [models, setModels] = useState(exampleModels);
+  const [bags, setBags] = useState(maxBags != null ? String(maxBags) : "");
   const [busy, setBusy] = useState(false);
 
   async function toggle(v: boolean) {
@@ -550,6 +553,8 @@ function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, d
   async function saveModels() {
     setBusy(true);
     await setCityVehicleExampleModels(cityCode, category, models.trim() === "" ? null : models);
+    const n = parseInt(bags, 10);
+    await setCityVehicleMaxBags(cityCode, category, bags.trim() === "" || Number.isNaN(n) ? null : n);
     setBusy(false);
     router.refresh();
   }
@@ -570,6 +575,15 @@ function VehicleToggleRow({ cityCode, category, label, enabled, exampleModels, d
           placeholder={defaultExampleModels || (ar ? "أمثلة السيارات" : "example models")}
           title={ar ? "أمثلة السيارات لهذه المدينة (فارغ = الافتراضي)" : "Example models for this city (blank = default)"}
           className="min-w-0 flex-1 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
+        />
+        <input
+          type="number"
+          min={0}
+          value={bags}
+          onChange={(e) => setBags(e.target.value)}
+          placeholder={ar ? "الحقائب" : "bags"}
+          title={ar ? "الحد الأقصى للحقائب في هذه المدينة (فارغ = لا يظهر)" : "Max luggage for this city (blank = hidden)"}
+          className="w-20 shrink-0 rounded-lg border border-charcoal/15 px-2 py-1 text-sm"
         />
         <button onClick={saveModels} disabled={busy} className="btn-dark px-3 py-1 text-xs">{pick(t.pricing.save)}</button>
       </div>

@@ -15,7 +15,7 @@ import { vehicleName, defaultVehicleCategory } from "@/lib/vehicles";
 import { computeStepPrice, formatPrice } from "@/lib/pricing";
 import { hasCityPricing, pricedVehicleClasses } from "@/lib/availability";
 import { validateStep, validateVehicleCapacity, totalVehicleCapacity } from "@/lib/validation/journey";
-import { PeopleIcon } from "@/components/ui/Glyphs";
+import { PeopleIcon, LuggageIcon } from "@/components/ui/Glyphs";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { DateField, TimeField } from "@/components/ui/DateTimeField";
 import type { CarCategory } from "@/lib/domain";
@@ -66,6 +66,9 @@ export function StepCard({
   const disabledForCity = new Set(catalog.city(step.city)?.disabledVehicles ?? []);
   // Per-city example-models overrides (fall back to the class default when unset).
   const exampleOverrides = catalog.city(step.city)?.vehicleExampleModels ?? {};
+  // Per-city max luggage per class — shown under the passenger capacity. Only
+  // classes the city has configured appear (there is no global default).
+  const maxBagsByCat = catalog.city(step.city)?.vehicleMaxBags ?? {};
   const priced = new Set(pricedVehicleClasses(config, step.city, step.stepType));
   const cityVehicles = vehicles.filter((v) => !disabledForCity.has(v.category) && (!priceKnown || priced.has(v.category)));
   const selVeh = step.carCategory ?? defaultVehicleCategory(cityVehicles);
@@ -167,6 +170,9 @@ export function StepCard({
                   <span className="block font-semibold text-charcoal">{vehicleName(v, locale)}</span>
                   <span className="block text-[0.7rem] text-charcoal/50">{exampleOverrides[v.category] || v.exampleModels}</span>
                   <span className="mt-1 flex items-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.passengers)}><PeopleIcon size={12} /> {ar ? `حتى ${v.maxPassengers}` : `up to ${v.maxPassengers}`}</span>
+                  {maxBagsByCat[v.category] != null && (
+                    <span className="mt-0.5 flex items-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.bags)}><LuggageIcon size={12} /> {ar ? `حتى ${maxBagsByCat[v.category]}` : `up to ${maxBagsByCat[v.category]}`}</span>
+                  )}
                   <span className={`mt-2 block text-sm font-semibold ${sel ? "text-gold-dark" : "text-charcoal/60"}`}>
                     {formatPrice(unit, locale)}{f.chauffeur ? ` ${pick(t.builder.perDay)}` : ""}
                   </span>
@@ -236,6 +242,9 @@ export function StepCard({
                       >
                         <span className="block font-semibold text-charcoal">{vehicleName(cv, locale)}</span>
                         <span className="flex items-center justify-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.passengers)}><PeopleIcon size={12} /> {ar ? `حتى ${cv.maxPassengers}` : `up to ${cv.maxPassengers}`}</span>
+                        {maxBagsByCat[cv.category] != null && (
+                          <span className="mt-0.5 flex items-center justify-center gap-1 text-[0.7rem] text-charcoal/40" title={pick(t.fields.bags)}><LuggageIcon size={12} /> {ar ? `حتى ${maxBagsByCat[cv.category]}` : `up to ${maxBagsByCat[cv.category]}`}</span>
+                        )}
                         <span className={cn("mt-1 block text-sm font-semibold", sel ? "text-gold-dark" : "text-charcoal/60")}>
                           {formatPrice(priceFor({ carCategory: cv.category as typeof step.carCategory, additionalVehicles: [] }), locale)}
                         </span>
