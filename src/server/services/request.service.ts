@@ -9,6 +9,8 @@ import { parsePhone } from "@/lib/phone";
 import { logAudit } from "./audit.service";
 import { getPricingConfig } from "./pricing.service";
 import { getStepMap } from "./step.service";
+import { getCityCatalog } from "./city.service";
+import { catalogCity } from "@/lib/catalog";
 import { isTargetVerified } from "./verification.service";
 import { sendOpsAlert } from "./notify.service";
 import { buildNewRequestAlert, buildNewRequestEmailBody, type NewRequestServiceLine } from "@/lib/ops-alert";
@@ -93,14 +95,30 @@ export async function createRequest(input: CreateRequestInput) {
   const stepMap = await getStepMap();
   // Authoritative server-side pricing — never trust the client estimate.
   const pricingConfig = await getPricingConfig();
+  // City catalog (airports per city) — used to auto-fill the airport for
+  // single-airport cities, which the builder never prompts for.
+  const cityCatalog = await getCityCatalog();
   // Only enforce price-driven availability when pricing actually loaded; if the
   // config is the empty fallback, don't drop everything (fail open).
   const priceKnown = hasCityPricing(pricingConfig);
+  // A city's only airport, when it has exactly one; otherwise undefined (either
+  // no airport, or a genuine choice the customer must have made explicitly).
+  const soleAirport = (cityCode: string | null | undefined): string | undefined => {
+    const airports = catalogCity(cityCatalog, cityCode)?.airports ?? [];
+    return airports.length === 1 ? airports[0].code : undefined;
+  };
   const steps = input.steps
-    .map((s) => ({
-      ...s,
-      def: stepMap[s.stepType] ? toStepDef(stepMap[s.stepType]) : getStep(s.stepType),
-    }))
+    .map((s) => {
+      const def = stepMap[s.stepType] ? toStepDef(stepMap[s.stepType]) : getStep(s.stepType);
+      const f = def?.features;
+      // Auto-fill the airport for airport-involving steps (every service except
+      // the in-city chauffeur) when the city has a single airport and none was
+      // chosen — the builder auto-selects it in the UI but never persists it, so
+      // fill it here so the driver record and ops alert always carry the airport.
+      const usesAirport = !!f && (f.transfer || f.assistance || f.flight);
+      const airport = s.airport ?? (usesAirport ? soleAirport(s.city) : undefined);
+      return { ...s, def, airport };
+    })
     // Price-driven availability: a non-skipped service with no effective price
     // (0 / unset) is not actually offered — treat it as skipped so it can never
     // be booked, priced, or spawn a driver task, even from a stale client.
