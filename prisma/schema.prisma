@@ -447,6 +447,9 @@ model CityVehiclePricing {
   // Per-city override of the vehicle class's example models text. Null/empty →
   // fall back to VehicleCategory.exampleModels (the global default).
   exampleModels String?
+  // Per-city maximum luggage (suitcases) this class can carry. Null → no luggage
+  // figure is shown for the class in this city (there is no global default).
+  maxBags       Int?
 
   @@unique([cityCode, category])
 }

@@ -47,6 +47,9 @@ export interface CatalogCity {
   /** Per-city override of a vehicle class's example-models text (category → text).
    *  Absent categories fall back to the class's global exampleModels. */
   vehicleExampleModels: Record<string, string>;
+  /** Per-city maximum luggage per vehicle class (category → max bags). Absent
+   *  categories have no configured luggage figure (nothing is shown). */
+  vehicleMaxBags: Record<string, number>;
 }
 
 export interface Catalog {
@@ -66,6 +69,7 @@ export const FALLBACK_CATALOG: Catalog = {
     disabledSteps: [],
     disabledVehicles: [],
     vehicleExampleModels: {},
+    vehicleMaxBags: {},
   })),
 };
 

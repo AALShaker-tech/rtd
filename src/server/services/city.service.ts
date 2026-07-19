@@ -40,8 +40,10 @@ export async function getCityCatalog(): Promise<Catalog> {
       ];
       const disabledVehicles = c.vehiclePricing.filter((v) => !v.enabled).map((v) => v.category);
       const vehicleExampleModels: Record<string, string> = {};
+      const vehicleMaxBags: Record<string, number> = {};
       for (const v of c.vehiclePricing) {
         if (v.exampleModels && v.exampleModels.trim() !== "") vehicleExampleModels[v.category] = v.exampleModels;
+        if (v.maxBags != null) vehicleMaxBags[v.category] = v.maxBags;
       }
       return {
         code: c.code,
@@ -72,6 +74,7 @@ export async function getCityCatalog(): Promise<Catalog> {
         disabledSteps,
         disabledVehicles,
         vehicleExampleModels,
+        vehicleMaxBags,
       };
     }),
   };

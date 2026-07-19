@@ -31,6 +31,14 @@ import {
 
 const prisma = new PrismaClient();
 
+// Default max luggage (suitcases) per vehicle class, used to seed each city's
+// per-city luggage figure. Roughly tracks boot size, not passenger count.
+const DEFAULT_VEHICLE_MAX_BAGS: Record<string, number> = {
+  ECONOMY: 3,
+  VIP: 6,
+  VVIP: 2,
+};
+
 async function main() {
   console.log("🌱 Seeding RTD…");
 
@@ -190,6 +198,17 @@ async function main() {
         where: { cityCode_loungeType: { cityCode: c.code, loungeType } },
         update: {},
         create: { cityCode: c.code, loungeType, price },
+      });
+    }
+    // Per-city max luggage per vehicle class. Seeded from a sensible default so a
+    // fresh database shows a luggage figure; the admin can override it per city.
+    for (const v of VEHICLES) {
+      const maxBags = DEFAULT_VEHICLE_MAX_BAGS[v.category];
+      if (maxBags == null) continue;
+      await prisma.cityVehiclePricing.upsert({
+        where: { cityCode_category: { cityCode: c.code, category: v.category } },
+        update: {},
+        create: { cityCode: c.code, category: v.category, maxBags },
       });
     }
   }

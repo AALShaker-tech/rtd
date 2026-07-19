@@ -304,6 +304,28 @@ export async function setCityVehicleExampleModels(cityCode: string, category: st
   return { ok: true as const };
 }
 
+/** Per-city maximum luggage (suitcases) a vehicle class can carry. A null/blank
+ *  or non-positive value clears the figure so nothing is shown for the class in
+ *  this city. Never changes availability. */
+export async function setCityVehicleMaxBags(cityCode: string, category: string, maxBags: number | null) {
+  const s = await requireAdmin();
+  const value = maxBags != null && Number.isFinite(maxBags) && maxBags > 0 ? Math.floor(maxBags) : null;
+  await prisma.cityVehiclePricing.upsert({
+    where: { cityCode_category: { cityCode, category } },
+    update: { maxBags: value },
+    create: { cityCode, category, maxBags: value },
+  });
+  await logAudit({
+    action: "CITY_VEHICLE_MAX_BAGS_SET",
+    entity: "CityVehiclePricing",
+    entityId: `${cityCode}:${category}`,
+    actorId: s.userId,
+    metadata: { maxBags: value },
+  });
+  revalidatePath("/admin/cities");
+  return { ok: true as const };
+}
+
 export async function setCityLoungePrice(
   cityCode: string,
   loungeType: string,

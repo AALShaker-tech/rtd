@@ -96,6 +96,24 @@ describe("getCityCatalog — vehicle (per-city) availability", () => {
     const catalog = await getCityCatalog();
     expect(catalog.cities[0].disabledVehicles).toEqual([]);
   });
+
+  it("surfaces a per-city vehicle max-bags figure, and only for configured classes", async () => {
+    cityFindMany.mockResolvedValue([
+      city({ vehiclePricing: [{ category: "VIP", enabled: true, maxBags: 6 }, { category: "VVIP", enabled: true, maxBags: null }] }),
+    ]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].vehicleMaxBags).toEqual({ VIP: 6 });
+  });
+
+  it("leaves vehicleMaxBags empty when no class has a luggage figure", async () => {
+    cityFindMany.mockResolvedValue([city()]);
+    serviceFindMany.mockResolvedValue([]);
+
+    const catalog = await getCityCatalog();
+    expect(catalog.cities[0].vehicleMaxBags).toEqual({});
+  });
 });
 
 describe("getCityCatalog — airport lounges", () => {
