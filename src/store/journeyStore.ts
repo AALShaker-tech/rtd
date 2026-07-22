@@ -139,10 +139,10 @@ interface JourneyDraftData {
   phoneVerified: boolean;
   emailVerified: boolean;
   /**
-   * Whether the return services have already been seeded from the outbound
-   * selections. The mirror runs exactly once (on first entry to the Return
-   * phase); after that the return journey is independent and is never
-   * auto-overwritten again — only the explicit "match outbound" action re-copies.
+   * Whether the customer has explicitly copied their outbound selections into
+   * the return journey. The return leg is never seeded automatically — it
+   * starts blank and the customer chooses their return services from scratch.
+   * This flag flips only when they opt in via the "copy my outbound" action.
    */
   returnMirrored: boolean;
   /** Epoch ms of last user activity — drives draft expiry. */
@@ -158,10 +158,11 @@ interface JourneyState extends JourneyDraftData {
   initFlow: (destination?: string, stepDefs?: StepDef[]) => void;
   startBlank: () => void;
   /**
-   * Copy the outbound service selections into their return counterparts. Called
-   * once automatically on first entry to the Return phase, and again only when
-   * the customer explicitly asks to re-match. Trip-derived fields (dates, times,
-   * passengers, bags) are NOT copied — they stay computed for the return side.
+   * Copy the outbound service selections into their return counterparts. Only
+   * ever called when the customer explicitly opts in ("copy my outbound") — the
+   * return journey is never seeded automatically. Trip-derived fields (dates,
+   * times, passengers, bags) are NOT copied — they stay computed for the return
+   * side.
    */
   mirrorReturnFromOutbound: () => void;
   updateStep: (stepType: StepType, patch: Partial<JourneyStepInput>) => void;
