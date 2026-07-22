@@ -31,8 +31,9 @@ const today = () => new Date().toISOString().slice(0, 10);
  *   1. Outbound from Riyadh — the departure-side Riyadh services (steps 1–2)
  *   2. At Your Destination  — the departure-side destination services (steps 3–5, incl. chauffeur)
  *   3. Your Return          — every return-side service (steps 6–9)
- * The Return phase is a review/customization phase: it's seeded once from the
- * outbound selections (see the store's mirror) and is only shown for round trips.
+ * The Return phase starts blank — the customer chooses their return services
+ * from scratch (copying the outbound selections is an opt-in convenience, see
+ * the store's mirror). It is only shown for round trips.
  */
 type PhaseKey = "outbound" | "destination" | "return";
 
@@ -86,7 +87,6 @@ export default function JourneyPage() {
   const tripInfo = useJourneyStore((s) => s.tripInfo);
   const initFlow = useJourneyStore((s) => s.initFlow);
   const updateStep = useJourneyStore((s) => s.updateStep);
-  const returnMirrored = useJourneyStore((s) => s.returnMirrored);
   const mirrorReturn = useJourneyStore((s) => s.mirrorReturnFromOutbound);
   const draftExpired = useJourneyStore((s) => s.draftExpired);
   const clearExpiredNotice = useJourneyStore((s) => s.clearExpiredNotice);
@@ -151,15 +151,9 @@ export default function JourneyPage() {
     window.scrollTo(0, 0);
   }, [stage, phaseIdx]);
 
-  // Seed the return services from the outbound selections exactly once, the
-  // first time the customer reaches the Return phase. After that the return
-  // journey is independent — never auto-overwritten.
-  useEffect(() => {
-    if (stage === "phase" && phase?.isReturn && !returnMirrored) {
-      mirrorReturn();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, phase?.key, returnMirrored]);
+  // The return journey is never seeded from the outbound selections. The
+  // customer chooses their return services from scratch; copying the outbound
+  // choices is an explicit, opt-in action (see ReturnMirrorBar).
 
   function startFlow() {
     initFlow(destination ?? undefined, flowSteps);
@@ -409,20 +403,24 @@ function PhaseServiceCard({ def }: { def: StepDef }) {
   );
 }
 
-/** Notice + explicit "re-match my outbound journey" action for the Return phase. */
+/**
+ * Optional convenience for the Return phase. The return journey starts blank —
+ * the customer picks their return services from scratch — but if they'd rather
+ * mirror their outbound choices, this offers a one-tap copy.
+ */
 function ReturnMirrorBar({ onRematch }: { onRematch: () => void }) {
   const { t, pick } = useI18n();
   return (
     <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-gold/40 bg-gold-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="flex items-start gap-2 text-xs leading-relaxed text-charcoal/70">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a8854a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0"><path d="M21 12a9 9 0 11-3-6.7M21 4v4h-4" /></svg>
-        {pick(t.builder.returnMirroredNote)}
+        {pick(t.builder.returnChooseNote)}
       </p>
       <button
         onClick={() => { if (window.confirm(pick(t.builder.matchOutboundConfirm))) onRematch(); }}
         className="btn-outline shrink-0 whitespace-nowrap px-4 py-2 text-xs"
       >
-        {pick(t.builder.matchOutboundAgain)}
+        {pick(t.builder.matchOutbound)}
       </button>
     </div>
   );
