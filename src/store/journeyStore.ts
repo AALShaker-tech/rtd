@@ -139,10 +139,10 @@ interface JourneyDraftData {
   phoneVerified: boolean;
   emailVerified: boolean;
   /**
-   * Whether the return services have already been seeded from the outbound
-   * selections. The mirror runs exactly once (on first entry to the Return
-   * phase); after that the return journey is independent and is never
-   * auto-overwritten again — only the explicit "match outbound" action re-copies.
+   * Whether the customer has explicitly copied their outbound selections into
+   * the return journey. The return leg is never seeded automatically — it
+   * starts blank and the customer chooses their return services from scratch.
+   * This flag flips only when they opt in via the "copy my outbound" action.
    */
   returnMirrored: boolean;
   /** Epoch ms of last user activity — drives draft expiry. */
@@ -158,10 +158,11 @@ interface JourneyState extends JourneyDraftData {
   initFlow: (destination?: string, stepDefs?: StepDef[]) => void;
   startBlank: () => void;
   /**
-   * Copy the outbound service selections into their return counterparts. Called
-   * once automatically on first entry to the Return phase, and again only when
-   * the customer explicitly asks to re-match. Trip-derived fields (dates, times,
-   * passengers, bags) are NOT copied — they stay computed for the return side.
+   * Copy the outbound service selections into their return counterparts. Only
+   * ever called when the customer explicitly opts in ("copy my outbound") — the
+   * return journey is never seeded automatically. Trip-derived fields (dates,
+   * times, passengers, bags) are NOT copied — they stay computed for the return
+   * side.
    */
   mirrorReturnFromOutbound: () => void;
   updateStep: (stepType: StepType, patch: Partial<JourneyStepInput>) => void;
@@ -313,7 +314,7 @@ export const useJourneyStore = create<JourneyState>()(
     }),
     {
       name: "rtd-journey-draft",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       // Don't hydrate during SSR; the builder triggers rehydration on mount so
       // the server and first client render always match (no hydration flash).
@@ -331,6 +332,41 @@ export const useJourneyStore = create<JourneyState>()(
         returnMirrored: s.returnMirrored,
         lastTouched: s.lastTouched,
       }),
+      // Migrate older persisted drafts to the current shape before merge runs.
+      // v1 drafts were built while the Return phase auto-mirrored the outbound
+      // selections, so a saved v1 draft still carries those inherited return
+      // choices. Reset every mirrored return step back to its blank default so
+      // the customer chooses their return from scratch — the rest of the draft
+      // (outbound selections, trip info, customer) is preserved.
+      migrate: (persisted, version) => {
+        const p = persisted as Partial<JourneyDraftData> | undefined;
+        if (!p) return p;
+        if (version < 2 && Array.isArray(p.steps)) {
+          p.steps = p.steps.map((s) => {
+            if (!RETURN_MIRROR[s.stepType]) return s; // not a mirrored return step
+            const def = s.def ?? getStep(s.stepType);
+            if (!def) return s;
+            // Reset exactly the service selections the old mirror copied, back
+            // to their blank defaults. Trip-derived fields (passengers, bags,
+            // time, city) were never mirrored, so they're left untouched.
+            const blank = blankStep(def);
+            return {
+              ...s,
+              skipped: blank.skipped,
+              serviceType: blank.serviceType,
+              carCategory: blank.carCategory,
+              loungeType: undefined,
+              airport: undefined,
+              homeAddress: undefined,
+              hotelName: undefined,
+              notes: undefined,
+              additionalVehicles: undefined,
+            };
+          });
+          p.returnMirrored = false;
+        }
+        return p;
+      },
       // Drop a stale draft on rehydrate and raise the expiry notice; otherwise
       // restore it verbatim over the fresh in-memory defaults.
       merge: (persisted, current) => {

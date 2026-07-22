@@ -182,15 +182,15 @@ export const dict = {
     viewOptions: { en: "View options", ar: "عرض الخيارات" },
     hideOptions: { en: "Hide options", ar: "إخفاء الخيارات" },
     removeFromJourney: { en: "Remove from journey", ar: "إزالة من الرحلة" },
-    // Return phase — mirror controls
-    returnMirroredNote: {
-      en: "Your return services were copied from your outbound journey. Any change here won't affect the outbound trip.",
-      ar: "تم نسخ خدمات عودتك من رحلة الذهاب. أي تعديل هنا لن يؤثر على رحلة الذهاب.",
+    // Return phase — opt-in copy control
+    returnChooseNote: {
+      en: "Choose your return services below. They start fresh and are separate from your outbound journey — or copy your outbound choices to start from.",
+      ar: "اختر خدمات عودتك أدناه. تبدأ فارغة ومنفصلة عن رحلة الذهاب — أو انسخ اختيارات الذهاب للبدء منها.",
     },
-    matchOutboundAgain: { en: "Match my outbound journey again", ar: "طابق رحلة الذهاب مرة أخرى" },
+    matchOutbound: { en: "Copy my outbound journey", ar: "انسخ رحلة الذهاب" },
     matchOutboundConfirm: {
-      en: "Replace your return selections with a fresh copy of your outbound journey? Your current return edits will be lost.",
-      ar: "استبدال اختيارات العودة بنسخة جديدة من رحلة الذهاب؟ ستفقد تعديلات العودة الحالية.",
+      en: "Copy your outbound journey into your return selections? This will replace any return choices you've already made.",
+      ar: "نسخ رحلة الذهاب إلى اختيارات العودة؟ سيحل هذا محل أي اختيارات عودة قمت بها.",
     },
     oneWayTitle: { en: "One-way trip", ar: "رحلة ذهاب فقط" },
     oneWayNote: {
